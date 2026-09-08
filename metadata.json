@@ -1,0 +1,6 @@
+{
+  "name": "CentralBo",
+  "description": "Plataforma SaaS Marketplace Multi-Tenant y PWA de CentralBo",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
