@@ -23,18 +23,18 @@ export const Footer: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center justify-center gap-4 text-xs">
-          <span className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300 font-medium">
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+          <span className="flex items-center gap-1.5 text-slate-600 dark:text-slate-400 font-medium">
+            <ShieldCheck className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
             <span>Conexión Segura & Datos Protegidos</span>
           </span>
           <span className="text-slate-300 dark:text-slate-700 select-none">•</span>
-          <span className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300 font-medium">
-            <Globe className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-            <span>Web Responsive (Móvil / Tablet / PC)</span>
+          <span className="flex items-center gap-1.5 text-slate-600 dark:text-slate-400 font-medium">
+            <Globe className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
+            <span>Web Responsive</span>
           </span>
           <span className="text-slate-300 dark:text-slate-700 select-none">•</span>
-          <span className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300 font-medium">
-            <Smartphone className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+          <span className="flex items-center gap-1.5 text-slate-600 dark:text-slate-400 font-medium">
+            <Smartphone className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
             <span>PWA Instalable</span>
           </span>
         </div>

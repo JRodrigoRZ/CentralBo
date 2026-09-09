@@ -3,6 +3,8 @@ import {
   ShieldCheck,
   Store as StoreIcon,
   ShoppingBag,
+  Utensils,
+  Sparkles,
   ExternalLink,
   ArrowRight,
   UserCheck,
@@ -18,140 +20,158 @@ const STORE_TYPE_LABELS: Record<string, string> = {
   general: 'Comercio General',
 };
 
+const STORE_TYPE_ICONS: Record<string, React.ElementType> = {
+  restaurante: Utensils,
+  moda: ShoppingBag,
+  servicios: Sparkles,
+  general: StoreIcon,
+};
+
 export const PortalHome: React.FC = () => {
   const { user, profile, signOut } = useAuth();
   const { navigate } = useRouter();
 
   return (
-    <div className="w-full space-y-8 sm:space-y-10">
-      {/* Banner Principal Comercial */}
+    <div className="w-full space-y-12 sm:space-y-16">
+      {/* 2. HERO — Integrado directamente en el canvas, sin macro-card */}
       <section
         id="centralbo-hero-banner"
-        className="relative overflow-hidden rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 sm:p-8 lg:p-10 shadow-sm transition-colors"
+        className="pt-6 pb-4 sm:pt-10 sm:pb-8 md:pt-14 md:pb-10 text-center max-w-3xl mx-auto px-4"
       >
-        <div className="relative z-10 max-w-3xl space-y-4">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/50 text-blue-700 dark:text-blue-300 text-xs font-semibold">
-            <StoreIcon className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-            <span>Comercio Digital en Bolivia</span>
-          </div>
+        {/* Badge superior */}
+        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 text-xs font-medium mb-6 transition-colors">
+          <StoreIcon className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+          <span>Comercio Digital en Bolivia</span>
+        </div>
 
-          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white leading-tight">
-            CentralBo — Plataforma Integral de Comercio
-          </h1>
+        {/* Título de alto impacto tipográfico */}
+        <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-slate-900 dark:text-white leading-[1.16] mb-5">
+          CentralBo — Plataforma Integral de Comercio
+        </h1>
 
-          <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 leading-relaxed max-w-2xl">
-            Crea tu tienda online, gestiona tu catálogo de productos y servicios, atiende a tus clientes y administra pedidos de forma ágil y moderna.
-          </p>
+        {/* Descripción con balance de lectura */}
+        <p className="text-base sm:text-lg text-slate-600 dark:text-slate-300 leading-relaxed max-w-2xl mx-auto mb-8 font-normal">
+          Crea tu tienda online, gestiona tu catálogo de productos y servicios, atiende a tus clientes y administra pedidos de forma ágil y moderna.
+        </p>
 
-          {/* Tarjetas rápidas de sesión */}
-          <div className="pt-2 flex flex-wrap items-center gap-3">
-            {user ? (
-              <>
-                <div className="px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-800 text-xs flex items-center gap-2">
-                  <UserCheck className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                  <span className="text-slate-500 dark:text-slate-400">Sesión:</span>
-                  <span className="font-semibold text-slate-900 dark:text-white">{user.email}</span>
-                </div>
-
-                {profile === 'superadmin' && (
-                  <button
-                    onClick={() => navigate('/superadmin')}
-                    className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs flex items-center gap-1.5 transition cursor-pointer"
-                  >
-                    <ShieldCheck className="w-4 h-4" />
-                    <span>Panel SuperAdmin</span>
-                  </button>
-                )}
-
-                {profile === 'store_admin' && user.tenantId && (
-                  <button
-                    onClick={() => navigate(`/admin/${user.tenantId}`)}
-                    className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs flex items-center gap-1.5 transition cursor-pointer"
-                  >
-                    <StoreIcon className="w-4 h-4" />
-                    <span>Panel de Mi Tienda</span>
-                  </button>
-                )}
-
-                <button
-                  onClick={() => signOut()}
-                  className="px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium border border-slate-200 dark:border-slate-700 transition cursor-pointer"
-                >
-                  Cerrar Sesión
-                </button>
-              </>
-            ) : (
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => navigate('/login')}
-                  className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shadow-sm flex items-center gap-2 transition cursor-pointer"
-                >
-                  <span>Iniciar Sesión</span>
-                  <ArrowRight className="w-4 h-4" />
-                </button>
+        {/* CTA / Acciones de sesión centradas */}
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          {user ? (
+            <>
+              <div className="px-4 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs flex items-center gap-2 shadow-xs">
+                <UserCheck className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                <span className="text-slate-500 dark:text-slate-400">Sesión:</span>
+                <span className="font-semibold text-slate-900 dark:text-white">{user.email}</span>
               </div>
-            )}
-          </div>
+
+              {profile === 'superadmin' && (
+                <button
+                  onClick={() => navigate('/superadmin')}
+                  className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs flex items-center gap-1.5 transition cursor-pointer"
+                >
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>Panel SuperAdmin</span>
+                </button>
+              )}
+
+              {profile === 'store_admin' && user.tenantId && (
+                <button
+                  onClick={() => navigate(`/admin/${user.tenantId}`)}
+                  className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs flex items-center gap-1.5 transition cursor-pointer"
+                >
+                  <StoreIcon className="w-4 h-4" />
+                  <span>Panel de Mi Tienda</span>
+                </button>
+              )}
+
+              <button
+                onClick={() => signOut()}
+                className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium border border-slate-200 dark:border-slate-700 transition cursor-pointer"
+              >
+                Cerrar Sesión
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={() => navigate('/login')}
+              className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shadow-xs hover:shadow transition cursor-pointer flex items-center gap-2 active:scale-[0.98]"
+            >
+              <span>Iniciar Sesión</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </section>
 
-      {/* Catálogo de Tiendas Activas */}
+      {/* Divisor sutil entre Hero y Sección de Comercios */}
+      <div className="w-full h-px bg-slate-200/80 dark:bg-slate-800/80" />
+
+      {/* 3. SECCIÓN DE COMERCIOS — Directamente en el canvas sin macro-card exterior */}
       <section
         id="public-stores-catalog-section"
-        className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 sm:p-7 space-y-4 shadow-sm transition-colors"
+        className="w-full space-y-6"
       >
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-200 dark:border-slate-800">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-2">
           <div>
-            <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white">
+            <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
               Comercios en CentralBo
             </h2>
-            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
               Explora las tiendas disponibles en la plataforma y descubre sus productos y servicios:
             </p>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {BASELINE_STORES.map((store) => (
-            <div
-              key={store.id}
-              className="p-5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800/80 flex flex-col justify-between space-y-4 hover:border-slate-300 dark:hover:border-slate-700 transition shadow-xs"
-            >
-              <div>
-                <div className="flex items-center justify-between gap-2 mb-2">
-                  <span className="text-base font-bold text-slate-900 dark:text-white">{store.name}</span>
-                  <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/30 capitalize">
-                    {store.status === 'activo' ? 'Activo' : store.status}
-                  </span>
-                </div>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
-                  {STORE_TYPE_LABELS[store.store_type] || store.store_type}
-                </p>
-                <div className="text-xs text-blue-600 dark:text-blue-400 font-medium">
-                  centralbo.com/{store.slug}
-                </div>
-              </div>
+        {/* Grid equilibrada: 1 col (móvil), 2 cols (intermedio), 4 cols (escritorio amplio) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+          {BASELINE_STORES.map((store) => {
+            const Icon = STORE_TYPE_ICONS[store.store_type] || StoreIcon;
 
-              <div className="flex items-center gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
-                <button
-                  onClick={() => navigate(`/tienda/${store.slug}`)}
-                  className="flex-1 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer shadow-xs"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  <span>Ver Tienda</span>
-                </button>
-                {user?.profile === 'superadmin' && (
+            return (
+              <div
+                key={store.id}
+                className="group rounded-2xl bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 p-5 sm:p-6 flex flex-col justify-between transition-all duration-200 hover:border-slate-300 dark:hover:border-slate-700 hover:shadow-md hover:-translate-y-0.5"
+              >
+                <div>
+                  {/* Icono de categoría comercial refinado */}
+                  <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700/60 flex items-center justify-center text-slate-700 dark:text-slate-300 mb-4 transition-colors group-hover:text-blue-600 dark:group-hover:text-blue-400">
+                    <Icon className="w-5 h-5" />
+                  </div>
+
+                  {/* Categoría comercial */}
+                  <span className="text-xs font-medium text-slate-500 dark:text-slate-400 tracking-wide block mb-1">
+                    {STORE_TYPE_LABELS[store.store_type] || store.store_type}
+                  </span>
+
+                  {/* Nombre del comercio */}
+                  <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white leading-snug tracking-tight">
+                    {store.name}
+                  </h3>
+                </div>
+
+                {/* Acciones de la tarjeta */}
+                <div className="pt-5 mt-6 border-t border-slate-100 dark:border-slate-800/80 flex items-center gap-2">
                   <button
-                    onClick={() => navigate(`/admin/${store.id}`)}
-                    className="px-3.5 py-2.5 rounded-lg bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs font-semibold transition cursor-pointer"
-                    title="Administrar como SuperAdmin"
+                    onClick={() => navigate(`/tienda/${store.slug}`)}
+                    className="flex-1 py-2.5 px-3 rounded-xl border border-slate-200 dark:border-slate-700/80 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer group/btn"
                   >
-                    Admin
+                    <span>Ver Tienda</span>
+                    <ExternalLink className="w-3.5 h-3.5 text-slate-400 dark:text-slate-400 group-hover/btn:text-slate-600 dark:group-hover/btn:text-slate-200 transition-colors" />
                   </button>
-                )}
+
+                  {user?.profile === 'superadmin' && (
+                    <button
+                      onClick={() => navigate(`/admin/${store.id}`)}
+                      className="py-2.5 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-medium transition cursor-pointer"
+                      title="Administrar como SuperAdmin"
+                    >
+                      Admin
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </section>
     </div>
