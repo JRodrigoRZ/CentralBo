@@ -19,11 +19,11 @@ export const SuperAdminSettings: React.FC = () => {
         <h2 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
           <span>Configuración Global</span>
           <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
-            Parámetros del MVP
+            Parámetros de Plataforma
           </span>
         </h2>
         <p className="text-xs text-slate-400 mt-0.5">
-          Parámetros globales del sistema aprobados para el funcionamiento de CentralBo.
+          Parámetros globales y directivas de funcionamiento del ecosistema CentralBo.
         </p>
       </div>
 
@@ -43,7 +43,7 @@ export const SuperAdminSettings: React.FC = () => {
             </div>
             <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950/70 border border-slate-800">
               <span className="text-slate-400">Versión de la Plataforma</span>
-              <span className="font-mono text-cyan-300">v1.3.0 (Módulo 3)</span>
+              <span className="font-mono text-cyan-300">v1.3.0</span>
             </div>
             <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950/70 border border-slate-800">
               <span className="text-slate-400">Arquitectura</span>
@@ -128,10 +128,12 @@ export const SuperAdminSettings: React.FC = () => {
         </div>
       </div>
 
-      <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-400">
-        <p>
-          <strong className="text-white">Delimitación del Módulo 3:</strong> La configuración global únicamente incluye los parámetros definidos para el MVP de CentralBo, evitando agregar configuraciones no especificadas.
-        </p>
+      <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-400 flex items-center justify-between">
+        <span>Parámetros de infraestructura y gobernanza de CentralBo en producción.</span>
+        <span className="text-emerald-400 font-medium flex items-center gap-1.5">
+          <CheckCircle2 className="w-3.5 h-3.5" />
+          Sistema Operativo
+        </span>
       </div>
     </div>
   );

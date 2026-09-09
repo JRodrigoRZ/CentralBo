@@ -19,9 +19,9 @@ export const SuperAdminActivity: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-800">
         <div>
           <h2 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
-            <span>Actividad Básica Global</span>
+            <span>Actividad General</span>
             <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-              Métricas MVP
+              En Tiempo Real
             </span>
           </h2>
           <p className="text-xs text-slate-400 mt-0.5">
@@ -138,11 +138,8 @@ export const SuperAdminActivity: React.FC = () => {
         </div>
       </div>
 
-      <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-400">
-        <p>
-          <strong className="text-white">Nota de Alcance:</strong> Esta sección refleja las estadísticas simples aprobadas para el MVP.
-          No incluye analíticas avanzadas, funnels de conversión, mapas de calor ni seguimiento publicitario.
-        </p>
+      <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-400 flex items-center justify-between">
+        <span>Resumen consolidado de interacciones, visitas y pedidos de los comercios registrados.</span>
       </div>
     </div>
   );

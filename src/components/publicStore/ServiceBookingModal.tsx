@@ -294,7 +294,7 @@ ${submittedAppointment.notes ? `Notas: ${submittedAppointment.notes}\n` : ''}
 
         {/* Flujo: Tienda → Servicio → Profesional → Fecha → Hora → Solicitud */}
         <div className="flex-1 overflow-y-auto space-y-5 pr-1 text-xs">
-          {/* Advertencia Mandatoria del Módulo 5 */}
+          {/* Advertencia de confirmación de cita */}
           <div className="rounded-xl bg-amber-500/10 border border-amber-500/30 p-3 flex items-start gap-2.5 text-amber-300">
             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
             <div className="text-[11px] leading-relaxed">

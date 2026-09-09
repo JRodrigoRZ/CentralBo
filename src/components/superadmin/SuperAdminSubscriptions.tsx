@@ -180,7 +180,7 @@ export const SuperAdminSubscriptions: React.FC = () => {
                   )}
 
                   <div className="mt-3 text-[11px] text-slate-500">
-                    * Registro informativo para el MVP. Las pasarelas automáticas de pago no están activas en esta versión.
+                    * Registro informativo de facturación y conciliación manual de suscripciones.
                   </div>
                 </div>
               )}

@@ -343,7 +343,7 @@ export const CatalogoConfigEspecifica: React.FC<CatalogoConfigEspecificaProps> =
             <span>Configuración Específica de Catálogo</span>
           </h2>
           <p className="text-xs text-slate-400 mt-0.5">
-            Módulo adaptativo para el modelo de negocio:{' '}
+            Configuración adaptada para el modelo de negocio:{' '}
             <strong className="text-indigo-300 uppercase">{store.store_type}</strong>
           </p>
         </div>

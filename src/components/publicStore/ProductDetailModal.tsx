@@ -240,7 +240,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     Bs {unitFinalPrice.toFixed(2)}
                   </span>
                   {hasOffer && previousPrice && (
-                    <span className="text-sm line-through text-slate-500 font-mono">
+                    <span className="text-sm line-through text-slate-400 font-mono select-none">
                       Bs {previousPrice.toFixed(2)}
                     </span>
                   )}
@@ -288,8 +288,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                             onClick={() => setSelectedSize(sz)}
                             className={`min-w-[44px] h-10 px-3 rounded-xl font-bold text-xs border transition cursor-pointer ${
                               selectedSize === sz
-                                ? 'bg-indigo-600 text-white border-indigo-500 shadow-md'
-                                : 'bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700'
+                                ? 'bg-blue-600 text-white border-blue-500 shadow-md'
+                                : 'bg-slate-950 border-slate-700 text-slate-200 hover:border-slate-500'
                             }`}
                           >
                             {sz}
@@ -427,27 +427,27 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 <div className="space-y-3 pt-3 border-t border-slate-800/80">
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800">
-                      <span className="text-[10px] text-slate-500 block">Duración:</span>
+                      <span className="text-[10px] text-slate-400 font-medium block">Duración:</span>
                       <span className="font-semibold text-slate-200 flex items-center gap-1 mt-0.5">
-                        <Clock className="w-3.5 h-3.5 text-indigo-400" />
+                        <Clock className="w-3.5 h-3.5 text-blue-400" />
                         <span>{duration} minutos</span>
                       </span>
                     </div>
 
-                    <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800">
-                      <span className="text-[10px] text-slate-500 block">Especialidad:</span>
+                    <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-700">
+                      <span className="text-[10px] text-slate-400 font-medium block">Especialidad:</span>
                       <span className="font-semibold text-slate-200 truncate block mt-0.5">
                         {specialty}
                       </span>
                     </div>
                   </div>
 
-                  <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800 flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center shrink-0">
+                  <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-700 flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
                       <User className="w-4 h-4" />
                     </div>
                     <div className="text-xs">
-                      <span className="text-[10px] text-slate-500 block">Especialista a cargo:</span>
+                      <span className="text-[10px] text-slate-400 font-medium block">Especialista a cargo:</span>
                       <span className="font-semibold text-white">{professionalName}</span>
                     </div>
                   </div>

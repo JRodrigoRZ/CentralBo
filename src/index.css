@@ -3,97 +3,144 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* ==========================================================================
-   SISTEMA DE TEMAS CLARO Y OSCURO DE CENTRALBO
+   CENTRALBO — SISTEMA DE DISEÑO VISUAL BASE
+   Plataforma de Comercio Digital para Bolivia
    ========================================================================== */
 
+:root {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
 /* --------------------------------------------------------------------------
-   1. MODO CLARO (☀️)
+   1. VARIABLES DE TEMA — MODO CLARO (☀️)
    -------------------------------------------------------------------------- */
 html.light,
 [data-theme="light"] {
   color-scheme: light;
 
-  /* Fondo general y texto base */
-  --bg-app: #f8fafc;
-  --text-app: #0f172a;
+  /* Niveles Visuales de Superficie — Modo Claro */
+  --cb-bg-main: #f8f9fa;              /* 1. Fondo principal */
+  --cb-surface: #ffffff;              /* 2. Superficie de cards y paneles */
+  --cb-surface-elevated: #ffffff;     /* 3. Superficie elevada (modales, dropdowns) */
+  --cb-surface-subtle: #f1f3f5;       /* 4. Contenido secundario, encabezados */
+  --cb-border: #e2e4e8;               /* 5. Borde estructural sutil */
+  --cb-border-subtle: #edf0f2;        /* 5b. Divisores internos suaves */
+  
+  /* Jerarquía de Texto — Modo Claro */
+  --cb-text-primary: #0f172a;         /* 6. Texto principal: alto contraste y legibilidad */
+  --cb-text-secondary: #334155;       /* 7. Texto secundario: cómodo para lectura */
+  --cb-text-tertiary: #64748b;        /* 8. Texto terciario: metadatos y etiquetas */
+  --cb-text-muted: #94a3b8;           /* Placeholders y elementos inactivos */
 
-  /* Inversión semántica de la escala Slate para Modo Claro */
-  --color-slate-950: #ffffff;       /* Fondo principal de tarjetas, modales y paneles */
-  --color-slate-900: #f8fafc;       /* Fondo secundario / paneles anidados */
-  --color-slate-850: #f1f5f9;
-  --color-slate-800: #e2e8f0;       /* Bordes principales y separadores */
-  --color-slate-700: #cbd5e1;       /* Bordes de inputs y divisores destacados */
-  --color-slate-600: #94a3b8;       /* Iconos y elementos atenuados */
-  --color-slate-500: #64748b;       /* Texto secundario de apoyo */
-  --color-slate-400: #475569;       /* Texto regular de subtítulos y meta info */
-  --color-slate-300: #334155;       /* Texto de lectura */
-  --color-slate-200: #1e293b;       /* Texto de alto contraste */
-  --color-slate-100: #0f172a;       /* Texto principal casi negro */
-  --color-slate-50: #020617;        /* Énfasis máximo */
+  /* Identidad CentralBo — Acción Primaria y Acentos */
+  --cb-primary: #1d4ed8;              /* 9. Azul CentralBo Comercial */
+  --cb-primary-hover: #1e40af;
+  --cb-primary-subtle: #eff6ff;
+  --cb-primary-border: #bfdbfe;
+  --cb-accent: #d97706;               /* Acento Ámbar cálido para comercio */
+  --cb-accent-subtle: #fffbeb;
 
-  /* Contenedores de color tintado en Modo Claro */
-  --color-indigo-950: #eef2ff;
-  --color-indigo-900: #e0e7ff;
-  --color-cyan-950: #ecfeff;
-  --color-cyan-900: #cffafe;
-  --color-emerald-950: #ecfdf5;
-  --color-emerald-900: #d1fae5;
-  --color-rose-950: #fff1f2;
-  --color-rose-900: #ffe4e6;
-  --color-amber-950: #fffbeb;
-  --color-amber-900: #fef3c7;
-  --color-purple-950: #faf5ff;
-  --color-purple-900: #f3e8ff;
+  /* Estados Semánticos (10) */
+  --cb-success: #047857;
+  --cb-success-bg: #ecfdf5;
+  --cb-success-border: #a7f3d0;
 
-  /* Alto contraste para textos de color en Modo Claro */
-  --color-indigo-400: #3730a3;
-  --color-indigo-300: #4338ca;
-  --color-cyan-400: #155e75;
-  --color-cyan-300: #0e7490;
-  --color-emerald-400: #065f46;
-  --color-emerald-300: #047857;
-  --color-rose-400: #9f1239;
-  --color-rose-300: #be123c;
-  --color-amber-400: #92400e;
-  --color-amber-300: #b45309;
+  --cb-error: #b91c1c;
+  --cb-error-bg: #fef2f2;
+  --cb-error-border: #fecaca;
+
+  --cb-warning: #b45309;
+  --cb-warning-bg: #fffbeb;
+  --cb-warning-border: #fde68a;
+
+  --cb-info: #1d4ed8;
+  --cb-info-bg: #eff6ff;
+  --cb-info-border: #bfdbfe;
 }
 
-/* Reglas complementarias para Modo Claro */
+/* --------------------------------------------------------------------------
+   2. VARIABLES DE TEMA — MODO OSCURO (🌙)
+   -------------------------------------------------------------------------- */
+html.dark,
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* Niveles Visuales de Superficie — Modo Oscuro con Separación Clara */
+  --cb-bg-main: #090d16;              /* 1. Fondo principal: base profunda y limpia */
+  --cb-surface: #111827;              /* 2. Superficie de cards y paneles (elevada sobre el fondo) */
+  --cb-surface-elevated: #1e293b;     /* 3. Superficie elevada (modales, dropdowns, popovers) */
+  --cb-surface-subtle: #172236;       /* 4. Contenedores internos, sub-cabeceras */
+  --cb-border: #1f293d;               /* 5. Borde estructural nítido (nunca desaparece) */
+  --cb-border-subtle: #182030;        /* 5b. Divisores internos suaves */
+
+  /* Jerarquía de Texto — Modo Oscuro con Alto Contraste */
+  --cb-text-primary: #ffffff;         /* 6. Texto principal: blanco nítido, máxima legibilidad */
+  --cb-text-secondary: #cbd5e1;       /* 7. Texto secundario: slate-300, lectura cómoda */
+  --cb-text-tertiary: #94a3b8;        /* 8. Texto terciario: slate-400, metadatos y subtítulos */
+  --cb-text-muted: #64748b;           /* Texto atenuado no esencial */
+
+  /* Identidad CentralBo — Acción Primaria y Acentos */
+  --cb-primary: #2563eb;              /* 9. Azul CentralBo Luminoso y Confiable */
+  --cb-primary-hover: #3b82f6;
+  --cb-primary-subtle: rgba(37, 99, 235, 0.16);
+  --cb-primary-border: rgba(37, 99, 235, 0.35);
+  --cb-accent: #fbbf24;               /* Acento Ámbar cálido */
+  --cb-accent-subtle: rgba(245, 158, 11, 0.16);
+
+  /* Estados Semánticos (10) */
+  --cb-success: #34d399;
+  --cb-success-bg: rgba(16, 185, 129, 0.16);
+  --cb-success-border: rgba(16, 185, 129, 0.35);
+
+  --cb-error: #f87171;
+  --cb-error-bg: rgba(239, 68, 68, 0.16);
+  --cb-error-border: rgba(239, 68, 68, 0.35);
+
+  --cb-warning: #fbbf24;
+  --cb-warning-bg: rgba(245, 158, 11, 0.16);
+  --cb-warning-border: rgba(245, 158, 11, 0.35);
+
+  --cb-info: #60a5fa;
+  --cb-info-bg: rgba(37, 99, 235, 0.16);
+  --cb-info-border: rgba(37, 99, 235, 0.35);
+}
+
+/* --------------------------------------------------------------------------
+   3. ESTILOS GLOBALES DE CUERPO Y BASE
+   -------------------------------------------------------------------------- */
+body {
+  background-color: var(--cb-bg-main);
+  color: var(--cb-text-primary);
+  min-height: 100vh;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
 html.light body {
-  background-color: #f8fafc;
+  background-color: #f8f9fa;
   color: #0f172a;
 }
 
-/* Títulos y textos con text-white en modo claro */
-html.light .text-white:not(
-  button.bg-indigo-600,
-  button.bg-indigo-700,
-  button.bg-indigo-500,
-  button.bg-emerald-600,
-  button.bg-emerald-700,
-  button.bg-rose-600,
-  button.bg-rose-700,
-  button.bg-amber-600,
-  button.bg-cyan-600,
-  button.bg-blue-600,
-  a.bg-indigo-600,
-  a.bg-emerald-600,
-  .bg-indigo-600 *,
-  .bg-indigo-700 *,
-  .bg-emerald-600 *,
-  .bg-emerald-700 *,
-  .bg-rose-600 *,
-  .bg-amber-600 *,
-  .bg-cyan-600 *,
-  .bg-blue-600 *,
-  .badge-contrast,
-  [data-keep-white="true"],
-  .keep-white
-) {
-  color: #0f172a;
+html.dark body {
+  background-color: #090d16;
+  color: #ffffff;
 }
 
-/* Inputs, textareas y selects en Modo Claro */
+/* Reglas de inputs, textareas y selects para ergonomía y legibilidad */
+input, textarea, select {
+  font-size: 15px;
+}
+
+@media (max-width: 640px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
+/* Inputs en Modo Claro */
 html.light input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]),
 html.light textarea,
 html.light select {
@@ -108,107 +155,233 @@ html.light textarea::placeholder {
 }
 
 html.light select option {
-  background-color: #ffffff !important;
-  color: #0f172a !important;
-}
-
-/* Botones primarios conservan texto blanco para máximo contraste */
-html.light .bg-indigo-600,
-html.light .bg-indigo-700,
-html.light .bg-emerald-600,
-html.light .bg-rose-600,
-html.light .bg-amber-600,
-html.light .bg-cyan-600,
-html.light .bg-blue-600 {
-  color: #ffffff !important;
-}
-
-html.light .bg-indigo-600 *,
-html.light .bg-indigo-700 *,
-html.light .bg-emerald-600 *,
-html.light .bg-rose-600 *,
-html.light .bg-amber-600 *,
-html.light .bg-cyan-600 *,
-html.light .bg-blue-600 * {
-  color: #ffffff;
-}
-
-/* Tablas en Modo Claro */
-html.light table thead {
-  background-color: #f1f5f9;
-  color: #475569;
-}
-
-html.light table tbody tr:hover {
-  background-color: #f8fafc;
-}
-
-/* Código y badges inline en Modo Claro */
-html.light code:not(.keep-white) {
-  background-color: #f1f5f9;
+  background-color: #ffffff;
   color: #0f172a;
 }
 
-/* Tarjetas y sombras sutiles en Modo Claro */
-html.light .border-slate-800,
-html.light .border-slate-800\/80,
-html.light .border-slate-800\/60 {
-  border-color: #e2e8f0;
+/* Inputs en Modo Oscuro: superficie hundida nítida, borde visible y texto blanco */
+html.dark input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]),
+html.dark textarea,
+html.dark select {
+  background-color: #090d16 !important;
+  color: #ffffff !important;
+  border-color: #334155 !important;
 }
 
-html.light .shadow-2xl {
-  box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.06), 0 8px 10px -6px rgb(0 0 0 / 0.04);
+html.dark input:focus,
+html.dark textarea:focus,
+html.dark select:focus {
+  border-color: #3b82f6 !important;
+  outline: none !important;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3) !important;
+}
+
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+html.dark select option {
+  background-color: #111827;
+  color: #ffffff;
 }
 
 /* --------------------------------------------------------------------------
-   2. MODO OSCURO (🌙)
+   4. ESTABILIZACIÓN DE BADGES Y ESTADOS EN MODO OSCURO
+   Evita fondos con opacidades invisibles y asegura contraste óptimo
    -------------------------------------------------------------------------- */
-html.dark,
-[data-theme="dark"] {
-  color-scheme: dark;
-
-  --bg-app: #020617;
-  --text-app: #f1f5f9;
-
-  --color-slate-950: #020617;
-  --color-slate-900: #0f172a;
-  --color-slate-850: #131d31;
-  --color-slate-800: #1e293b;
-  --color-slate-700: #334155;
-  --color-slate-600: #475569;
-  --color-slate-500: #64748b;
-  --color-slate-400: #94a3b8;
-  --color-slate-300: #cbd5e1;
-  --color-slate-200: #e2e8f0;
-  --color-slate-100: #f1f5f9;
-  --color-slate-50: #f8fafc;
-
-  --color-indigo-950: #1e1b4b;
-  --color-indigo-900: #312e81;
-  --color-cyan-950: #083344;
-  --color-cyan-900: #164e63;
-  --color-emerald-950: #022c22;
-  --color-emerald-900: #064e3b;
-  --color-rose-950: #4c0519;
-  --color-rose-900: #881337;
-  --color-amber-950: #451a03;
-  --color-amber-900: #78350f;
-  --color-purple-950: #3b0764;
-  --color-purple-900: #581c87;
-
-  --color-indigo-400: #818cf8;
-  --color-indigo-300: #a5b4fc;
-  --color-cyan-400: #22d3ee;
-  --color-cyan-300: #67e8f9;
-  --color-emerald-400: #34d399;
-  --color-emerald-300: #6ee7b7;
-  --color-rose-400: #fb7185;
-  --color-rose-300: #fda4af;
-  --color-amber-400: #fbbf24;
-  --color-amber-300: #fcd34d;
+html.dark .bg-emerald-950\/20,
+html.dark .bg-emerald-950\/30,
+html.dark .bg-emerald-950\/40,
+html.dark .bg-emerald-950 {
+  background-color: rgba(16, 185, 129, 0.16) !important;
+}
+html.dark .border-emerald-800\/40,
+html.dark .border-emerald-800,
+html.dark .border-emerald-700 {
+  border-color: rgba(16, 185, 129, 0.35) !important;
+}
+html.dark .text-emerald-400,
+html.dark .text-emerald-300 {
+  color: #34d399 !important;
 }
 
-html.dark body {
-  background-color: #020617;
-  color: #f1f5f9;
+html.dark .bg-rose-950\/20,
+html.dark .bg-rose-950\/30,
+html.dark .bg-rose-950\/40,
+html.dark .bg-rose-950 {
+  background-color: rgba(239, 68, 68, 0.16) !important;
+}
+html.dark .border-rose-800\/40,
+html.dark .border-rose-800,
+html.dark .border-rose-700 {
+  border-color: rgba(239, 68, 68, 0.35) !important;
+}
+html.dark .text-rose-400,
+html.dark .text-rose-300 {
+  color: #f87171 !important;
+}
+
+html.dark .bg-amber-950\/20,
+html.dark .bg-amber-950\/30,
+html.dark .bg-amber-950\/40,
+html.dark .bg-amber-950 {
+  background-color: rgba(245, 158, 11, 0.16) !important;
+}
+html.dark .border-amber-800\/40,
+html.dark .border-amber-800,
+html.dark .border-amber-700 {
+  border-color: rgba(245, 158, 11, 0.35) !important;
+}
+html.dark .text-amber-400,
+html.dark .text-amber-300 {
+  color: #fbbf24 !important;
+}
+
+html.dark .bg-cyan-950\/20,
+html.dark .bg-cyan-950\/30,
+html.dark .bg-cyan-950\/40,
+html.dark .bg-cyan-950,
+html.dark .bg-indigo-950\/20,
+html.dark .bg-indigo-950\/30,
+html.dark .bg-indigo-950\/40,
+html.dark .bg-indigo-950,
+html.dark .bg-blue-950\/20,
+html.dark .bg-blue-950\/30,
+html.dark .bg-blue-950\/40,
+html.dark .bg-blue-950\/50,
+html.dark .bg-blue-950 {
+  background-color: rgba(37, 99, 235, 0.16) !important;
+}
+html.dark .border-cyan-800\/40,
+html.dark .border-indigo-800\/40,
+html.dark .border-blue-800\/40,
+html.dark .border-blue-800\/50,
+html.dark .border-blue-800 {
+  border-color: rgba(37, 99, 235, 0.35) !important;
+}
+html.dark .text-cyan-400,
+html.dark .text-cyan-300,
+html.dark .text-indigo-400,
+html.dark .text-indigo-300,
+html.dark .text-blue-400,
+html.dark .text-blue-300 {
+  color: #60a5fa !important;
+}
+
+/* --------------------------------------------------------------------------
+   5. BOTONES Y ACCIONES — CONTRASTE ABSOLUTO
+   -------------------------------------------------------------------------- */
+button.bg-blue-600,
+button.bg-blue-700,
+button.bg-indigo-600,
+button.bg-indigo-700,
+button.bg-emerald-600,
+button.bg-rose-600,
+a.bg-blue-600,
+a.bg-blue-700,
+a.bg-emerald-600,
+.cb-btn-primary {
+  color: #ffffff !important;
+}
+
+/* --------------------------------------------------------------------------
+   6. CLASES DE COMPONENTES DEL SISTEMA BASE DE CENTRALBO
+   -------------------------------------------------------------------------- */
+
+/* Tarjetas y Contenedores */
+.cb-card {
+  background-color: var(--cb-surface);
+  border: 1px solid var(--cb-border);
+  border-radius: 0.875rem; /* 14px */
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.03);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.cb-card-elevated {
+  background-color: var(--cb-surface-elevated);
+  border: 1px solid var(--cb-border);
+  border-radius: 1rem; /* 16px */
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.06);
+}
+
+/* Botones con Jerarquía Unificada */
+.cb-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-size: 0.875rem; /* 14px */
+  font-weight: 600;
+  line-height: 1.25rem;
+  padding: 0.625rem 1.25rem; /* 10px vertical, 20px horizontal */
+  border-radius: 0.625rem; /* 10px */
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.cb-btn:active {
+  transform: scale(0.98);
+}
+
+.cb-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Primario */
+.cb-btn-primary {
+  background-color: var(--cb-primary);
+  color: #ffffff !important;
+  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.25);
+}
+
+.cb-btn-primary:hover:not(:disabled) {
+  background-color: var(--cb-primary-hover);
+}
+
+/* Secundario */
+.cb-btn-secondary {
+  background-color: var(--cb-surface-subtle);
+  color: var(--cb-text-primary);
+  border: 1px solid var(--cb-border);
+}
+
+.cb-btn-secondary:hover:not(:disabled) {
+  background-color: var(--cb-border);
+}
+
+/* Terciario / Ghost */
+.cb-btn-ghost {
+  background-color: transparent;
+  color: var(--cb-text-secondary);
+}
+
+.cb-btn-ghost:hover:not(:disabled) {
+  background-color: var(--cb-surface-subtle);
+  color: var(--cb-text-primary);
+}
+
+/* Destructivo */
+.cb-btn-danger {
+  background-color: #dc2626;
+  color: #ffffff !important;
+}
+
+.cb-btn-danger:hover:not(:disabled) {
+  background-color: #b91c1c;
+}
+
+/* Sombras refinadas (anti-slop) */
+html.light .shadow-xl,
+html.light .shadow-2xl {
+  box-shadow: 0 10px 25px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -4px rgba(0, 0, 0, 0.03);
+}
+
+html.dark .shadow-xl,
+html.dark .shadow-2xl {
+  box-shadow: 0 12px 28px -4px rgba(0, 0, 0, 0.45), 0 4px 8px -4px rgba(0, 0, 0, 0.3);
 }

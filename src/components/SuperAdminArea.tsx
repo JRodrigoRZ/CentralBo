@@ -49,20 +49,20 @@ export const SuperAdminArea: React.FC = () => {
   // Guardia de Seguridad Interna: Disponible ÚNICAMENTE para SuperAdmin Global
   if (!user || user.profile !== 'superadmin') {
     return (
-      <div className="max-w-xl mx-auto p-6 sm:p-8 rounded-3xl bg-slate-900 border border-rose-900/50 text-center space-y-4 shadow-2xl">
-        <div className="w-14 h-14 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400 mx-auto">
+      <div className="max-w-xl mx-auto p-6 sm:p-8 rounded-2xl bg-white dark:bg-slate-900 border border-rose-200 dark:border-rose-900/50 text-center space-y-4 shadow-sm">
+        <div className="w-14 h-14 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/40 flex items-center justify-center text-rose-600 dark:text-rose-400 mx-auto">
           <ShieldAlert className="w-8 h-8" />
         </div>
-        <h2 className="text-lg sm:text-xl font-bold text-white">
+        <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white">
           Acceso Restringido al SuperAdmin Global
         </h2>
-        <p className="text-xs text-slate-300 leading-relaxed">
+        <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
           Este panel está reservado exclusivamente para usuarios con el perfil de <strong>SuperAdmin Global</strong>.
           Los administradores de comercios y usuarios públicos tienen restringido el acceso.
         </p>
         <button
           onClick={() => navigate('/')}
-          className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition cursor-pointer"
+          className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition cursor-pointer shadow-xs"
         >
           Volver al Portal Principal
         </button>
@@ -73,32 +73,32 @@ export const SuperAdminArea: React.FC = () => {
   return (
     <div className="w-full space-y-6">
       {/* Barra Superior del Panel SuperAdmin */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 sm:p-5 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-lg">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs transition-colors">
         <div className="flex items-center gap-3">
           <button
             onClick={() => navigate('/')}
             title="Volver al portal"
             aria-label="Volver al portal principal"
-            className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition cursor-pointer"
+            className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" />
           </button>
 
-          <div className="w-10 h-10 rounded-xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 font-bold">
+          <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800/40 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold">
             <ShieldCheck className="w-5 h-5" />
           </div>
 
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-base sm:text-lg font-extrabold text-white leading-tight">
+              <h1 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white leading-tight">
                 Panel SuperAdmin Global
               </h1>
-              <span className="hidden sm:inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 uppercase">
+              <span className="hidden sm:inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/40 uppercase">
                 CentralBo
               </span>
             </div>
-            <p className="text-xs text-slate-400 truncate max-w-xs sm:max-w-md">
-              Sesión activa: <strong className="text-slate-200">{user.email}</strong>
+            <p className="text-xs text-slate-500 dark:text-slate-400 truncate max-w-xs sm:max-w-md mt-0.5">
+              Sesión activa: <strong className="text-slate-700 dark:text-slate-200">{user.email}</strong>
             </p>
           </div>
         </div>
@@ -108,18 +108,18 @@ export const SuperAdminArea: React.FC = () => {
 
           <button
             onClick={() => signOut()}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-medium border border-slate-700 transition cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 hover:text-rose-600 dark:hover:text-rose-400 text-xs font-medium border border-slate-200 dark:border-slate-700 transition cursor-pointer"
           >
-            <LogOut className="w-3.5 h-3.5 text-rose-400" />
+            <LogOut className="w-3.5 h-3.5" />
             <span>Cerrar Sesión</span>
           </button>
         </div>
       </div>
 
-      {/* Menú de 7 Secciones del SuperAdmin (Responsive con scroll horizontal en móvil) */}
+      {/* Menú de 7 Secciones del SuperAdmin */}
       <div className="overflow-x-auto pb-1 -mx-4 px-4 sm:mx-0 sm:px-0">
         <nav
-          className="flex items-center gap-1.5 p-1.5 rounded-2xl bg-slate-900/90 border border-slate-800 min-w-max sm:min-w-0 sm:flex-wrap"
+          className="flex items-center gap-1.5 p-1.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 min-w-max sm:min-w-0 sm:flex-wrap shadow-xs"
           aria-label="Menú del SuperAdmin"
         >
           {MENU_ITEMS.map((item) => {
@@ -130,10 +130,10 @@ export const SuperAdminArea: React.FC = () => {
               <button
                 key={item.id}
                 onClick={() => setActiveSection(item.id)}
-                className={`inline-flex items-center gap-2 px-3 sm:px-3.5 py-2 rounded-xl text-xs font-semibold transition whitespace-nowrap cursor-pointer ${
+                className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition whitespace-nowrap cursor-pointer ${
                   isActive
-                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-900/30'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/70'
                 }`}
               >
                 <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-slate-400'}`} />
@@ -146,7 +146,7 @@ export const SuperAdminArea: React.FC = () => {
       </div>
 
       {/* Contenido Dinámico de la Sección Seleccionada */}
-      <section className="rounded-3xl bg-slate-900/60 border border-slate-800/80 p-5 sm:p-7 shadow-xl">
+      <section className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 sm:p-7 shadow-xs transition-colors">
         {activeSection === 'dashboard' && (
           <SuperAdminDashboard onNavigateSection={(sec) => setActiveSection(sec)} />
         )}

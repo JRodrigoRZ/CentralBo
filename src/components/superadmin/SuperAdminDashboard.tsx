@@ -53,7 +53,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
             <StoreIcon className="w-3.5 h-3.5 text-indigo-400" />
-            <span>1. Comercios Registrados</span>
+            <span>Comercios Registrados</span>
           </h3>
           <button
             onClick={() => onNavigateSection('comercios')}
@@ -131,19 +131,19 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
               <div className="flex items-center gap-2 text-indigo-400">
                 <Users className="w-4 h-4" />
                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300">
-                  2. Usuarios
+                  Usuarios
                 </h3>
               </div>
               <span className="text-xl font-bold text-white">{metrics.users.total}</span>
             </div>
             <p className="text-xs text-slate-400 mb-3">
-              Desglose de los 3 perfiles oficiales de CentralBo:
+              Distribución por rol de usuario:
             </p>
 
             <div className="space-y-2 text-xs">
               <div className="flex items-center justify-between p-2 rounded-lg bg-slate-950/70 border border-slate-800/60">
                 <span className="text-slate-300 flex items-center gap-1.5">
-                  <ShieldCheck className="w-3.5 h-3.5 text-indigo-400" /> SuperAdmin Global
+                  <ShieldCheck className="w-3.5 h-3.5 text-indigo-400" /> SuperAdmin
                 </span>
                 <span className="font-bold text-indigo-400">{metrics.users.superadmins}</span>
               </div>
@@ -157,7 +157,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
 
               <div className="flex items-center justify-between p-2 rounded-lg bg-slate-950/70 border border-slate-800/60">
                 <span className="text-slate-300 flex items-center gap-1.5">
-                  <ShoppingBag className="w-3.5 h-3.5 text-emerald-400" /> Cliente / Comprador
+                  <ShoppingBag className="w-3.5 h-3.5 text-emerald-400" /> Clientes
                 </span>
                 <span className="font-bold text-emerald-400">{metrics.users.publicClients}</span>
               </div>
@@ -180,13 +180,13 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
               <div className="flex items-center gap-2 text-cyan-400">
                 <CreditCard className="w-4 h-4" />
                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300">
-                  3. Planes
+                  Planes
                 </h3>
               </div>
               <span className="text-xl font-bold text-white">{metrics.plans.total} Planes</span>
             </div>
             <p className="text-xs text-slate-400 mb-3">
-              Estructura tarifaria definida para CentralBo:
+              Estructura tarifaria de la plataforma:
             </p>
 
             <div className="space-y-2 text-xs">
@@ -224,13 +224,13 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
               <div className="flex items-center gap-2 text-emerald-400">
                 <TrendingUp className="w-4 h-4" />
                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300">
-                  4. Suscripciones
+                  Suscripciones
                 </h3>
               </div>
               <span className="text-xl font-bold text-white">{metrics.subscriptions.total}</span>
             </div>
             <p className="text-xs text-slate-400 mb-3">
-              Estado de cobros y periodos de suscripción:
+              Estado de cobros y periodos de facturación:
             </p>
 
             <div className="space-y-2 text-xs">
@@ -267,7 +267,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
           <div>
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
               <Activity className="w-4 h-4 text-indigo-400" />
-              <span>5. Estado de Actividad General (Métricas MVP)</span>
+              <span>Actividad General de la Plataforma</span>
             </h3>
             <p className="text-xs text-slate-400 mt-0.5">
               Última actividad registrada: <span className="text-white font-medium">{metrics.activity.ultimaActividadGeneral}</span>

@@ -19,7 +19,7 @@ function AppContent() {
   const pwaStatus = usePWA();
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col selection:bg-indigo-500 selection:text-white">
+    <div className="min-h-screen bg-slate-50 dark:bg-[#090d16] text-slate-900 dark:text-slate-100 flex flex-col selection:bg-blue-500 selection:text-white transition-colors">
       {/* Barra de navegación superior responsive */}
       <Header pwaStatus={pwaStatus} onInstallClick={pwaStatus.install} />
 

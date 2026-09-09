@@ -56,6 +56,7 @@ import {
 } from './publicStore/cartStorage';
 import { CartItem } from './publicStore/types';
 import { ThemeToggle } from './ThemeToggle';
+import { PriceDisplay } from './common/PriceDisplay';
 
 interface PublicStoreViewProps {
   slug: string;
@@ -291,8 +292,8 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
   if (isLoading) {
     return (
       <div className="w-full py-24 flex flex-col items-center justify-center text-slate-400 space-y-3">
-        <div className="w-9 h-9 border-3 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-        <p className="text-xs text-slate-300 font-medium">
+        <div className="w-9 h-9 border-3 border-blue-600 border-t-transparent rounded-full animate-spin" />
+        <p className="text-xs text-slate-600 dark:text-slate-300 font-medium">
           Cargando tienda "{slug}"...
         </p>
       </div>
@@ -301,18 +302,18 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
 
   if (notFound || !store || !profile || !appearance || !shipping || !scheduledOrders) {
     return (
-      <div className="max-w-2xl mx-auto my-12 p-8 rounded-2xl bg-slate-900/80 border border-slate-800 text-center">
-        <StoreIcon className="w-12 h-12 text-slate-500 mx-auto mb-4" />
-        <h2 className="text-xl font-bold text-white mb-2">Comercio no encontrado</h2>
-        <p className="text-sm text-slate-400 mb-6">
+      <div className="max-w-2xl mx-auto my-12 p-8 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-center shadow-xs transition-colors">
+        <StoreIcon className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+        <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Comercio no encontrado</h2>
+        <p className="text-sm text-slate-600 dark:text-slate-400 mb-6">
           No existe ningún comercio activo registrado con el slug{' '}
-          <code className="text-indigo-400 font-mono bg-slate-950 px-2 py-0.5 rounded">
+          <code className="text-blue-600 dark:text-blue-400 font-mono bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">
             "{slug}"
           </code>.
         </p>
         <button
           onClick={() => navigate('/')}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition cursor-pointer"
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition cursor-pointer shadow-xs"
         >
           <ArrowLeft className="w-4 h-4" />
           Volver al Inicio de CentralBo
@@ -321,7 +322,7 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
     );
   }
 
-  const primaryColor = appearance.primaryColor || '#4f46e5';
+  const primaryColor = appearance.primaryColor || '#2563eb';
   const totalCartCount = cartItems.reduce((acc, it) => acc + it.quantity, 0);
   const cartSubtotal = cartItems.reduce((acc, it) => acc + it.price * it.quantity, 0);
 
@@ -333,10 +334,10 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
   return (
     <div className="w-full max-w-6xl mx-auto space-y-6 pb-20">
       {/* Barra superior de navegación y utilidades públicas */}
-      <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-800">
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200 dark:border-slate-800">
         <button
           onClick={() => navigate('/')}
-          className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition cursor-pointer"
+          className="inline-flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-medium transition cursor-pointer"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>Volver al portal CentralBo</span>
@@ -349,13 +350,13 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
           {/* Botón de Mis Pedidos & Reservas */}
           <button
             onClick={() => setIsOrdersHistoryOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs text-slate-300 hover:text-white transition cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 text-xs text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white shadow-xs transition cursor-pointer"
             title="Ver mis pedidos o citas en este comercio"
           >
-            <History className="w-3.5 h-3.5 text-indigo-400" />
+            <History className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
             <span>Mis Pedidos & Citas</span>
             {totalCustomerActivity > 0 && (
-              <span className="w-4 h-4 rounded-full bg-indigo-600 text-white text-[10px] font-bold flex items-center justify-center">
+              <span className="w-4 h-4 rounded-full bg-blue-600 text-white text-[10px] font-bold flex items-center justify-center">
                 {totalCustomerActivity}
               </span>
             )}
@@ -365,7 +366,7 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
           {user?.tenantId === store.id && (
             <button
               onClick={() => navigate(`/admin/${store.id}`)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 text-xs font-semibold hover:bg-indigo-600/30 transition cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/40 text-xs font-semibold hover:bg-blue-100 dark:hover:bg-blue-900/40 transition cursor-pointer"
             >
               <span>Panel de Mi Tienda</span>
             </button>
@@ -388,7 +389,7 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
       <div className="space-y-4 pt-2">
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
-            <h2 className="text-lg font-black text-white">
+            <h2 className="text-lg font-bold text-slate-900 dark:text-white">
               {store.store_type === 'restaurante'
                 ? 'Menú del Restaurante'
                 : store.store_type === 'moda'
@@ -397,7 +398,7 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
                 ? 'Servicios & Tratamientos Disponibles'
                 : 'Catálogo de Productos'}
             </h2>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
               Explora las opciones y realiza tu pedido directo sin necesidad de registro.
             </p>
           </div>
@@ -425,22 +426,22 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
         />
       </div>
 
-      {/* NOTIFICACIÓN TOAST: PRODUCTO AGREGADO (Permite seguir comprando o abrir carrito) */}
+      {/* NOTIFICACIÓN TOAST: PRODUCTO AGREGADO */}
       {cartToast && (
         <div
           id="cart-added-toast"
-          className="fixed bottom-24 right-4 sm:right-6 z-40 max-w-sm w-[calc(100vw-2rem)] sm:w-auto p-3.5 rounded-2xl bg-slate-900/95 border border-emerald-500/40 shadow-2xl backdrop-blur-md animate-in slide-in-from-bottom-3 duration-200"
+          className="fixed bottom-24 right-4 sm:right-6 z-40 max-w-sm w-[calc(100vw-2rem)] sm:w-auto p-3.5 rounded-2xl bg-white/95 dark:bg-slate-900/95 border border-emerald-500/40 shadow-xl backdrop-blur-md animate-in slide-in-from-bottom-3 duration-200"
         >
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+            <div className="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
               <Check className="w-4 h-4" />
             </div>
             <div className="flex-1 min-w-0 text-xs">
-              <p className="font-bold text-white truncate">
+              <p className="font-bold text-slate-900 dark:text-white truncate">
                 ¡{cartToast.quantity} {cartToast.quantity === 1 ? 'unidad agregada' : 'unidades agregadas'}!
               </p>
-              <p className="text-[11px] text-slate-300 truncate">
-                {cartToast.productName} • <span className="text-emerald-400 font-bold">{totalCartCount} {totalCartCount === 1 ? 'unidad' : 'unidades'}</span> en canasta
+              <p className="text-[11px] text-slate-600 dark:text-slate-300 truncate">
+                {cartToast.productName} • <span className="text-emerald-600 dark:text-emerald-400 font-bold">{totalCartCount} {totalCartCount === 1 ? 'unidad' : 'unidades'}</span> en canasta
               </p>
             </div>
             <div className="flex items-center gap-1.5 shrink-0">
@@ -448,7 +449,7 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
                 type="button"
                 id="btn-toast-continue"
                 onClick={() => setCartToast(null)}
-                className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-semibold text-[11px] transition cursor-pointer"
+                className="px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-[11px] transition cursor-pointer"
                 title="Seguir comprando"
               >
                 Seguir
@@ -478,7 +479,7 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
             id="floating-cart-btn"
             onClick={() => setIsCartOpen(true)}
             style={{ backgroundColor: primaryColor }}
-            className="flex items-center gap-3 px-4 sm:px-5 py-3 rounded-2xl text-white font-bold text-xs shadow-2xl shadow-indigo-600/40 hover:opacity-95 transition cursor-pointer border border-white/20"
+            className="flex items-center gap-3 px-4 sm:px-5 py-3 rounded-2xl text-white font-bold text-xs shadow-xl hover:opacity-95 transition cursor-pointer border border-white/20"
             title="Ver los productos en tu canasta acumulativa"
           >
             <div className="relative">
@@ -491,7 +492,7 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
               <p className="text-[10px] uppercase font-bold tracking-wider opacity-90">
                 Canasta ({totalCartCount} {totalCartCount === 1 ? 'unidad' : 'unidades'})
               </p>
-              <p className="font-mono text-sm font-extrabold">Bs {cartSubtotal.toFixed(2)}</p>
+              <PriceDisplay amount={cartSubtotal} size="sm" className="text-white" />
             </div>
           </button>
         </div>
