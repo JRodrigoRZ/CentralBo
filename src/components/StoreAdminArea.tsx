@@ -59,17 +59,30 @@ export const StoreAdminArea: React.FC<StoreAdminAreaProps> = ({ tenantId }) => {
   const [store, setStore] = useState<Store | null>(user?.store || null);
   const [loading, setLoading] = useState<boolean>(!user?.store);
 
-  const activeTenantId = tenantId || user?.tenantId;
+  // Para store_admin, se fuerza estrictamente su propio tenantId autorizado; sólo superadmin puede alternar tenantId arbitrario
+  const activeTenantId =
+    user?.profile === 'superadmin' ? (tenantId || user?.tenantId) : user?.tenantId;
 
   useEffect(() => {
+    let cancelled = false;
     if (activeTenantId) {
       setLoading(true);
+      // Limpiar inmediatamente datos de la tienda anterior para evitar fugas en el panel y en la PWA
+      setStore(null);
       resolveStoreById(activeTenantId)
         .then((s) => {
-          if (s) setStore(s);
+          if (!cancelled && s) setStore(s);
         })
-        .finally(() => setLoading(false));
+        .finally(() => {
+          if (!cancelled) setLoading(false);
+        });
+    } else {
+      setStore(null);
+      setLoading(false);
     }
+    return () => {
+      cancelled = true;
+    };
   }, [activeTenantId]);
 
   // Guardia de Seguridad Interna Multi-Tenant
@@ -101,7 +114,16 @@ export const StoreAdminArea: React.FC<StoreAdminAreaProps> = ({ tenantId }) => {
     );
   }
 
-  const currentStore = store || user?.store || BASELINE_STORES[0];
+  if (loading || !store) {
+    return (
+      <div className="w-full max-w-6xl mx-auto py-20 flex flex-col items-center justify-center space-y-4">
+        <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+        <p className="text-xs text-slate-400 font-medium">Cargando administración del comercio...</p>
+      </div>
+    );
+  }
+
+  const currentStore = store;
   const planInfo = getStorePlan(currentStore.id);
 
   // Inyección reactiva del manifiesto PWA específico para la administración de este comercio
@@ -447,7 +469,10 @@ export const StoreAdminArea: React.FC<StoreAdminAreaProps> = ({ tenantId }) => {
       </div>
 
       {/* ÁREA DE CONTENIDO ACTIVO */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 sm:p-7 shadow-xs transition-colors">
+      <div
+        key={currentStore.id}
+        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 sm:p-7 shadow-xs transition-colors"
+      >
         {activeTab === 'inicio_resumen' && (
           <InicioResumen store={currentStore} onNavigateTab={setActiveTab} />
         )}

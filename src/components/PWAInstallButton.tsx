@@ -3,7 +3,7 @@ import { Download, Share, CheckCircle2, X } from 'lucide-react';
 import { usePWA } from '../hooks/usePWA';
 
 export const PWAInstallButton: React.FC = () => {
-  const { isInstallable, isInstalled, isIOS, install } = usePWA();
+  const { isInstallable, isInstalled, isIOS, install } = usePWA('/');
   const [showIOSGuide, setShowIOSGuide] = useState(false);
   const [isInstalling, setIsInstalling] = useState(false);
 

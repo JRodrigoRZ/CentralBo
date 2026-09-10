@@ -385,3 +385,35 @@ html.dark .shadow-xl,
 html.dark .shadow-2xl {
   box-shadow: 0 12px 28px -4px rgba(0, 0, 0, 0.45), 0 4px 8px -4px rgba(0, 0, 0, 0.3);
 }
+
+/* --------------------------------------------------------------------------
+   7. ANIMACIONES DE ESCAPARATES (HERO MARQUEE CONTINUO)
+   -------------------------------------------------------------------------- */
+@keyframes marqueeVertical {
+  0% {
+    transform: translateY(0%);
+  }
+  100% {
+    transform: translateY(-50%);
+  }
+}
+
+.animate-marquee-vertical {
+  animation: marqueeVertical 22s linear infinite;
+  will-change: transform;
+}
+
+.animate-marquee-vertical:hover,
+.group:hover .animate-marquee-vertical {
+  animation-play-state: paused;
+}
+
+/* Ocultar barra de desplazamiento manteniendo funcionalidad de scroll */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+

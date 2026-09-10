@@ -546,6 +546,17 @@ export function deleteSuperAdminStorePermanently(id: string): boolean {
         }
       }
       keysToRemove.forEach((k) => localStorage.removeItem(k));
+
+      // Limpiar invitaciones asociadas al comercio eliminado para evitar registros huérfanos
+      const rawInv = localStorage.getItem('centralbo_store_owner_invitations_v1');
+      if (rawInv) {
+        const parsedInv = JSON.parse(rawInv);
+        if (Array.isArray(parsedInv)) {
+          const remainingInv = parsedInv.filter((inv: { storeId?: string }) => inv.storeId !== id);
+          localStorage.setItem('centralbo_store_owner_invitations_v1', JSON.stringify(remainingInv));
+          window.dispatchEvent(new CustomEvent('centralbo:store_owner_invitation_changed'));
+        }
+      }
     }
   } catch {
     // Ignorar fallos menores de limpieza local

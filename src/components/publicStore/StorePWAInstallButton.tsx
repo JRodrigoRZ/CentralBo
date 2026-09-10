@@ -44,12 +44,20 @@ export const StorePWAInstallButton: React.FC<StorePWAInstallButtonProps> = ({
   className = '',
   variant = 'header',
 }) => {
-  const { isInstallable, isInstalled, isIOS, install } = usePWA();
+  const { isInstallable, isInstalled, isIOS, install } = usePWA(`/tienda/${storeSlug}`);
   const { isDark } = useTheme();
   const [isInstalling, setIsInstalling] = useState(false);
   const [showIOSModal, setShowIOSModal] = useState(false);
   const [showHelpModal, setShowHelpModal] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  // Determinar si la instancia instalada corresponde específicamente a esta tienda
+  const isThisStoreInstalled =
+    isInstalled &&
+    (typeof window !== 'undefined'
+      ? (!new URLSearchParams(window.location.search).get('pwa_slug') ||
+         new URLSearchParams(window.location.search).get('pwa_slug') === storeSlug)
+      : true);
 
   // Determinar si el comercio cuenta con personalización Pro
   const isProStore = propIsPro !== undefined
@@ -95,8 +103,8 @@ export const StorePWAInstallButton: React.FC<StorePWAInstallButtonProps> = ({
     }
   };
 
-  // 1. Si la aplicación ya está instalada y ejecutándose en modo standalone
-  if (isInstalled) {
+  // 1. Si la aplicación ya está instalada y ejecutándose en modo standalone para este comercio
+  if (isThisStoreInstalled) {
     return (
       <div
         id={`pwa-installed-badge-${storeSlug}`}
@@ -149,6 +157,8 @@ export const StorePWAInstallButton: React.FC<StorePWAInstallButtonProps> = ({
               ? isLightTextNeeded
                 ? 'text-white'
                 : 'text-slate-900'
+              : className && className.includes('text-')
+              ? 'text-current'
               : isDark
               ? 'text-indigo-400'
               : 'text-indigo-600'

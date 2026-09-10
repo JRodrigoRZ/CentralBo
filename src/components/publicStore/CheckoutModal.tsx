@@ -65,7 +65,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   onOrderCompleted,
   primaryColor = '#4f46e5',
 }) => {
-  const savedProfile = getSavedCustomerProfile();
+  const savedProfile = getSavedCustomerProfile(store.id);
 
   const effectivePaymentSettings = paymentSettings || getStorePaymentSettings(store.id);
 
@@ -324,15 +324,18 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
     // Guardar perfil local si está tildado
     if (saveProfile) {
-      saveCustomerProfile({
-        name: customerName.trim(),
-        phone: phone.trim(),
-        whatsapp: whatsapp.trim() || phone.trim(),
-        email: email.trim(),
-        address: deliveryAddress.trim(),
-        reference: deliveryReference.trim(),
-        city: 'La Paz',
-      });
+      saveCustomerProfile(
+        {
+          name: customerName.trim(),
+          phone: phone.trim(),
+          whatsapp: whatsapp.trim() || phone.trim(),
+          email: email.trim(),
+          address: deliveryAddress.trim(),
+          reference: deliveryReference.trim(),
+          city: 'La Paz',
+        },
+        store.id
+      );
     }
 
     // Limpiar carrito del tenant

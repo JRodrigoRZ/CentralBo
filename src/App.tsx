@@ -17,17 +17,29 @@ import { UnauthorizedView } from './components/UnauthorizedView';
 function AppContent() {
   const { currentRoute } = useRouter();
   const pwaStatus = usePWA();
+  const isPublicStore = currentRoute.type === 'public_store';
+  const isBoutique = currentRoute.type === 'public_store' && currentRoute.slug === 'boutique-milano';
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#090d16] text-slate-900 dark:text-slate-100 flex flex-col selection:bg-blue-500 selection:text-white transition-colors">
-      {/* Barra de navegación superior responsive */}
-      <Header pwaStatus={pwaStatus} onInstallClick={pwaStatus.install} />
+    <div
+      className={`min-h-screen ${
+        isBoutique
+          ? 'bg-[#FAF8F5] dark:bg-[#101012] text-stone-900 dark:text-stone-100 selection:bg-rose-500 selection:text-white'
+          : isPublicStore
+          ? 'bg-stone-50 dark:bg-stone-950 text-stone-900 dark:text-stone-100 selection:bg-amber-500 selection:text-white'
+          : 'bg-slate-50 dark:bg-[#090d16] text-slate-900 dark:text-slate-100 selection:bg-amber-500 selection:text-white'
+      } flex flex-col transition-colors`}
+    >
+      {/* Barra de navegación superior responsive - Excluida en tienda pública */}
+      {!isPublicStore && (
+        <Header pwaStatus={pwaStatus} onInstallClick={pwaStatus.install} />
+      )}
 
       {/* Alerta toast de desconexión PWA */}
       <OfflineIndicator />
 
       {/* Contenido Dinámico de la Ruta Multi-Tenant */}
-      <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-10">
+      <main className={isPublicStore ? "flex-1 w-full" : "flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-10"}>
         {currentRoute.type === 'home' && <PortalHome />}
 
         {currentRoute.type === 'login' && (
@@ -59,8 +71,8 @@ function AppContent() {
         )}
       </main>
 
-      {/* Pie de página con verificación de fases */}
-      <Footer />
+      {/* Pie de página institucional - Excluido en tienda pública */}
+      {!isPublicStore && <Footer />}
     </div>
   );
 }

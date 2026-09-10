@@ -19,11 +19,8 @@ export const CustomerOrdersModal: React.FC<CustomerOrdersModalProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'orders' | 'appointments'>('orders');
 
-  const allOrders = getCustomerPlacedOrders();
-  const storeOrders = allOrders.filter((o) => o.tenantId === tenantId);
-
-  const allAppointments = getCustomerAppointments();
-  const storeAppointments = allAppointments.filter((a) => a.tenant_id === tenantId);
+  const storeOrders = getCustomerPlacedOrders(tenantId);
+  const storeAppointments = getCustomerAppointments(tenantId);
 
   const cleanWhatsapp = (storeWhatsapp || '').replace(/\D/g, '');
 

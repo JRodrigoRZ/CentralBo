@@ -55,11 +55,24 @@ export function getStorePlan(tenantId: string): 'basic' | 'pro' {
 
 const TENANT_STORAGE_PREFIX = 'centralbo_store_data_v4_';
 
+function isValidTenantId(tenantId: string | undefined | null): boolean {
+  return (
+    typeof tenantId === 'string' &&
+    tenantId.trim().length > 0 &&
+    tenantId !== 'undefined' &&
+    tenantId !== 'null'
+  );
+}
+
 function getStorageKey(tenantId: string, section: string): string {
-  return `${TENANT_STORAGE_PREFIX}${tenantId}_${section}`;
+  return `${TENANT_STORAGE_PREFIX}${tenantId.trim()}_${section.trim()}`;
 }
 
 function loadFromStorage<T>(tenantId: string, section: string, fallback: T): T {
+  if (!isValidTenantId(tenantId)) {
+    console.warn(`[CentralBo StoreAdmin] Intento de acceso a sección "${section}" con tenantId inválido: "${tenantId}"`);
+    return fallback;
+  }
   try {
     const raw = localStorage.getItem(getStorageKey(tenantId, section));
     if (raw) {
@@ -72,6 +85,10 @@ function loadFromStorage<T>(tenantId: string, section: string, fallback: T): T {
 }
 
 function saveToStorage<T>(tenantId: string, section: string, data: T): void {
+  if (!isValidTenantId(tenantId)) {
+    console.warn(`[CentralBo StoreAdmin] Intento de persistir sección "${section}" con tenantId inválido: "${tenantId}"`);
+    return;
+  }
   try {
     localStorage.setItem(getStorageKey(tenantId, section), JSON.stringify(data));
   } catch (e) {
@@ -1021,6 +1038,61 @@ export function getStoreProducts(tenantId: string, storeType: StoreType): Produc
             created_at: '2026-09-02T12:00:00Z',
             updated_at: '2026-09-02T12:00:00Z',
           },
+          {
+            id: 'prod-moda-3',
+            tenant_id: tenantId,
+            category_id: 'cat-moda-1',
+            name: 'Blusa Seda Satín Milano',
+            description: 'Blusa en seda satinada de tacto sutil con cuello camisero atelier y puños drapeados. Confección refinada para eventos.',
+            price: 195,
+            is_available: true,
+            image_url: 'https://images.unsplash.com/photo-1551803091-e20673f15770?w=600&auto=format&fit=crop&q=80',
+            status: 'activo',
+            attributes: {
+              is_featured: true,
+              previous_price: 220,
+              offer_price: 195,
+              sizes: ['XS', 'S', 'M', 'L'],
+              colors: [
+                { name: 'Champagne Perla', hex: '#f7f1e5' },
+                { name: 'Rosa Empolvado', hex: '#d4a59a' },
+                { name: 'Negro Carbón', hex: '#1c1917' },
+              ],
+              gallery_images: [
+                'https://images.unsplash.com/photo-1551803091-e20673f15770?w=600&auto=format&fit=crop&q=80',
+              ],
+              size_guide: 'Caída suelta estándar.',
+              exchange_policy: 'Cambio hasta 7 días con etiqueta.',
+            },
+            created_at: '2026-09-02T12:00:00Z',
+            updated_at: '2026-09-02T12:00:00Z',
+          },
+          {
+            id: 'prod-moda-4',
+            tenant_id: tenantId,
+            category_id: 'cat-moda-3',
+            name: 'Botines Cuero Nappa Atelier',
+            description: 'Botines artesanales en cuero nappa flexible con tacón medio bloque y cierre lateral invisible. Acabado de lujo.',
+            price: 360,
+            is_available: true,
+            image_url: 'https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=600&auto=format&fit=crop&q=80',
+            status: 'activo',
+            attributes: {
+              is_featured: false,
+              sizes: ['36', '37', '38', '39'],
+              colors: [
+                { name: 'Negro Atelier', hex: '#18181b' },
+                { name: 'Camel Nuez', hex: '#a27035' },
+              ],
+              gallery_images: [
+                'https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=600&auto=format&fit=crop&q=80',
+              ],
+              size_guide: 'Horma estándar boliviana.',
+              exchange_policy: 'Cambio por número sin costo.',
+            },
+            created_at: '2026-09-02T12:00:00Z',
+            updated_at: '2026-09-02T12:00:00Z',
+          },
         ]
       : storeType === 'servicios'
       ? [
@@ -1305,8 +1377,11 @@ export function getStoreStatistics(tenantId: string): StoreStatistics {
 
 // Mecanismo anti-inflación de visitas (Deduplicación por ventana de 30 minutos)
 export function recordStoreVisitSafely(tenantId: string): boolean {
+  if (!isValidTenantId(tenantId)) {
+    return false;
+  }
   const now = Date.now();
-  const sessionKey = `${VISIT_SESSION_KEY}${tenantId}`;
+  const sessionKey = `${VISIT_SESSION_KEY}${tenantId.trim()}`;
   const lastRecorded = localStorage.getItem(sessionKey);
 
   if (lastRecorded) {

@@ -1,8 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { AuthenticatedUser, CentralBoProfile } from '../types';
-import { DEMO_IDENTITIES, resolveUserProfile, resolveStoreById } from '../lib/multiTenantService';
-import { verifyStoreOwnerCredentials } from '../lib/storeOwnerActivationService';
+import { DEMO_IDENTITIES, resolveUserProfile } from '../lib/multiTenantService';
 
 const SESSION_STORAGE_KEY = 'centralbo_auth_session';
 
@@ -98,7 +97,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-  // Iniciar sesión con email y contraseña
+  // Iniciar sesión con email y contraseña mediante Supabase Auth
   const signInWithPassword = async (email: string, password: string) => {
     setIsLoading(true);
     setError(null);
@@ -106,50 +105,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const cleanEmail = email.trim();
 
-      // 1. Verificar si corresponde a un Dueño de Comercio registrado en CentralBo
-      const ownerCheck = verifyStoreOwnerCredentials(cleanEmail, password);
-      if (!ownerCheck.notFound) {
-        if (!ownerCheck.success) {
-          const errMsg = ownerCheck.error || 'Error al validar credenciales';
-          setError(errMsg);
-          setIsLoading(false);
-          return { success: false, error: errMsg };
-        }
-
-        if (ownerCheck.owner) {
-          // Resolver el comercio asociado para garantizar su vinculación exclusiva
-          let store = await resolveStoreById(ownerCheck.owner.storeId);
-          if (!store) {
-            store = {
-              id: ownerCheck.owner.storeId,
-              name: ownerCheck.owner.storeName,
-              slug: ownerCheck.owner.storeSlug || null,
-              store_type: 'general',
-              status: 'activo',
-              logo_url: null,
-              created_at: ownerCheck.owner.createdAt,
-              updated_at: ownerCheck.owner.createdAt,
-            };
-          }
-
-          const authenticatedOwner: AuthenticatedUser = {
-            id: ownerCheck.owner.id,
-            email: ownerCheck.owner.ownerEmail,
-            fullName: ownerCheck.owner.ownerName,
-            profile: 'store_admin',
-            tenantId: ownerCheck.owner.storeId,
-            store: store,
-            storeRole: 'admin',
-          };
-
-          setUser(authenticatedOwner);
-          localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(authenticatedOwner));
-          setIsLoading(false);
-          return { success: true };
-        }
-      }
-
-      // 2. Si no es un dueño local, proceder con Supabase Auth
+      // Autenticación legítima y obligatoria mediante Supabase Auth
+      // Las credenciales locales en localStorage no pueden otorgar acceso administrativo
       const { data, error: authError } = await supabase.auth.signInWithPassword({
         email: cleanEmail,
         password,

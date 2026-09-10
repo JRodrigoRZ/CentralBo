@@ -438,13 +438,12 @@ export function activateStoreOwnerAccount(
     };
   }
 
-  // Activación exitosa
+  // Activación exitosa de metadatos de invitación (sin almacenamiento de credenciales locales para login)
   const now = new Date().toISOString();
   const updatedInvitation: StoreOwnerInvitation = {
     ...invitation,
     status: 'Acceso activado',
     activatedAt: now,
-    passwordHash: password, // Almacenado privadamente para autenticación del dueño
   };
 
   invitations[index] = updatedInvitation;
@@ -458,37 +457,18 @@ export function activateStoreOwnerAccount(
 
 /**
  * Valida credenciales de inicio de sesión de un dueño de comercio
+ * SEGURIDAD (Corrección Crítica #2): Desactivado como mecanismo de autenticación.
+ * Las credenciales o contraseñas almacenadas localmente en localStorage NO pueden otorgar
+ * una sesión administrativa ni autenticar a un usuario. Toda autenticación de administradores
+ * debe realizarse obligatoria y exclusivamente mediante Supabase Auth.
  */
 export function verifyStoreOwnerCredentials(
-  email: string,
-  password: string
+  _email: string,
+  _password: string
 ): { success: boolean; error?: string; notFound?: boolean; owner?: StoreOwnerInvitation } {
-  const invitation = getInvitationByEmail(email);
-
-  if (!invitation) {
-    return { success: false, notFound: true };
-  }
-
-  // Caso: Intento de inicio de sesión con invitación aún pendiente
-  if (invitation.status === 'Invitación pendiente') {
-    return {
-      success: false,
-      error:
-        'Tu cuenta tiene una invitación pendiente de activación. Por favor abre el enlace único de activación que te enviamos por WhatsApp para definir tu contraseña y activar tu acceso.',
-    };
-  }
-
-  // Caso: Contraseña incorrecta
-  if (invitation.passwordHash !== password) {
-    return {
-      success: false,
-      error: 'Contraseña incorrecta. Por favor verifica los datos ingresados.',
-    };
-  }
-
-  // Credenciales válidas
   return {
-    success: true,
-    owner: invitation,
+    success: false,
+    notFound: true,
+    error: 'La autenticación mediante credenciales locales está deshabilitada por seguridad. Inicie sesión mediante Supabase Auth.',
   };
 }

@@ -46,6 +46,7 @@ export const ServiceBookingModal: React.FC<ServiceBookingModalProps> = ({
   preselectedServiceId,
   onClose,
 }) => {
+  const isZenit = storeName.toLowerCase().includes('zenit') || tenantId.includes('zenit') || storeName.toLowerCase().includes('spa');
   const [selectedServiceId, setSelectedServiceId] = useState<string>(
     preselectedServiceId || (services[0]?.id || '')
   );
@@ -100,7 +101,7 @@ export const ServiceBookingModal: React.FC<ServiceBookingModalProps> = ({
   const [selectedTime, setSelectedTime] = useState<string>('');
 
   // Perfil guardado si existe
-  const savedProfile = getSavedCustomerProfile();
+  const savedProfile = getSavedCustomerProfile(tenantId);
   const [customerName, setCustomerName] = useState(savedProfile?.name || '');
   const [customerPhone, setCustomerPhone] = useState(
     savedProfile?.whatsapp || savedProfile?.phone || ''
@@ -281,7 +282,7 @@ ${submittedAppointment.notes ? `Notas: ${submittedAppointment.notes}\n` : ''}
         {/* Encabezado */}
         <div className="flex items-center justify-between pb-3 border-b border-slate-800 shrink-0">
           <div className="flex items-center gap-2 text-white font-bold text-base">
-            <Briefcase className="w-5 h-5 text-indigo-400" />
+            <Briefcase className={`w-5 h-5 ${isZenit ? 'text-emerald-400' : 'text-indigo-400'}`} />
             <span>Solicitud de Cita — {storeName}</span>
           </div>
           <button
@@ -326,7 +327,9 @@ ${submittedAppointment.notes ? `Notas: ${submittedAppointment.notes}\n` : ''}
                     setSelectedProfId(s.attributes.professional_id as string);
                   }
                 }}
-                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-indigo-500 text-xs"
+                className={`w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none text-xs ${
+                  isZenit ? 'focus:border-emerald-500' : 'focus:border-indigo-500'
+                }`}
               >
                 {services.map((srv) => (
                   <option key={srv.id} value={srv.id}>
@@ -362,17 +365,21 @@ ${submittedAppointment.notes ? `Notas: ${submittedAppointment.notes}\n` : ''}
                     }}
                     className={`p-3 rounded-xl border text-left transition cursor-pointer flex items-start gap-3 ${
                       selectedProfId === prof.id
-                        ? 'bg-indigo-600/15 border-indigo-500 text-white shadow-sm ring-1 ring-indigo-500/50'
+                        ? isZenit
+                          ? 'bg-emerald-600/15 border-emerald-500 text-white shadow-sm ring-1 ring-emerald-500/50'
+                          : 'bg-indigo-600/15 border-indigo-500 text-white shadow-sm ring-1 ring-indigo-500/50'
                         : 'bg-slate-950/70 border-slate-800 text-slate-300 hover:border-slate-700'
                     }`}
                   >
-                    <div className="w-8 h-8 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center shrink-0 mt-0.5">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
+                      isZenit ? 'bg-emerald-500/20 text-emerald-400' : 'bg-indigo-500/20 text-indigo-400'
+                    }`}>
                       <User className="w-4 h-4" />
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="font-semibold text-xs truncate">{prof.name}</p>
                       <p className="text-[10px] text-slate-400 truncate">{prof.specialty}</p>
-                      <p className="text-[9px] text-indigo-300/80 mt-1 font-mono">
+                      <p className={`text-[9px] mt-1 font-mono ${isZenit ? 'text-emerald-300/80' : 'text-indigo-300/80'}`}>
                         Turno: {prof.shiftHours || 'Horario regular'}
                       </p>
                     </div>
@@ -395,7 +402,9 @@ ${submittedAppointment.notes ? `Notas: ${submittedAppointment.notes}\n` : ''}
                   }}
                   className={`p-2.5 rounded-xl border text-center font-semibold transition cursor-pointer ${
                     selectedDate === todayStr
-                      ? 'bg-indigo-600 text-white border-indigo-500 shadow-md'
+                      ? isZenit
+                        ? 'bg-emerald-700 text-white border-emerald-600 shadow-md'
+                        : 'bg-indigo-600 text-white border-indigo-500 shadow-md'
                       : 'bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700'
                   }`}
                 >
@@ -411,7 +420,9 @@ ${submittedAppointment.notes ? `Notas: ${submittedAppointment.notes}\n` : ''}
                   }}
                   className={`p-2.5 rounded-xl border text-center font-semibold transition cursor-pointer ${
                     selectedDate === tomorrowStr
-                      ? 'bg-indigo-600 text-white border-indigo-500 shadow-md'
+                      ? isZenit
+                        ? 'bg-emerald-700 text-white border-emerald-600 shadow-md'
+                        : 'bg-indigo-600 text-white border-indigo-500 shadow-md'
                       : 'bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700'
                   }`}
                 >
@@ -430,7 +441,9 @@ ${submittedAppointment.notes ? `Notas: ${submittedAppointment.notes}\n` : ''}
                         setSelectedTime('');
                       }
                     }}
-                    className="w-full h-full p-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs font-mono focus:outline-none focus:border-indigo-500"
+                    className={`w-full h-full p-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs font-mono focus:outline-none ${
+                      isZenit ? 'focus:border-emerald-500' : 'focus:border-indigo-500'
+                    }`}
                     title="Otras fechas"
                   />
                 </div>
@@ -494,7 +507,11 @@ ${submittedAppointment.notes ? `Notas: ${submittedAppointment.notes}\n` : ''}
                           !isAvailable
                             ? 'bg-slate-950/40 border-slate-900 text-slate-600 cursor-not-allowed line-through'
                             : selectedTime === slot.time
-                            ? 'bg-indigo-600 text-white border-indigo-500 shadow-md cursor-pointer ring-2 ring-indigo-400/50'
+                            ? isZenit
+                              ? 'bg-emerald-700 text-white border-emerald-500 shadow-md cursor-pointer ring-2 ring-emerald-400/50'
+                              : 'bg-indigo-600 text-white border-indigo-500 shadow-md cursor-pointer ring-2 ring-indigo-400/50'
+                            : isZenit
+                            ? 'bg-slate-950 border-slate-800 text-slate-200 hover:border-emerald-500/50 hover:bg-slate-900 cursor-pointer'
                             : 'bg-slate-950 border-slate-800 text-slate-200 hover:border-indigo-500/50 hover:bg-slate-900 cursor-pointer'
                         }`}
                         title={
@@ -529,7 +546,9 @@ ${submittedAppointment.notes ? `Notas: ${submittedAppointment.notes}\n` : ''}
                     value={customerName}
                     onChange={(e) => setCustomerName(e.target.value)}
                     placeholder="Ej. Ana Fernández"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs focus:outline-none focus:border-indigo-500"
+                    className={`w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs focus:outline-none ${
+                      isZenit ? 'focus:border-emerald-500' : 'focus:border-indigo-500'
+                    }`}
                   />
                 </div>
 
@@ -541,7 +560,9 @@ ${submittedAppointment.notes ? `Notas: ${submittedAppointment.notes}\n` : ''}
                     value={customerPhone}
                     onChange={(e) => setCustomerPhone(e.target.value)}
                     placeholder="Ej. 71023456"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs focus:outline-none focus:border-indigo-500"
+                    className={`w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs focus:outline-none ${
+                      isZenit ? 'focus:border-emerald-500' : 'focus:border-indigo-500'
+                    }`}
                   />
                 </div>
               </div>
@@ -553,7 +574,9 @@ ${submittedAppointment.notes ? `Notas: ${submittedAppointment.notes}\n` : ''}
                   value={customerEmail}
                   onChange={(e) => setCustomerEmail(e.target.value)}
                   placeholder="ejemplo@correo.com"
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs focus:outline-none focus:border-indigo-500"
+                  className={`w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs focus:outline-none ${
+                    isZenit ? 'focus:border-emerald-500' : 'focus:border-indigo-500'
+                  }`}
                 />
               </div>
 
@@ -564,7 +587,9 @@ ${submittedAppointment.notes ? `Notas: ${submittedAppointment.notes}\n` : ''}
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="Ej. Es mi primera sesión, prefiero presión moderada..."
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs focus:outline-none focus:border-indigo-500 resize-none"
+                  className={`w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs focus:outline-none resize-none ${
+                    isZenit ? 'focus:border-emerald-500' : 'focus:border-indigo-500'
+                  }`}
                 />
               </div>
             </div>
@@ -576,7 +601,11 @@ ${submittedAppointment.notes ? `Notas: ${submittedAppointment.notes}\n` : ''}
           <button
             type="submit"
             form="service-booking-form"
-            className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-600/20 transition cursor-pointer"
+            className={`w-full py-3 rounded-xl text-white text-xs font-bold transition cursor-pointer ${
+              isZenit
+                ? 'bg-emerald-700 hover:bg-emerald-600 shadow-lg shadow-emerald-700/20'
+                : 'bg-indigo-600 hover:bg-indigo-500 shadow-lg shadow-indigo-600/20'
+            }`}
           >
             Enviar Solicitud de Cita
           </button>

@@ -13,11 +13,19 @@ export const StoreAdminPWAInstallButton: React.FC<StoreAdminPWAInstallButtonProp
   tenantId,
   className = '',
 }) => {
-  const { isInstallable, isInstalled, isIOS, install } = usePWA();
+  const { isInstallable, isInstalled, isIOS, install } = usePWA(`/admin/${tenantId}`);
   const [isInstalling, setIsInstalling] = useState(false);
   const [showIOSModal, setShowIOSModal] = useState(false);
   const [showHelpModal, setShowHelpModal] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  // Determinar si la instancia instalada corresponde específicamente a esta administración
+  const isThisAdminInstalled =
+    isInstalled &&
+    (typeof window !== 'undefined'
+      ? (!new URLSearchParams(window.location.search).get('pwa_admin') ||
+         new URLSearchParams(window.location.search).get('pwa_admin') === tenantId)
+      : true);
 
   const adminUrl = typeof window !== 'undefined'
     ? `${window.location.origin}/#/admin/${tenantId}`
@@ -56,8 +64,8 @@ export const StoreAdminPWAInstallButton: React.FC<StoreAdminPWAInstallButtonProp
     }
   };
 
-  // 1. Si ya está instalada y ejecutándose en modo standalone
-  if (isInstalled) {
+  // 1. Si ya está instalada y ejecutándose en modo standalone para este comercio
+  if (isThisAdminInstalled) {
     return (
       <div
         id={`admin-pwa-installed-badge-${tenantId.slice(0, 8)}`}

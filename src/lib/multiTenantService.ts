@@ -12,7 +12,6 @@
 import { supabase } from './supabase';
 import { Store, StoreUserRole, CentralBoProfile, AuthenticatedUser } from '../types';
 import { getStoreOwnerInvitations } from './storeOwnerActivationService';
-import { MOCK_SUPERADMIN_USERS } from './mockUsersData';
 
 // Comercios base validados (definidos en la suite de pruebas de la Fase 1: 04_validation_tests.sql)
 export const BASELINE_STORES: Store[] = [
@@ -233,26 +232,7 @@ export async function resolveUserProfile(
   const normalizedEmail = (userEmail || '').trim().toLowerCase();
   const cleanUserId = (userId || '').trim();
 
-  // 1. Identificar mediante identidades de demostración oficiales
-  const matchingDemo = Object.values(DEMO_IDENTITIES).find(
-    (d) =>
-      (normalizedEmail && d.email.toLowerCase() === normalizedEmail) ||
-      (cleanUserId && d.id === cleanUserId)
-  );
-
-  if (matchingDemo) {
-    return {
-      id: userId || matchingDemo.id,
-      email: userEmail || matchingDemo.email,
-      fullName: matchingDemo.fullName,
-      profile: matchingDemo.profile,
-      tenantId: matchingDemo.tenantId,
-      store: matchingDemo.store,
-      storeRole: matchingDemo.storeRole,
-    };
-  }
-
-  // 2. Identificar mediante accesos o invitaciones de Dueños de Comercio
+  // 1. Identificar mediante accesos o invitaciones de Dueños de Comercio
   try {
     const invitations = getStoreOwnerInvitations();
     const matchingInv = invitations.find(
@@ -290,66 +270,7 @@ export async function resolveUserProfile(
     console.warn('[CentralBo] Error al consultar invitaciones locales:', e);
   }
 
-  // 3. Identificar mediante registros de usuarios del sistema (MOCK_SUPERADMIN_USERS)
-  const matchingMockUser = MOCK_SUPERADMIN_USERS.find(
-    (u) =>
-      (normalizedEmail && u.email.trim().toLowerCase() === normalizedEmail) ||
-      (cleanUserId && u.id === cleanUserId)
-  );
-
-  if (matchingMockUser) {
-    if (matchingMockUser.profile === 'superadmin') {
-      return {
-        id: userId || matchingMockUser.id,
-        email: userEmail,
-        fullName: matchingMockUser.fullName || 'SuperAdmin CentralBo',
-        profile: 'superadmin',
-        tenantId: null,
-        store: null,
-        storeRole: 'superadmin',
-      };
-    }
-
-    if (matchingMockUser.profile === 'store_admin') {
-      const store = matchingMockUser.tenantId
-        ? BASELINE_STORES.find((s) => s.id === matchingMockUser.tenantId) ||
-          ({
-            id: matchingMockUser.tenantId,
-            name: matchingMockUser.storeName || 'Comercio',
-            slug: matchingMockUser.storeSlug || '',
-            store_type: 'general',
-            status: 'activo',
-            logo_url: null,
-            created_at: matchingMockUser.createdAt,
-            updated_at: matchingMockUser.createdAt,
-          } as Store)
-        : null;
-
-      return {
-        id: userId || matchingMockUser.id,
-        email: userEmail,
-        fullName: matchingMockUser.fullName || userEmail.split('@')[0],
-        profile: 'store_admin',
-        tenantId: matchingMockUser.tenantId,
-        store: store,
-        storeRole: 'admin',
-      };
-    }
-
-    if (matchingMockUser.profile === 'public_client') {
-      return {
-        id: userId || matchingMockUser.id,
-        email: userEmail,
-        fullName: matchingMockUser.fullName || userEmail.split('@')[0],
-        profile: 'public_client',
-        tenantId: matchingMockUser.tenantId || null,
-        store: null,
-        storeRole: null,
-      };
-    }
-  }
-
-  // 4. Identificar mediante sesión activa guardada localmente si existe
+  // 2. Identificar mediante sesión activa guardada localmente si existe
   try {
     if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
       const rawSession = localStorage.getItem('centralbo_auth_session');
@@ -376,20 +297,7 @@ export async function resolveUserProfile(
     // Ignorar error al leer sesión previa
   }
 
-  // 5. Heurística SuperAdmin por correo
-  if (normalizedEmail.includes('superadmin')) {
-    return {
-      id: userId,
-      email: userEmail,
-      fullName: 'SuperAdmin Global',
-      profile: 'superadmin',
-      tenantId: null,
-      store: null,
-      storeRole: 'superadmin',
-    };
-  }
-
-  // 6. Último recurso: usuario autenticado genérico o cliente público
+  // 3. Último recurso: usuario autenticado genérico o cliente público (sin privilegios administrativos)
   return {
     id: userId,
     email: userEmail,

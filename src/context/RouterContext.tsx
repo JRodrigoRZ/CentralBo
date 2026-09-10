@@ -154,14 +154,23 @@ export const RouterProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       // Caso Administrador de Comercio
       if (profile === 'store_admin') {
+        if (!user.tenantId) {
+          return {
+            type: 'unauthorized',
+            reason: 'Esta cuenta no tiene asignado un comercio activo válido.',
+            attemptedPath: path,
+            requiredRole: 'admin',
+          };
+        }
+
         // Si no se especifica tenantId en la URL, se asume su propio comercio
         if (!targetTenantId) {
-          return { type: 'store_admin', tenantId: user.tenantId || undefined };
+          return { type: 'store_admin', tenantId: user.tenantId };
         }
 
         // SEGURIDAD CRÍTICA MULTI-TENANT:
         // Verificar que el administrador NO pueda acceder ni administrar otro comercio distinto al suyo
-        if (user.tenantId && user.tenantId !== targetTenantId) {
+        if (user.tenantId !== targetTenantId) {
           return {
             type: 'unauthorized',
             reason: `Violación de Frontera Multi-Tenant: Su cuenta está asociada exclusivamente a su comercio. No tiene permisos para acceder ni administrar el comercio solicitado.`,
@@ -172,7 +181,7 @@ export const RouterProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           };
         }
 
-        return { type: 'store_admin', tenantId: targetTenantId };
+        return { type: 'store_admin', tenantId: user.tenantId };
       }
 
       // Cliente público que intente entrar a admin

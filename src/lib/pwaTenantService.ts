@@ -242,8 +242,26 @@ export function buildPlatformManifest() {
   };
 }
 
+// Estado global del manifiesto activo para aislamiento estricto multi-tenant
+let currentActiveManifestId: string = '/';
+
+export function getActiveManifestId(): string {
+  return currentActiveManifestId;
+}
+
+type ManifestChangeListener = (manifestId: string) => void;
+const manifestChangeListeners = new Set<ManifestChangeListener>();
+
+export function onManifestChange(cb: ManifestChangeListener): () => void {
+  manifestChangeListeners.add(cb);
+  return () => {
+    manifestChangeListeners.delete(cb);
+  };
+}
+
 /**
  * Aplica activamente un manifiesto Web App al documento DOM
+ * Garantiza aislamiento eliminando cualquier manifiesto residual previo y actualizando metadatos visuales.
  */
 export function applyPWAManifest(manifestObj: ReturnType<typeof buildStoreManifest>): void {
   if (typeof document === 'undefined') return;
@@ -253,18 +271,33 @@ export function applyPWAManifest(manifestObj: ReturnType<typeof buildStoreManife
     const dataUri = `data:application/manifest+json;charset=utf-8,${encodeURIComponent(jsonString)}`;
 
     // 1. Manifiesto <link rel="manifest">
-    let link = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
-    if (!link) {
-      link = document.createElement('link');
-      link.rel = 'manifest';
-      document.head.appendChild(link);
+    // Remover todos los tags previos para evitar duplicidad y forzar al navegador a registrar el nuevo manifiesto
+    const existingLinks = document.querySelectorAll<HTMLLinkElement>('link[rel="manifest"]');
+    existingLinks.forEach((el) => el.remove());
+
+    const newLink = document.createElement('link');
+    newLink.rel = 'manifest';
+    newLink.href = dataUri;
+    document.head.appendChild(newLink);
+
+    // 2. Notificar cambio de identidad de manifiesto para invalidar prompts de otros tenants
+    currentActiveManifestId = manifestObj.id;
+    manifestChangeListeners.forEach((cb) => {
+      try {
+        cb(manifestObj.id);
+      } catch (err) {
+        console.warn('[CentralBo PWA] Error en listener de manifest:', err);
+      }
+    });
+
+    // 3. Título de la página
+    if (manifestObj.id === '/') {
+      document.title = 'CentralBo — Plataforma PWA';
+    } else {
+      document.title = `${manifestObj.name} — CentralBo`;
     }
-    link.href = dataUri;
 
-    // 2. Título de la página
-    document.title = `${manifestObj.name} — CentralBo`;
-
-    // 3. Meta theme-color
+    // 4. Meta theme-color
     let metaTheme = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
     if (!metaTheme) {
       metaTheme = document.createElement('meta');
@@ -273,7 +306,7 @@ export function applyPWAManifest(manifestObj: ReturnType<typeof buildStoreManife
     }
     metaTheme.content = manifestObj.theme_color;
 
-    // 4. Meta apple-mobile-web-app-title
+    // 5. Meta apple-mobile-web-app-title
     let metaApple = document.querySelector<HTMLMetaElement>(
       'meta[name="apple-mobile-web-app-title"]'
     );
@@ -284,18 +317,28 @@ export function applyPWAManifest(manifestObj: ReturnType<typeof buildStoreManife
     }
     metaApple.content = manifestObj.short_name;
 
-    // 5. Meta description
+    // 6. Meta description
     let metaDesc = document.querySelector<HTMLMetaElement>('meta[name="description"]');
     if (metaDesc && manifestObj.description) {
       metaDesc.content = manifestObj.description;
     }
 
-    // 6. Iconos apple-touch-icon y favicon si están disponibles
+    // 7. Iconos apple-touch-icon y favicon aislados por tenant
     if (manifestObj.icons && manifestObj.icons.length > 0) {
       const topIcon = manifestObj.icons[0].src;
       let appleIcon = document.querySelector<HTMLLinkElement>('link[rel="apple-touch-icon"]');
       if (appleIcon) {
         appleIcon.href = topIcon;
+      }
+
+      // Icono SVG para pestaña si es data URI dinámico o volver a icon.svg en plataforma
+      const svgFavicon = document.querySelector<HTMLLinkElement>('link[type="image/svg+xml"]');
+      if (svgFavicon) {
+        if (topIcon.startsWith('data:image/svg+xml')) {
+          svgFavicon.href = topIcon;
+        } else if (manifestObj.id === '/') {
+          svgFavicon.href = '/icon.svg';
+        }
       }
     }
   } catch (err) {
