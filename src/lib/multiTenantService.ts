@@ -11,7 +11,6 @@
 
 import { supabase } from './supabase';
 import { Store, StoreUserRole, CentralBoProfile, AuthenticatedUser } from '../types';
-import { getStoreOwnerInvitations } from './storeOwnerActivationService';
 
 // Comercios base validados (definidos en la suite de pruebas de la Fase 1: 04_validation_tests.sql)
 export const BASELINE_STORES: Store[] = [
@@ -227,77 +226,12 @@ export async function resolveUserProfile(
   }
 
   // =========================================================================
-  // FALLBACK OFFLINE / SIN CONEXIÓN A SUPABASE
+  // FALLBACK SEGURO ESTRICTO (Etapa 11B)
   // =========================================================================
-  const normalizedEmail = (userEmail || '').trim().toLowerCase();
-  const cleanUserId = (userId || '').trim();
-
-  // 1. Identificar mediante accesos o invitaciones de Dueños de Comercio
-  try {
-    const invitations = getStoreOwnerInvitations();
-    const matchingInv = invitations.find(
-      (inv) =>
-        normalizedEmail &&
-        inv.ownerEmail &&
-        inv.ownerEmail.trim().toLowerCase() === normalizedEmail
-    );
-
-    if (matchingInv) {
-      const store =
-        BASELINE_STORES.find((s) => s.id === matchingInv.storeId) ||
-        ({
-          id: matchingInv.storeId,
-          name: matchingInv.storeName,
-          slug: matchingInv.storeSlug,
-          store_type: 'general',
-          status: 'activo',
-          logo_url: null,
-          created_at: matchingInv.createdAt || new Date().toISOString(),
-          updated_at: matchingInv.activatedAt || matchingInv.createdAt || new Date().toISOString(),
-        } as Store);
-
-      return {
-        id: userId || matchingInv.id,
-        email: userEmail,
-        fullName: matchingInv.ownerName || userEmail.split('@')[0],
-        profile: 'store_admin',
-        tenantId: matchingInv.storeId,
-        store: store,
-        storeRole: 'admin',
-      };
-    }
-  } catch (e) {
-    console.warn('[CentralBo] Error al consultar invitaciones locales:', e);
-  }
-
-  // 2. Identificar mediante sesión activa guardada localmente si existe
-  try {
-    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
-      const rawSession = localStorage.getItem('centralbo_auth_session');
-      if (rawSession) {
-        const parsed = JSON.parse(rawSession);
-        if (
-          parsed &&
-          ((normalizedEmail && parsed.email?.trim().toLowerCase() === normalizedEmail) ||
-            (cleanUserId && parsed.id === cleanUserId))
-        ) {
-          return {
-            id: userId || parsed.id,
-            email: userEmail || parsed.email,
-            fullName: parsed.fullName || userEmail.split('@')[0],
-            profile: parsed.profile || 'public_client',
-            tenantId: parsed.tenantId || null,
-            store: parsed.store || null,
-            storeRole: parsed.storeRole || null,
-          };
-        }
-      }
-    }
-  } catch {
-    // Ignorar error al leer sesión previa
-  }
-
-  // 3. Último recurso: usuario autenticado genérico o cliente público (sin privilegios administrativos)
+  // Si no existe un registro administrativo activo en Supabase (store_users con is_active=true),
+  // el usuario se resuelve estrictamente como cliente público (public_client) sin privilegios
+  // administrativos, sin tenantId y sin storeRole.
+  // Las invitaciones locales o datos en localStorage NO pueden otorgar ni reconstruir un perfil store_admin.
   return {
     id: userId,
     email: userEmail,

@@ -115,27 +115,92 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
 
   const handleSaveProduct = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!currentProduct || !currentProduct.name) return;
+    if (!currentProduct) return;
+
+    // 1. Validación runtime estricta de Nombre
+    if (
+      typeof currentProduct.name !== 'string' ||
+      !currentProduct.name.trim()
+    ) {
+      showNotification('El nombre del producto es obligatorio y no puede estar vacío ni contener solo espacios.');
+      return;
+    }
+
+    // 2. Validación runtime estricta de Precio
+    const rawPrice = currentProduct.price;
+    const numPrice = Number(rawPrice);
+    if (
+      (typeof rawPrice !== 'number' && typeof rawPrice !== 'string') ||
+      isNaN(numPrice) ||
+      !Number.isFinite(numPrice) ||
+      numPrice < 0
+    ) {
+      showNotification('El precio debe ser un número válido, finito y mayor o igual a 0.');
+      return;
+    }
+
+    // 3. Validación runtime de Precio Anterior (opcional)
+    let cleanPrevPrice: number | null = null;
+    const rawPrevPrice = currentProduct.attributes?.previous_price;
+    if (rawPrevPrice !== undefined && rawPrevPrice !== null && rawPrevPrice !== '') {
+      const numPrev = Number(rawPrevPrice);
+      if (isNaN(numPrev) || !Number.isFinite(numPrev) || numPrev < 0) {
+        showNotification('El precio anterior debe ser un número válido, finito y no negativo.');
+        return;
+      }
+      cleanPrevPrice = numPrev;
+    }
+
+    // 4. Validación runtime de Precio de Oferta (opcional)
+    let cleanOfferPrice: number | null = null;
+    const rawOfferPrice = currentProduct.attributes?.offer_price;
+    if (rawOfferPrice !== undefined && rawOfferPrice !== null && rawOfferPrice !== '') {
+      const numOffer = Number(rawOfferPrice);
+      if (isNaN(numOffer) || !Number.isFinite(numOffer) || numOffer < 0) {
+        showNotification('El precio de oferta debe ser un número válido, finito y no negativo.');
+        return;
+      }
+      cleanOfferPrice = numOffer;
+    }
+
+    // 5. Límite estricto de descripción (máx 1000 caracteres)
+    const cleanDescription = typeof currentProduct.description === 'string'
+      ? currentProduct.description.slice(0, 1000)
+      : null;
+
+    const cleanName = currentProduct.name.trim().slice(0, 150);
 
     const exists = products.some((p) => p.id === currentProduct.id);
     let updated: Product[];
 
+    // Normalizar objeto descartando propiedades arbitrarias
+    const cleanAttributes: Record<string, unknown> = {
+      ...(currentProduct.attributes || {}),
+      previous_price: cleanPrevPrice,
+      offer_price: cleanOfferPrice,
+    };
+
+    const targetId = currentProduct.id || `prod-${Date.now()}`;
+    const normalizedProduct: Product = {
+      id: targetId,
+      tenant_id: store.id,
+      category_id: typeof currentProduct.category_id === 'string' ? currentProduct.category_id : null,
+      name: cleanName,
+      description: cleanDescription,
+      price: numPrice,
+      is_available: currentProduct.is_available ?? true,
+      image_url: typeof currentProduct.image_url === 'string' ? currentProduct.image_url : null,
+      status: currentProduct.status === 'inactivo' || currentProduct.status === 'agotado' ? currentProduct.status : 'activo',
+      attributes: cleanAttributes,
+      created_at: currentProduct.created_at || new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
     if (exists) {
-      updated = products.map((p) =>
-        p.id === currentProduct.id
-          ? ({ ...p, ...currentProduct, updated_at: new Date().toISOString() } as Product)
-          : p
-      );
+      updated = products.map((p) => (p.id === targetId ? normalizedProduct : p));
       showNotification('Producto actualizado exitosamente.');
     } else {
-      const fullNewProduct = {
-        ...currentProduct,
-        id: currentProduct.id || `prod-${Date.now()}`,
-        tenant_id: store.id,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      } as Product;
-      updated = [fullNewProduct, ...products];
+      updated = [normalizedProduct, ...products];
       showNotification('Nuevo producto añadido al catálogo.');
     }
 
@@ -462,6 +527,7 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
                   <input
                     type="text"
                     required
+                    maxLength={150}
                     value={currentProduct.name || ''}
                     onChange={(e) =>
                       setCurrentProduct({ ...currentProduct, name: e.target.value })
@@ -493,17 +559,23 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">
-                  Descripción
-                </label>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="block text-xs font-medium text-slate-300">
+                    Descripción
+                  </label>
+                  <span className="text-[10px] text-slate-500">
+                    {(currentProduct.description || '').length}/1000
+                  </span>
+                </div>
                 <textarea
                   rows={2}
+                  maxLength={1000}
                   value={currentProduct.description || ''}
                   onChange={(e) =>
                     setCurrentProduct({ ...currentProduct, description: e.target.value })
                   }
                   className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-indigo-500 resize-none"
-                  placeholder="Detalles de preparación, ingredientes, materiales o alcance..."
+                  placeholder="Detalles de preparación, ingredientes, materiales o alcance (máx. 1000 caracteres)..."
                 />
               </div>
 

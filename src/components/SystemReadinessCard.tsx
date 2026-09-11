@@ -33,6 +33,23 @@ export const SystemReadinessCard: React.FC = () => {
     endpoint: 'https://wuerdwkcpurbtcwyqjep.supabase.co',
   });
 
+  // SEC-14A-04: Cooldown para evitar saturación o llamadas repetitivas en pruebas de conectividad
+  const [cooldownRemaining, setCooldownRemaining] = useState<number>(0);
+
+  useEffect(() => {
+    if (cooldownRemaining <= 0) return;
+    const timer = setInterval(() => {
+      setCooldownRemaining((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [cooldownRemaining]);
+
   useEffect(() => {
     const handleResize = () => setWindowWidth(window.innerWidth);
     window.addEventListener('resize', handleResize);
@@ -41,10 +58,15 @@ export const SystemReadinessCard: React.FC = () => {
 
   // Probar conectividad no destructiva al montar
   useEffect(() => {
-    runConnectionTest();
+    runConnectionTest(false);
   }, []);
 
-  const runConnectionTest = async () => {
+  const runConnectionTest = async (isManual = false) => {
+    // Si ya está probando o en cooldown, ignorar la petición
+    if (dbStatus.testing || (isManual && cooldownRemaining > 0)) {
+      return;
+    }
+
     setDbStatus((prev) => ({ ...prev, testing: true }));
     const result = await testCentralBoConnection();
     setDbStatus({
@@ -55,6 +77,10 @@ export const SystemReadinessCard: React.FC = () => {
       endpoint: result.endpoint,
       latencyMs: result.latencyMs,
     });
+
+    if (isManual) {
+      setCooldownRemaining(8); // 8 segundos de cooldown
+    }
   };
 
   const getDeviceCategory = () => {
@@ -219,13 +245,19 @@ export const SystemReadinessCard: React.FC = () => {
             </div>
             <button
               id="test-supabase-btn"
-              onClick={runConnectionTest}
-              disabled={dbStatus.testing}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-medium border border-slate-700 transition cursor-pointer disabled:opacity-50"
-              title="Comprobar conectividad no destructiva"
+              onClick={() => runConnectionTest(true)}
+              disabled={dbStatus.testing || cooldownRemaining > 0}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-medium border border-slate-700 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              title={cooldownRemaining > 0 ? `Espera ${cooldownRemaining}s para volver a probar` : 'Comprobar conectividad no destructiva'}
             >
               <RefreshCw className={`w-3 h-3 ${dbStatus.testing ? 'animate-spin text-cyan-400' : ''}`} />
-              <span>{dbStatus.testing ? 'Probando...' : 'Verificar'}</span>
+              <span>
+                {dbStatus.testing
+                  ? 'Probando...'
+                  : cooldownRemaining > 0
+                  ? `Espera (${cooldownRemaining}s)`
+                  : 'Verificar'}
+              </span>
             </button>
           </div>
 

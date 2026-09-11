@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ShoppingBag,
   Clock,
@@ -89,6 +89,12 @@ export const StoreAdminPedidos: React.FC<StoreAdminPedidosProps> = ({ store }) =
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [notification, setNotification] = useState<string | null>(null);
+
+  useEffect(() => {
+    setOrders(getStoreOrders(store.id));
+    setSelectedOrder(null);
+    setNotification(null);
+  }, [store.id]);
 
   const filteredOrders = orders.filter((o) => {
     if (statusFilter !== 'all' && o.status !== statusFilter) return false;

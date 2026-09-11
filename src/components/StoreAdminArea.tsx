@@ -494,7 +494,7 @@ export const StoreAdminArea: React.FC<StoreAdminAreaProps> = ({ tenantId }) => {
         )}
 
         {/* PEDIDOS */}
-        {activeTab === 'pedidos' && <StoreAdminPedidos store={currentStore} />}
+        {activeTab === 'pedidos' && <StoreAdminPedidos key={currentStore.id} store={currentStore} />}
 
         {/* PROMOCIONES */}
         {activeTab === 'promociones' && <StoreAdminPromociones store={currentStore} />}

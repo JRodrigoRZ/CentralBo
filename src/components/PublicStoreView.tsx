@@ -146,6 +146,8 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
     setProfessionals([]);
     setCartItems([]);
     setSelectedProduct(null);
+    setIsBookingOpen(false);
+    setIsOrdersHistoryOpen(false);
 
     resolveStoreBySlug(slug)
       .then((resolved) => {
@@ -1132,7 +1134,7 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
       )}
 
       {/* MODAL: SOLICITUD DE CITA (SERVICIOS) */}
-      {isBookingOpen && (
+      {isBookingOpen && store && profile && (
         <ServiceBookingModal
           tenantId={store.id}
           storeName={store.name}
@@ -1153,7 +1155,7 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
       )}
 
       {/* MODAL: MIS PEDIDOS & CITAS */}
-      {isOrdersHistoryOpen && (
+      {isOrdersHistoryOpen && store && profile && (
         <CustomerOrdersModal
           tenantId={store.id}
           storeName={store.name}

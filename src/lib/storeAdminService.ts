@@ -68,20 +68,203 @@ function getStorageKey(tenantId: string, section: string): string {
   return `${TENANT_STORAGE_PREFIX}${tenantId.trim()}_${section.trim()}`;
 }
 
+export const CANONICAL_ORDER_STATUSES: readonly string[] = [
+  'pendiente',
+  'recibido',
+  'pagado',
+  'en_preparacion',
+  'despachado',
+  'completado',
+  'cancelado',
+];
+
+function cloneFallback<T>(fallback: T): T {
+  if (typeof fallback === 'object' && fallback !== null) {
+    try {
+      return JSON.parse(JSON.stringify(fallback)) as T;
+    } catch {
+      return fallback;
+    }
+  }
+  return fallback;
+}
+
+function sanitizeProductItem(item: any, tenantId: string): Product | null {
+  if (
+    !item ||
+    typeof item !== 'object' ||
+    typeof item.id !== 'string' ||
+    !item.id.trim() ||
+    typeof item.name !== 'string' ||
+    !item.name.trim() ||
+    typeof item.price !== 'number' ||
+    !Number.isFinite(item.price) ||
+    item.price < 0
+  ) {
+    return null;
+  }
+
+  // Sanear atributos descartando propiedades arbitrarias
+  const rawAttrs = (item.attributes && typeof item.attributes === 'object' && !Array.isArray(item.attributes))
+    ? item.attributes
+    : {};
+  
+  const cleanAttrs: Record<string, unknown> = {};
+  if (typeof rawAttrs.is_featured === 'boolean') cleanAttrs.is_featured = rawAttrs.is_featured;
+  if (typeof rawAttrs.previous_price === 'number' && Number.isFinite(rawAttrs.previous_price) && rawAttrs.previous_price >= 0) {
+    cleanAttrs.previous_price = rawAttrs.previous_price;
+  } else {
+    cleanAttrs.previous_price = null;
+  }
+  if (typeof rawAttrs.offer_price === 'number' && Number.isFinite(rawAttrs.offer_price) && rawAttrs.offer_price >= 0) {
+    cleanAttrs.offer_price = rawAttrs.offer_price;
+  } else {
+    cleanAttrs.offer_price = null;
+  }
+  if (Array.isArray(rawAttrs.sizes)) {
+    cleanAttrs.sizes = rawAttrs.sizes.filter((s: unknown) => typeof s === 'string').slice(0, 20);
+  }
+  if (Array.isArray(rawAttrs.colors)) {
+    cleanAttrs.colors = rawAttrs.colors.filter((c: any) => c && typeof c === 'object' && typeof c.name === 'string').slice(0, 20);
+  }
+  if (typeof rawAttrs.kitchen_notes_allowed === 'boolean') cleanAttrs.kitchen_notes_allowed = rawAttrs.kitchen_notes_allowed;
+  if (Array.isArray(rawAttrs.modifiers)) cleanAttrs.modifiers = rawAttrs.modifiers.slice(0, 30);
+  if (typeof rawAttrs.is_combo === 'boolean') cleanAttrs.is_combo = rawAttrs.is_combo;
+  if (typeof rawAttrs.duration_minutes === 'number' && Number.isFinite(rawAttrs.duration_minutes) && rawAttrs.duration_minutes > 0) {
+    cleanAttrs.duration_minutes = rawAttrs.duration_minutes;
+  }
+  if (typeof rawAttrs.professional_id === 'string') cleanAttrs.professional_id = rawAttrs.professional_id;
+
+  return {
+    id: String(item.id).trim(),
+    tenant_id: typeof item.tenant_id === 'string' && item.tenant_id.trim() ? item.tenant_id.trim() : tenantId,
+    category_id: typeof item.category_id === 'string' ? item.category_id : null,
+    name: String(item.name).trim().slice(0, 150),
+    description: typeof item.description === 'string' ? item.description.slice(0, 1000) : null,
+    price: Number(item.price),
+    is_available: Boolean(item.is_available),
+    image_url: typeof item.image_url === 'string' ? item.image_url : null,
+    status: (item.status === 'inactivo' || item.status === 'agotado') ? item.status : 'activo',
+    attributes: cleanAttrs,
+    created_at: typeof item.created_at === 'string' ? item.created_at : new Date().toISOString(),
+    updated_at: typeof item.updated_at === 'string' ? item.updated_at : new Date().toISOString(),
+  };
+}
+
+function sanitizeOrderItem(item: any, tenantId: string): Order | null {
+  if (
+    !item ||
+    typeof item !== 'object' ||
+    typeof item.id !== 'string' ||
+    !item.id.trim() ||
+    typeof item.total !== 'number' ||
+    !Number.isFinite(item.total) ||
+    item.total < 0
+  ) {
+    return null;
+  }
+
+  const validStatus = (typeof item.status === 'string' && CANONICAL_ORDER_STATUSES.includes(item.status))
+    ? (item.status as OrderStatus)
+    : 'pendiente';
+
+  return {
+    id: String(item.id).trim(),
+    tenant_id: typeof item.tenant_id === 'string' && item.tenant_id.trim() ? item.tenant_id.trim() : tenantId,
+    customer_id: typeof item.customer_id === 'string' ? item.customer_id : null,
+    customer_name: typeof item.customer_name === 'string' ? item.customer_name.slice(0, 100) : null,
+    customer_email: typeof item.customer_email === 'string' ? item.customer_email.slice(0, 120) : null,
+    customer_phone: typeof item.customer_phone === 'string' ? item.customer_phone.slice(0, 25) : null,
+    status: validStatus,
+    total: Number(item.total),
+    created_at: typeof item.created_at === 'string' ? item.created_at : new Date().toISOString(),
+    updated_at: typeof item.updated_at === 'string' ? item.updated_at : new Date().toISOString(),
+  };
+}
+
+function sanitizeCategoryItem(item: any, tenantId: string): Category | null {
+  if (
+    !item ||
+    typeof item !== 'object' ||
+    typeof item.id !== 'string' ||
+    !item.id.trim() ||
+    typeof item.name !== 'string' ||
+    !item.name.trim()
+  ) {
+    return null;
+  }
+
+  return {
+    id: String(item.id).trim(),
+    tenant_id: typeof item.tenant_id === 'string' && item.tenant_id.trim() ? item.tenant_id.trim() : tenantId,
+    name: String(item.name).trim().slice(0, 100),
+    status: item.status === 'inactivo' ? 'inactivo' : 'activo',
+    created_at: typeof item.created_at === 'string' ? item.created_at : new Date().toISOString(),
+    updated_at: typeof item.updated_at === 'string' ? item.updated_at : new Date().toISOString(),
+  };
+}
+
 function loadFromStorage<T>(tenantId: string, section: string, fallback: T): T {
   if (!isValidTenantId(tenantId)) {
     console.warn(`[CentralBo StoreAdmin] Intento de acceso a sección "${section}" con tenantId inválido: "${tenantId}"`);
-    return fallback;
+    return cloneFallback(fallback);
   }
   try {
     const raw = localStorage.getItem(getStorageKey(tenantId, section));
     if (raw) {
-      return JSON.parse(raw) as T;
+      const parsed = JSON.parse(raw);
+
+      // Si el fallback esperado es un Array, validar que parsed sea Array y descartar corruptos
+      if (Array.isArray(fallback)) {
+        if (!Array.isArray(parsed)) {
+          console.warn(`[CentralBo StoreAdmin] Se esperaba un array para "${section}", recibido:`, typeof parsed);
+          return cloneFallback(fallback);
+        }
+
+        if (section === 'products') {
+          const sanitizedProducts = parsed
+            .map((item) => sanitizeProductItem(item, tenantId))
+            .filter((p): p is Product => p !== null);
+          return (sanitizedProducts.length > 0 ? sanitizedProducts : cloneFallback(fallback)) as unknown as T;
+        }
+
+        if (section === 'orders') {
+          const sanitizedOrders = parsed
+            .map((item) => sanitizeOrderItem(item, tenantId))
+            .filter((o): o is Order => o !== null);
+          return sanitizedOrders as unknown as T;
+        }
+
+        if (section === 'categories') {
+          const sanitizedCategories = parsed
+            .map((item) => sanitizeCategoryItem(item, tenantId))
+            .filter((c): c is Category => c !== null);
+          return (sanitizedCategories.length > 0 ? sanitizedCategories : cloneFallback(fallback)) as unknown as T;
+        }
+
+        // Para otras colecciones (schedule, promotions, professionals, appointments):
+        // descartar elementos que no sean objetos válidos
+        const cleanList = parsed.filter(
+          (item) => item !== null && typeof item === 'object' && !Array.isArray(item)
+        );
+        return cleanList as unknown as T;
+      }
+
+      // Si el fallback es un objeto individual, validar tipo objeto no nulo y no array
+      if (typeof fallback === 'object' && fallback !== null) {
+        if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+          console.warn(`[CentralBo StoreAdmin] Se esperaba un objeto para "${section}", recibido:`, typeof parsed);
+          return cloneFallback(fallback);
+        }
+        return parsed as T;
+      }
+
+      return parsed as T;
     }
   } catch (e) {
-    console.warn(`[CentralBo StoreAdmin] Error al cargar ${section}:`, e);
+    console.warn(`[CentralBo StoreAdmin] Error al cargar ${section} (JSON inválido o corrupto):`, e);
   }
-  return fallback;
+  return cloneFallback(fallback);
 }
 
 function saveToStorage<T>(tenantId: string, section: string, data: T): void {
@@ -1193,7 +1376,14 @@ export function saveStoreProducts(
   tenantId: string,
   products: Product[]
 ): void {
-  saveToStorage(tenantId, 'products', products);
+  if (!Array.isArray(products)) {
+    console.warn('[CentralBo StoreAdmin] Intento de guardar productos con valor no válido.');
+    return;
+  }
+  const sanitized = products
+    .map((p) => sanitizeProductItem(p, tenantId))
+    .filter((p): p is Product => p !== null);
+  saveToStorage(tenantId, 'products', sanitized);
 }
 
 // ----------------------------------------------------------------------------
@@ -1267,7 +1457,14 @@ export function getStoreOrders(tenantId: string): Order[] {
 }
 
 export function saveStoreOrders(tenantId: string, orders: Order[]): void {
-  saveToStorage(tenantId, 'orders', orders);
+  if (!Array.isArray(orders)) {
+    console.warn('[CentralBo StoreAdmin] Intento de guardar pedidos con valor no válido.');
+    return;
+  }
+  const sanitized = orders
+    .map((o) => sanitizeOrderItem(o, tenantId))
+    .filter((o): o is Order => o !== null);
+  saveToStorage(tenantId, 'orders', sanitized);
 }
 
 export function updateOrderStatus(
@@ -1275,6 +1472,16 @@ export function updateOrderStatus(
   orderId: string,
   newStatus: OrderStatus
 ): { success: boolean; order?: Order } {
+  // Validación estricta en runtime: debe pertenecer exclusivamente al conjunto canónico
+  if (
+    !newStatus ||
+    typeof newStatus !== 'string' ||
+    !CANONICAL_ORDER_STATUSES.includes(newStatus)
+  ) {
+    console.warn(`[CentralBo StoreAdmin] Estado de pedido rechazado por no ser canónico: "${newStatus}"`);
+    return { success: false };
+  }
+
   const orders = getStoreOrders(tenantId);
   const index = orders.findIndex((o) => o.id === orderId);
   if (index === -1) {

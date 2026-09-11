@@ -54,6 +54,52 @@ interface CheckoutModalProps {
   primaryColor?: string;
 }
 
+// SEC-14A-02: Rate Limiting & Cooldown para Checkout y Creación de Pedidos
+const CHECKOUT_RATE_LIMIT_KEY = 'cb_checkout_ratelimit';
+const ORDER_COOLDOWN_MS = 15000; // 15 segundos entre pedidos
+const MAX_ORDERS_PER_SESSION_WINDOW = 8; // Máximo 8 pedidos en 30 minutos
+const SESSION_WINDOW_MS = 30 * 60 * 1000; // 30 minutos
+
+interface CheckoutRateLimitRecord {
+  lastOrderTimestamp: number;
+  ordersInWindow: number;
+  windowStartTime: number;
+}
+
+function getCheckoutRateLimit(): CheckoutRateLimitRecord {
+  try {
+    const raw = sessionStorage.getItem(CHECKOUT_RATE_LIMIT_KEY);
+    if (!raw) return { lastOrderTimestamp: 0, ordersInWindow: 0, windowStartTime: 0 };
+    const parsed = JSON.parse(raw);
+    return {
+      lastOrderTimestamp: typeof parsed.lastOrderTimestamp === 'number' ? parsed.lastOrderTimestamp : 0,
+      ordersInWindow: typeof parsed.ordersInWindow === 'number' ? parsed.ordersInWindow : 0,
+      windowStartTime: typeof parsed.windowStartTime === 'number' ? parsed.windowStartTime : 0,
+    };
+  } catch {
+    return { lastOrderTimestamp: 0, ordersInWindow: 0, windowStartTime: 0 };
+  }
+}
+
+function recordOrderIssued(): void {
+  try {
+    const now = Date.now();
+    const current = getCheckoutRateLimit();
+    const isWindowValid = current.windowStartTime > 0 && now - current.windowStartTime < SESSION_WINDOW_MS;
+    const ordersInWindow = isWindowValid ? current.ordersInWindow + 1 : 1;
+    const windowStartTime = isWindowValid ? current.windowStartTime : now;
+
+    sessionStorage.setItem(
+      CHECKOUT_RATE_LIMIT_KEY,
+      JSON.stringify({
+        lastOrderTimestamp: now,
+        ordersInWindow,
+        windowStartTime,
+      })
+    );
+  } catch {}
+}
+
 export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   store,
   profile,
@@ -165,6 +211,32 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [formError, setFormError] = useState<string | null>(null);
   const [copiedSummary, setCopiedSummary] = useState(false);
 
+  // SEC-14A-02: Estado de Cooldown entre pedidos
+  const [cooldownRemaining, setCooldownRemaining] = useState<number>(() => {
+    const rl = getCheckoutRateLimit();
+    const elapsed = Date.now() - rl.lastOrderTimestamp;
+    if (elapsed < ORDER_COOLDOWN_MS) {
+      return Math.ceil((ORDER_COOLDOWN_MS - elapsed) / 1000);
+    }
+    return 0;
+  });
+
+  useEffect(() => {
+    if (cooldownRemaining <= 0) return;
+    const timer = setInterval(() => {
+      const rl = getCheckoutRateLimit();
+      const elapsed = Date.now() - rl.lastOrderTimestamp;
+      const remaining = Math.ceil((ORDER_COOLDOWN_MS - elapsed) / 1000);
+      if (remaining <= 0) {
+        setCooldownRemaining(0);
+        clearInterval(timer);
+      } else {
+        setCooldownRemaining(remaining);
+      }
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [cooldownRemaining]);
+
   // Cálculo de importes
   const subtotal = items.reduce((acc, it) => acc + it.price * it.quantity, 0);
 
@@ -252,18 +324,74 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     e.preventDefault();
     setFormError(null);
 
-    if (!customerName.trim()) {
-      setFormError('Por favor ingresa tu nombre.');
+    // SEC-14A-02: Verificación estricta de cooldown temporal entre pedidos
+    const rl = getCheckoutRateLimit();
+    const elapsed = Date.now() - rl.lastOrderTimestamp;
+    if (elapsed < ORDER_COOLDOWN_MS) {
+      const remainingSecs = Math.ceil((ORDER_COOLDOWN_MS - elapsed) / 1000);
+      setCooldownRemaining(remainingSecs);
+      setFormError(`Por favor espera ${remainingSecs} segundo${remainingSecs === 1 ? '' : 's'} antes de emitir un nuevo pedido.`);
       return;
     }
-    if (!phone.trim()) {
+
+    // SEC-14A-02: Verificación de límite de pedidos por sesión (máx 8 por 30m)
+    const isWindowValid = rl.windowStartTime > 0 && Date.now() - rl.windowStartTime < SESSION_WINDOW_MS;
+    if (isWindowValid && rl.ordersInWindow >= MAX_ORDERS_PER_SESSION_WINDOW) {
+      setFormError(
+        'Has alcanzado el límite máximo de pedidos permitidos para esta sesión (8 pedidos). Por favor espera unos minutos antes de emitir más pedidos.'
+      );
+      return;
+    }
+
+    if (isProcessing) return;
+
+    // 1. Validación de Nombre (máx 100 caracteres)
+    const trimmedName = customerName.trim();
+    if (!trimmedName) {
+      setFormError('Por favor ingresa tu nombre completo.');
+      return;
+    }
+    if (trimmedName.length > 100) {
+      setFormError('El nombre no puede exceder 100 caracteres.');
+      return;
+    }
+
+    // 2. Validación robusta de Teléfono (entre 7 y 25 caracteres, sin letras ni símbolos peligrosos)
+    const trimmedPhone = phone.trim();
+    if (!trimmedPhone) {
       setFormError('Por favor ingresa un número de teléfono de contacto.');
       return;
     }
-    if (deliveryMethod === 'delivery' && !deliveryAddress.trim()) {
-      setFormError('Por favor ingresa la dirección de entrega.');
+    // Acepta números bolivianos e internacionales estándar: dígitos, espacios, guiones, paréntesis y '+'
+    const phoneRegex = /^[+]?[(]?[0-9]{1,4}[)]?[-\s./0-9]{5,20}$/;
+    const digitsOnly = trimmedPhone.replace(/\D/g, '');
+    if (
+      trimmedPhone.length < 7 ||
+      trimmedPhone.length > 25 ||
+      !phoneRegex.test(trimmedPhone) ||
+      digitsOnly.length < 7
+    ) {
+      setFormError('Por favor ingresa un número de teléfono válido (mínimo 7 dígitos, ej. 71234567 o +591 71234567).');
       return;
     }
+
+    // 3. Validación de Dirección de Entrega (máx 200 caracteres)
+    const trimmedAddress = deliveryAddress.trim();
+    if (deliveryMethod === 'delivery') {
+      if (!trimmedAddress) {
+        setFormError('Por favor ingresa la dirección de entrega.');
+        return;
+      }
+      if (trimmedAddress.length > 200) {
+        setFormError('La dirección de entrega no puede exceder 200 caracteres.');
+        return;
+      }
+    }
+
+    // 4. Límite de Notas Generales (máx 300 caracteres)
+    const cleanGeneralNotes = generalNotes.trim().slice(0, 300);
+    const cleanPickupNotes = pickupNotes.trim().slice(0, 300);
+
     if (availablePaymentOptions.length > 0 && !availablePaymentOptions.some((opt) => opt.id === paymentMethod)) {
       setFormError('Por favor selecciona un método de pago disponible.');
       return;
@@ -279,9 +407,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       id: orderId,
       tenant_id: store.id,
       customer_id: null, // Compra como invitado
-      customer_name: customerName.trim(),
-      customer_email: email.trim() || null,
-      customer_phone: phone.trim(),
+      customer_name: trimmedName.slice(0, 100),
+      customer_email: email.trim().slice(0, 120) || null,
+      customer_phone: trimmedPhone.slice(0, 25),
       status: 'pendiente' as OrderStatus,
       total: Number(finalTotal.toFixed(2)),
       created_at: new Date().toISOString(),
@@ -306,16 +434,16 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       shippingCost: Number(shippingCost.toFixed(2)),
       total: Number(finalTotal.toFixed(2)),
       deliveryMethod: deliveryMethod,
-      deliveryAddress: deliveryAddress.trim() || undefined,
-      deliveryReference: deliveryReference.trim() || undefined,
-      pickupNotes: pickupNotes.trim() || undefined,
+      deliveryAddress: trimmedAddress || undefined,
+      deliveryReference: deliveryReference.trim().slice(0, 200) || undefined,
+      pickupNotes: (deliveryMethod === 'pickup' ? cleanPickupNotes : cleanGeneralNotes) || undefined,
       isScheduled: isScheduled,
       scheduledDate: isScheduled ? scheduledDate : undefined,
       scheduledSlot: isScheduled ? scheduledSlot : undefined,
       paymentMethod: paymentMethod,
-      customerName: customerName.trim(),
-      customerPhone: phone.trim(),
-      customerEmail: email.trim(),
+      customerName: trimmedName.slice(0, 100),
+      customerPhone: trimmedPhone.slice(0, 25),
+      customerEmail: email.trim().slice(0, 120),
       createdAt: new Date().toISOString(),
       status: 'pendiente',
     };
@@ -326,12 +454,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     if (saveProfile) {
       saveCustomerProfile(
         {
-          name: customerName.trim(),
-          phone: phone.trim(),
-          whatsapp: whatsapp.trim() || phone.trim(),
-          email: email.trim(),
-          address: deliveryAddress.trim(),
-          reference: deliveryReference.trim(),
+          name: trimmedName.slice(0, 100),
+          phone: trimmedPhone.slice(0, 25),
+          whatsapp: whatsapp.trim().slice(0, 25) || trimmedPhone.slice(0, 25),
+          email: email.trim().slice(0, 120),
+          address: trimmedAddress.slice(0, 200),
+          reference: deliveryReference.trim().slice(0, 200),
           city: 'La Paz',
         },
         store.id
@@ -340,6 +468,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
     // Limpiar carrito del tenant
     clearTenantCart(store.id);
+
+    // SEC-14A-02: Registrar emisión de pedido para cooldown y límite por sesión
+    recordOrderIssued();
+    setCooldownRemaining(Math.ceil(ORDER_COOLDOWN_MS / 1000));
 
     setPlacedOrder(clientOrderRecord);
     setIsProcessing(false);
@@ -573,6 +705,16 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
         {/* Formulario (Scrollable) */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 text-xs">
+          {cooldownRemaining > 0 && (
+            <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-2.5">
+              <Clock className="w-4 h-4 shrink-0 text-amber-400 animate-pulse" />
+              <span>
+                Protección contra envíos repetidos: Por favor espera{' '}
+                <strong className="underline">{cooldownRemaining}s</strong> antes de confirmar otro pedido.
+              </span>
+            </div>
+          )}
+
           {formError && (
             <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0" />
@@ -589,12 +731,18 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-[11px] text-slate-300 font-semibold">
-                    Nombre Completo *
-                  </label>
+                  <div className="flex justify-between items-center">
+                    <label className="text-[11px] text-slate-300 font-semibold">
+                      Nombre Completo *
+                    </label>
+                    <span className="text-[10px] text-slate-500">
+                      {customerName.length}/100
+                    </span>
+                  </div>
                   <input
                     type="text"
                     required
+                    maxLength={100}
                     value={customerName}
                     onChange={(e) => setCustomerName(e.target.value)}
                     placeholder="Ej. Rodrigo Mendoza"
@@ -603,18 +751,24 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[11px] text-slate-300 font-semibold">
-                    Teléfono / WhatsApp *
-                  </label>
+                  <div className="flex justify-between items-center">
+                    <label className="text-[11px] text-slate-300 font-semibold">
+                      Teléfono / WhatsApp *
+                    </label>
+                    <span className="text-[10px] text-slate-500">
+                      {phone.length}/25
+                    </span>
+                  </div>
                   <input
                     type="tel"
                     required
+                    maxLength={25}
                     value={phone}
                     onChange={(e) => {
                       setPhone(e.target.value);
                       if (!whatsapp) setWhatsapp(e.target.value);
                     }}
-                    placeholder="Ej. 77234567"
+                    placeholder="Ej. 77234567 o +591 77234567"
                     className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs focus:outline-none focus:border-indigo-500"
                   />
                 </div>
@@ -694,12 +848,18 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               {deliveryMethod === 'delivery' && (
                 <div className="space-y-3 pt-1">
                   <div className="space-y-1">
-                    <label className="text-[11px] text-slate-300 font-semibold">
-                      Dirección de Entrega Completa *
-                    </label>
+                    <div className="flex justify-between items-center">
+                      <label className="text-[11px] text-slate-300 font-semibold">
+                        Dirección de Entrega Completa *
+                      </label>
+                      <span className="text-[10px] text-slate-500">
+                        {deliveryAddress.length}/200
+                      </span>
+                    </div>
                     <input
                       type="text"
                       required
+                      maxLength={200}
                       value={deliveryAddress}
                       onChange={(e) => setDeliveryAddress(e.target.value)}
                       placeholder="Ej. Calle 21 de Calacoto #450, Edif. Los Pinos Dpto 3B"
@@ -708,15 +868,40 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[11px] text-slate-400">
-                      Punto de Referencia / Indicaciones
-                    </label>
+                    <div className="flex justify-between items-center">
+                      <label className="text-[11px] text-slate-400">
+                        Punto de Referencia / Indicaciones
+                      </label>
+                      <span className="text-[10px] text-slate-500">
+                        {deliveryReference.length}/200
+                      </span>
+                    </div>
                     <input
                       type="text"
+                      maxLength={200}
                       value={deliveryReference}
                       onChange={(e) => setDeliveryReference(e.target.value)}
                       placeholder="Ej. Frente a la plaza principal, portón negro"
                       className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex justify-between items-center">
+                      <label className="text-[11px] text-slate-400">
+                        Notas Generales para la Entrega
+                      </label>
+                      <span className="text-[10px] text-slate-500">
+                        {generalNotes.length}/300
+                      </span>
+                    </div>
+                    <textarea
+                      rows={2}
+                      maxLength={300}
+                      value={generalNotes}
+                      onChange={(e) => setGeneralNotes(e.target.value)}
+                      placeholder="Instrucciones específicas (ej. timbre descompuesto, dejar en portería)..."
+                      className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs focus:outline-none focus:border-indigo-500 resize-none"
                     />
                   </div>
                 </div>
@@ -728,11 +913,17 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   <p className="font-semibold text-white">Dirección de Retiro:</p>
                   <p className="text-slate-400">{profile.address || 'Consultar dirección exacta por WhatsApp'}</p>
                   <div className="pt-1">
-                    <label className="text-[10px] text-slate-400 block mb-1">
-                      Hora estimada o persona que retira:
-                    </label>
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="text-[10px] text-slate-400 block">
+                        Hora estimada o persona que retira:
+                      </label>
+                      <span className="text-[10px] text-slate-500">
+                        {pickupNotes.length}/300
+                      </span>
+                    </div>
                     <input
                       type="text"
+                      maxLength={300}
                       value={pickupNotes}
                       onChange={(e) => setPickupNotes(e.target.value)}
                       placeholder="Ej. Paso en 40 minutos / Retira mi hermano Juan"
@@ -1033,12 +1224,23 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           <button
             type="submit"
             form="checkout-form"
-            disabled={isProcessing}
+            disabled={isProcessing || cooldownRemaining > 0}
             style={{ backgroundColor: primaryColor }}
-            className="flex-1 py-3 px-6 rounded-xl text-white font-bold text-xs shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-2 transition hover:opacity-90 disabled:opacity-50 cursor-pointer"
+            className="flex-1 py-3 px-6 rounded-xl text-white font-bold text-xs shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-2 transition hover:opacity-90 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
           >
-            <span>{isProcessing ? 'Registrando Pedido...' : `Confirmar Pedido • Bs ${finalTotal.toFixed(2)}`}</span>
-            <ArrowRight className="w-4 h-4" />
+            {cooldownRemaining > 0 ? (
+              <span className="inline-flex items-center gap-1.5 text-amber-200">
+                <Clock className="w-4 h-4 animate-spin" />
+                <span>Espera ({cooldownRemaining}s)</span>
+              </span>
+            ) : isProcessing ? (
+              <span>Registrando Pedido...</span>
+            ) : (
+              <>
+                <span>{`Confirmar Pedido • Bs ${finalTotal.toFixed(2)}`}</span>
+                <ArrowRight className="w-4 h-4" />
+              </>
+            )}
           </button>
         </div>
       </div>

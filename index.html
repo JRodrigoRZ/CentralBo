@@ -3,6 +3,11 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    
+    <!-- Security Policies (Etapa 13B/13D: SEC-13A-01, SEC-13A-03, SEC-13A-04, OBS-13C-01, OBS-13C-02) -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://images.unsplash.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co; font-src 'self'; object-src 'none'; frame-src 'none'; base-uri 'self'; form-action 'self'; worker-src 'self'; manifest-src 'self' data:;" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+
     <title>CentralBo — Plataforma PWA</title>
     <meta name="description" content="Plataforma SaaS Marketplace Multi-Tenant y PWA de CentralBo" />
     

@@ -10,7 +10,10 @@ interface AuthContextType {
   profile: CentralBoProfile;
   isLoading: boolean;
   error: string | null;
-  signInWithPassword: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  signInWithPassword: (
+    email: string,
+    password: string
+  ) => Promise<{ success: boolean; error?: string; user?: AuthenticatedUser }>;
   switchDemoProfile: (type: 'superadmin' | 'adminRoma' | 'adminMilano' | 'adminZenit' | 'adminLosAndes' | 'public') => void;
   signOut: () => Promise<void>;
   clearError: () => void;
@@ -31,22 +34,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoading(true);
 
       try {
-        // 1. Verificar si hay sesión de prueba guardada en localStorage
-        const storedDemoSession = localStorage.getItem(SESSION_STORAGE_KEY);
-        if (storedDemoSession) {
-          try {
-            const parsed = JSON.parse(storedDemoSession);
-            if (parsed && parsed.email && mounted) {
-              setUser(parsed);
-              setIsLoading(false);
-              return;
-            }
-          } catch (e) {
-            localStorage.removeItem(SESSION_STORAGE_KEY);
-          }
-        }
+        // Limpieza de cualquier residuo de sesión local previa
+        try {
+          localStorage.removeItem(SESSION_STORAGE_KEY);
+        } catch {}
 
-        // 2. Verificar sesión activa de Supabase
+        // Verificar sesión activa legítima exclusivamente desde Supabase Auth
         const { data, error: sessionError } = await supabase.auth.getSession();
         if (sessionError) {
           console.warn('[CentralBo Auth] Error al obtener sesión Supabase:', sessionError.message);
@@ -58,9 +51,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             data.session.user.email || ''
           );
           setUser(resolved);
+        } else if (mounted) {
+          setUser(null);
         }
       } catch (err: unknown) {
         console.error('[CentralBo Auth] Excepción al inicializar sesión:', err);
+        if (mounted) {
+          setUser(null);
+        }
       } finally {
         if (mounted) {
           setIsLoading(false);
@@ -70,7 +68,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     initSession();
 
-    // 3. Suscripción a cambios en Supabase Auth
+    // 2. Suscripción a cambios en Supabase Auth
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!mounted) return;
@@ -82,11 +80,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             session.user.email || ''
           );
           setUser(resolved);
-          localStorage.removeItem(SESSION_STORAGE_KEY);
+          try {
+            localStorage.removeItem(SESSION_STORAGE_KEY);
+          } catch {}
           setIsLoading(false);
         } else if (event === 'SIGNED_OUT') {
           setUser(null);
-          localStorage.removeItem(SESSION_STORAGE_KEY);
+          try {
+            localStorage.removeItem(SESSION_STORAGE_KEY);
+          } catch {}
         }
       }
     );
@@ -121,9 +123,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (data?.user) {
         const resolved = await resolveUserProfile(data.user.id, data.user.email || '');
         setUser(resolved);
-        localStorage.removeItem(SESSION_STORAGE_KEY);
+        try {
+          localStorage.removeItem(SESSION_STORAGE_KEY);
+        } catch {}
         setIsLoading(false);
-        return { success: true };
+        return { success: true, user: resolved };
       }
 
       return { success: false, error: 'No se pudo obtener la identidad del usuario' };
@@ -142,14 +146,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setError(null);
     if (type === 'public') {
       setUser(null);
-      localStorage.removeItem(SESSION_STORAGE_KEY);
+      try {
+        localStorage.removeItem(SESSION_STORAGE_KEY);
+      } catch {}
       return;
     }
 
     const demoUser = DEMO_IDENTITIES[type];
     if (demoUser) {
       setUser(demoUser);
-      localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(demoUser));
+      // Las identidades demo solo existen en memoria volátil si se usan aisladamente; nunca se persisten en localStorage
+      try {
+        localStorage.removeItem(SESSION_STORAGE_KEY);
+      } catch {}
     }
   };
 
@@ -162,7 +171,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.warn('[CentralBo Auth] Advertencia durante signOut:', e);
     } finally {
       setUser(null);
-      localStorage.removeItem(SESSION_STORAGE_KEY);
+      try {
+        localStorage.removeItem(SESSION_STORAGE_KEY);
+      } catch {}
       setIsLoading(false);
     }
   };

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Lock,
   Mail,
@@ -8,12 +8,50 @@ import {
   ArrowRight,
   LogOut,
   AlertCircle,
+  Clock,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useRouter } from '../context/RouterContext';
 
 interface LoginViewProps {
   redirectPath?: string;
+}
+
+// SEC-14A-01: Configuración de protección contra abuso en autenticación
+const AUTH_RATE_LIMIT_KEY = 'cb_auth_ratelimit';
+const MAX_CONSECUTIVE_FAILURES = 5;
+const BASE_LOCK_DURATION_MS = 30000; // 30 segundos
+const MAX_LOCK_DURATION_MS = 60000; // 60 segundos
+
+interface AuthRateLimitRecord {
+  failures: number;
+  lockUntil: number;
+}
+
+function getStoredRateLimit(): AuthRateLimitRecord {
+  try {
+    const raw = localStorage.getItem(AUTH_RATE_LIMIT_KEY);
+    if (!raw) return { failures: 0, lockUntil: 0 };
+    const parsed = JSON.parse(raw);
+    return {
+      failures: typeof parsed.failures === 'number' ? parsed.failures : 0,
+      lockUntil: typeof parsed.lockUntil === 'number' ? parsed.lockUntil : 0,
+    };
+  } catch {
+    return { failures: 0, lockUntil: 0 };
+  }
+}
+
+function saveRateLimit(record: AuthRateLimitRecord): void {
+  try {
+    localStorage.setItem(AUTH_RATE_LIMIT_KEY, JSON.stringify(record));
+  } catch {}
+}
+
+function clearRateLimit(): void {
+  try {
+    localStorage.removeItem(AUTH_RATE_LIMIT_KEY);
+  } catch {}
 }
 
 export const LoginView: React.FC<LoginViewProps> = ({ redirectPath }) => {
@@ -26,8 +64,48 @@ export const LoginView: React.FC<LoginViewProps> = ({ redirectPath }) => {
   const [submitting, setSubmitting] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
 
+  // Inicializar contador de bloqueo persistente contra recarga (SEC-14A-01)
+  const [lockSecondsRemaining, setLockSecondsRemaining] = useState<number>(() => {
+    const stored = getStoredRateLimit();
+    if (stored.lockUntil > Date.now()) {
+      return Math.ceil((stored.lockUntil - Date.now()) / 1000);
+    }
+    return 0;
+  });
+
+  // Temporizador activo para el cooldown
+  useEffect(() => {
+    if (lockSecondsRemaining <= 0) return;
+
+    const timer = setInterval(() => {
+      const stored = getStoredRateLimit();
+      const remaining = Math.ceil((stored.lockUntil - Date.now()) / 1000);
+      if (remaining <= 0) {
+        setLockSecondsRemaining(0);
+        setLocalError(null);
+        clearInterval(timer);
+      } else {
+        setLockSecondsRemaining(remaining);
+      }
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [lockSecondsRemaining]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Comprobación dura de bloqueo temporal activo
+    const stored = getStoredRateLimit();
+    if (stored.lockUntil > Date.now()) {
+      const remaining = Math.ceil((stored.lockUntil - Date.now()) / 1000);
+      setLockSecondsRemaining(remaining);
+      setLocalError(
+        `Acceso temporalmente bloqueado por demasiados intentos fallidos. Por favor espera ${remaining} segundos.`
+      );
+      return;
+    }
+
     if (!email || !password) {
       setLocalError('Por favor ingresa correo y contraseña');
       return;
@@ -41,28 +119,67 @@ export const LoginView: React.FC<LoginViewProps> = ({ redirectPath }) => {
     setSubmitting(false);
 
     if (res.success) {
-      try {
-        const raw = localStorage.getItem('centralbo_auth_session');
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          if (parsed.profile === 'store_admin' && parsed.tenantId) {
-            navigate(`/admin/${parsed.tenantId}`);
-            return;
-          }
-          if (parsed.profile === 'superadmin') {
-            navigate(redirectPath && redirectPath !== '/login' ? redirectPath : '/superadmin');
-            return;
-          }
+      // Reinicio del contador de fallos tras autenticación exitosa
+      clearRateLimit();
+      setLockSecondsRemaining(0);
+
+      if (res.user) {
+        if (res.user.profile === 'store_admin' && res.user.tenantId) {
+          navigate(`/admin/${res.user.tenantId}`);
+          return;
         }
-      } catch (e) {}
+        if (res.user.profile === 'superadmin') {
+          navigate(redirectPath && redirectPath !== '/login' ? redirectPath : '/superadmin');
+          return;
+        }
+      }
 
       if (redirectPath && redirectPath !== '/login') {
         navigate(redirectPath);
       } else {
         navigate('/');
       }
-    } else if (res.error) {
-      setLocalError(res.error);
+    } else {
+      // Gestión de fallo: comprobación de HTTP 429 / Rate limit de proveedor o acumulación local
+      const errorMsg = res.error || 'Credenciales no válidas';
+      const isRateLimited =
+        errorMsg.includes('429') ||
+        errorMsg.toLowerCase().includes('too many requests') ||
+        errorMsg.toLowerCase().includes('rate limit') ||
+        errorMsg.toLowerCase().includes('exceeded');
+
+      const current = getStoredRateLimit();
+      const newFailures = isRateLimited
+        ? Math.max(current.failures + 1, MAX_CONSECUTIVE_FAILURES)
+        : current.failures + 1;
+
+      let lockDuration = 0;
+      if (isRateLimited) {
+        // Bloqueo de 60 segundos si el proveedor o red reporta 429
+        lockDuration = MAX_LOCK_DURATION_MS;
+      } else if (newFailures >= MAX_CONSECUTIVE_FAILURES) {
+        // Bloqueo progresivo: 5 fallos = 30s; 6 fallos = 45s; 7+ fallos = 60s
+        const extraSteps = newFailures - MAX_CONSECUTIVE_FAILURES;
+        lockDuration = Math.min(BASE_LOCK_DURATION_MS + extraSteps * 15000, MAX_LOCK_DURATION_MS);
+      }
+
+      if (lockDuration > 0) {
+        const lockUntil = Date.now() + lockDuration;
+        saveRateLimit({ failures: newFailures, lockUntil });
+        const remainingSecs = Math.ceil(lockDuration / 1000);
+        setLockSecondsRemaining(remainingSecs);
+        setLocalError(
+          `Demasiados intentos fallidos consecutivos. Por seguridad, el acceso está temporalmente bloqueado durante ${remainingSecs} segundos.`
+        );
+      } else {
+        saveRateLimit({ failures: newFailures, lockUntil: 0 });
+        const attemptsLeft = MAX_CONSECUTIVE_FAILURES - newFailures;
+        const warning =
+          attemptsLeft <= 2
+            ? ` (Te quedan ${attemptsLeft} intento${attemptsLeft === 1 ? '' : 's'} antes del bloqueo temporal)`
+            : '';
+        setLocalError(`${errorMsg}${warning}`);
+      }
     }
   };
 
@@ -132,12 +249,23 @@ export const LoginView: React.FC<LoginViewProps> = ({ redirectPath }) => {
           </div>
         </div>
 
-        {(localError || error) && (
+        {lockSecondsRemaining > 0 ? (
+          <div className="mb-4 p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800/60 text-amber-900 dark:text-amber-200 text-xs flex items-start gap-2.5 shadow-xs">
+            <Clock className="w-4 h-4 flex-shrink-0 mt-0.5 text-amber-600 dark:text-amber-400 animate-pulse" />
+            <div>
+              <p className="font-semibold mb-0.5">Acceso temporalmente restringido</p>
+              <p className="text-amber-800 dark:text-amber-300/90 leading-relaxed">
+                Demasiados intentos fallidos consecutivos. Por seguridad, debes esperar{' '}
+                <span className="font-bold underline">{lockSecondsRemaining} segundos</span> antes de volver a intentar.
+              </p>
+            </div>
+          </div>
+        ) : (localError || error) ? (
           <div className="mb-4 p-3 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800/40 text-rose-700 dark:text-rose-300 text-xs flex items-start gap-2">
             <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5 text-rose-600 dark:text-rose-400" />
             <span>{localError || error}</span>
           </div>
-        )}
+        ) : null}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -151,7 +279,8 @@ export const LoginView: React.FC<LoginViewProps> = ({ redirectPath }) => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="ejemplo@centralbo.com"
-                className="w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-hidden focus:border-blue-500 transition"
+                disabled={submitting || lockSecondsRemaining > 0}
+                className="w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-hidden focus:border-blue-500 transition disabled:opacity-60 disabled:cursor-not-allowed"
                 required
               />
             </div>
@@ -168,7 +297,8 @@ export const LoginView: React.FC<LoginViewProps> = ({ redirectPath }) => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-hidden focus:border-blue-500 transition"
+                disabled={submitting || lockSecondsRemaining > 0}
+                className="w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-hidden focus:border-blue-500 transition disabled:opacity-60 disabled:cursor-not-allowed"
                 required
               />
             </div>
@@ -176,10 +306,15 @@ export const LoginView: React.FC<LoginViewProps> = ({ redirectPath }) => {
 
           <button
             type="submit"
-            disabled={submitting || isLoading}
-            className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-sm font-semibold shadow-xs transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 mt-2"
+            disabled={submitting || isLoading || lockSecondsRemaining > 0}
+            className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-sm font-semibold shadow-xs transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed mt-2"
           >
-            {submitting ? (
+            {lockSecondsRemaining > 0 ? (
+              <span className="inline-flex items-center gap-2 text-amber-200">
+                <Clock className="w-4 h-4 animate-spin" />
+                <span>Bloqueado temporalmente ({lockSecondsRemaining}s)</span>
+              </span>
+            ) : submitting ? (
               <span className="inline-flex items-center gap-2">
                 <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 Iniciando sesión...

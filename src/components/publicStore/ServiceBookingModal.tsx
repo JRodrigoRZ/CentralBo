@@ -37,6 +37,10 @@ interface ServiceBookingModalProps {
   onClose: () => void;
 }
 
+// SEC-14A-03: Rate Limiting y Protección contra Abuso en Solicitud de Citas
+const BOOKING_COOLDOWN_MS = 15000; // 15 segundos entre solicitudes consecutivas
+const MAX_PENDING_APPOINTMENTS_PER_CLIENT = 3; // Máximo 3 reservas pendientes por cliente/teléfono
+
 export const ServiceBookingModal: React.FC<ServiceBookingModalProps> = ({
   tenantId,
   storeName,
@@ -114,6 +118,32 @@ export const ServiceBookingModal: React.FC<ServiceBookingModalProps> = ({
     useState<AppointmentRequest | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  // SEC-14A-03: Cooldown temporal para reservas
+  const [bookingCooldownRemaining, setBookingCooldownRemaining] = useState<number>(() => {
+    const lastTs = Number(sessionStorage.getItem(`cb_last_booking_${tenantId}`) || 0);
+    const elapsed = Date.now() - lastTs;
+    if (elapsed < BOOKING_COOLDOWN_MS) {
+      return Math.ceil((BOOKING_COOLDOWN_MS - elapsed) / 1000);
+    }
+    return 0;
+  });
+
+  useEffect(() => {
+    if (bookingCooldownRemaining <= 0) return;
+    const timer = setInterval(() => {
+      const lastTs = Number(sessionStorage.getItem(`cb_last_booking_${tenantId}`) || 0);
+      const elapsed = Date.now() - lastTs;
+      const remaining = Math.ceil((BOOKING_COOLDOWN_MS - elapsed) / 1000);
+      if (remaining <= 0) {
+        setBookingCooldownRemaining(0);
+        clearInterval(timer);
+      } else {
+        setBookingCooldownRemaining(remaining);
+      }
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [bookingCooldownRemaining, tenantId]);
+
   // Obtener turnos calculados según la disponibilidad propia de este profesional
   const professionalSlots: ProfessionalAgendaSlot[] = currentProfessional
     ? getProfessionalAgendaSlots(tenantId, currentProfessional, selectedDate)
@@ -129,9 +159,54 @@ export const ServiceBookingModal: React.FC<ServiceBookingModalProps> = ({
     }
   }, [selectedDate, selectedProfId, professionalSlots, selectedTime]);
 
+  const isValidCalendarDate = (dateStr: string): boolean => {
+    if (typeof dateStr !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+      return false;
+    }
+    const [yearStr, monthStr, dayStr] = dateStr.split('-');
+    const year = parseInt(yearStr, 10);
+    const month = parseInt(monthStr, 10);
+    const day = parseInt(dayStr, 10);
+
+    if (year < 2020 || year > 2100 || month < 1 || month > 12 || day < 1 || day > 31) {
+      return false;
+    }
+
+    const parsed = new Date(year, month - 1, day);
+    return (
+      parsed.getFullYear() === year &&
+      parsed.getMonth() === month - 1 &&
+      parsed.getDate() === day
+    );
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
+
+    // SEC-14A-03: Verificación de cooldown entre solicitudes de reserva
+    const lastBookingTs = Number(sessionStorage.getItem(`cb_last_booking_${tenantId}`) || 0);
+    const elapsed = Date.now() - lastBookingTs;
+    if (elapsed < BOOKING_COOLDOWN_MS) {
+      const remainingSecs = Math.ceil((BOOKING_COOLDOWN_MS - elapsed) / 1000);
+      setBookingCooldownRemaining(remainingSecs);
+      setErrorMsg(`Por favor espera ${remainingSecs} segundo${remainingSecs === 1 ? '' : 's'} antes de enviar otra solicitud de cita.`);
+      return;
+    }
+
+    // 1. Validación estricta de Fecha (formato YYYY-MM-DD, existencia en calendario y no pasada)
+    if (!selectedDate || typeof selectedDate !== 'string') {
+      setErrorMsg('Por favor selecciona una fecha válida para tu cita.');
+      return;
+    }
+    if (!isValidCalendarDate(selectedDate)) {
+      setErrorMsg('La fecha seleccionada no es una fecha válida en el calendario (ej. 31 de febrero no existe).');
+      return;
+    }
+    if (selectedDate < todayStr) {
+      setErrorMsg('No es posible reservar citas en fechas pasadas. Por favor selecciona hoy o una fecha posterior.');
+      return;
+    }
 
     if (!selectedService) {
       setErrorMsg('Selecciona un servicio válido.');
@@ -145,8 +220,44 @@ export const ServiceBookingModal: React.FC<ServiceBookingModalProps> = ({
       setErrorMsg('Selecciona un horario disponible para tu cita.');
       return;
     }
-    if (!customerName.trim() || !customerPhone.trim()) {
-      setErrorMsg('Por favor ingresa tu nombre y número de contacto.');
+
+    // 2. Validación de cliente
+    const trimmedName = customerName.trim();
+    if (!trimmedName) {
+      setErrorMsg('Por favor ingresa tu nombre.');
+      return;
+    }
+    if (trimmedName.length > 100) {
+      setErrorMsg('El nombre no puede exceder 100 caracteres.');
+      return;
+    }
+
+    const trimmedPhone = customerPhone.trim();
+    const phoneRegex = /^[+]?[(]?[0-9]{1,4}[)]?[-\s./0-9]{5,20}$/;
+    const digitsOnly = trimmedPhone.replace(/\D/g, '');
+    if (
+      !trimmedPhone ||
+      trimmedPhone.length < 7 ||
+      trimmedPhone.length > 25 ||
+      !phoneRegex.test(trimmedPhone) ||
+      digitsOnly.length < 7
+    ) {
+      setErrorMsg('Por favor ingresa un número de teléfono válido (mínimo 7 dígitos, ej. 71234567 o +591 71234567).');
+      return;
+    }
+
+    // SEC-14A-03: Límite de reservas pendientes por cliente/teléfono en este comercio
+    const existing = getStoreAppointments(tenantId);
+    const pendingForCustomer = existing.filter(
+      (appt) =>
+        appt.customerPhone.replace(/\D/g, '') === digitsOnly &&
+        appt.status === 'pendiente'
+    );
+
+    if (pendingForCustomer.length >= MAX_PENDING_APPOINTMENTS_PER_CLIENT) {
+      setErrorMsg(
+        `Has alcanzado el límite máximo permitido de ${MAX_PENDING_APPOINTMENTS_PER_CLIENT} reservas pendientes para este comercio. Por favor espera a que el comercio confirme o gestione tus citas anteriores antes de realizar otra reserva.`
+      );
       return;
     }
 
@@ -168,22 +279,25 @@ export const ServiceBookingModal: React.FC<ServiceBookingModalProps> = ({
       serviceName: selectedService.name,
       professionalId: currentProfessional.id,
       professionalName: currentProfessional.name,
-      customerName: customerName.trim(),
-      customerPhone: customerPhone.trim(),
-      customerEmail: customerEmail.trim() || 'cliente@centralbo.bo',
+      customerName: trimmedName.slice(0, 100),
+      customerPhone: trimmedPhone.slice(0, 25),
+      customerEmail: customerEmail.trim().slice(0, 120) || 'cliente@centralbo.bo',
       date: selectedDate,
       time: selectedTime,
       status: 'pendiente', // Siempre queda pendiente de confirmación por el profesional
       createdAt: new Date().toISOString(),
-      notes: notes.trim(),
+      notes: notes.trim().slice(0, 300),
     };
 
     // Guardar en la base del tenant
-    const existing = getStoreAppointments(tenantId);
     saveStoreAppointments(tenantId, [newAppointment, ...existing]);
 
     // Guardar en pedidos/citas del cliente local
     recordCustomerAppointment(newAppointment);
+
+    // SEC-14A-03: Registrar emisión para cooldown temporal
+    sessionStorage.setItem(`cb_last_booking_${tenantId}`, String(Date.now()));
+    setBookingCooldownRemaining(Math.ceil(BOOKING_COOLDOWN_MS / 1000));
 
     setSubmittedAppointment(newAppointment);
     setIsSubmitted(true);
@@ -305,6 +419,16 @@ ${submittedAppointment.notes ? `Notas: ${submittedAppointment.notes}\n` : ''}
               Tu solicitud será evaluada por el especialista, quien confirmará o coordinará la cita contigo.
             </div>
           </div>
+
+          {bookingCooldownRemaining > 0 && (
+            <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-2.5">
+              <Clock className="w-4 h-4 shrink-0 text-amber-400 animate-pulse" />
+              <span>
+                Protección contra envíos repetidos: Por favor espera{' '}
+                <strong className="underline">{bookingCooldownRemaining}s</strong> antes de enviar otra solicitud.
+              </span>
+            </div>
+          )}
 
           {errorMsg && (
             <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs">
@@ -539,10 +663,14 @@ ${submittedAppointment.notes ? `Notas: ${submittedAppointment.notes}\n` : ''}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-[11px] text-slate-400">Nombre Completo *</label>
+                  <div className="flex justify-between items-center">
+                    <label className="text-[11px] text-slate-400">Nombre Completo *</label>
+                    <span className="text-[10px] text-slate-500">{customerName.length}/100</span>
+                  </div>
                   <input
                     type="text"
                     required
+                    maxLength={100}
                     value={customerName}
                     onChange={(e) => setCustomerName(e.target.value)}
                     placeholder="Ej. Ana Fernández"
@@ -553,10 +681,14 @@ ${submittedAppointment.notes ? `Notas: ${submittedAppointment.notes}\n` : ''}
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[11px] text-slate-400">Teléfono / WhatsApp *</label>
+                  <div className="flex justify-between items-center">
+                    <label className="text-[11px] text-slate-400">Teléfono / WhatsApp *</label>
+                    <span className="text-[10px] text-slate-500">{customerPhone.length}/25</span>
+                  </div>
                   <input
                     type="tel"
                     required
+                    maxLength={25}
                     value={customerPhone}
                     onChange={(e) => setCustomerPhone(e.target.value)}
                     placeholder="Ej. 71023456"
@@ -571,6 +703,7 @@ ${submittedAppointment.notes ? `Notas: ${submittedAppointment.notes}\n` : ''}
                 <label className="text-[11px] text-slate-400">Email de Contacto (Opcional)</label>
                 <input
                   type="email"
+                  maxLength={120}
                   value={customerEmail}
                   onChange={(e) => setCustomerEmail(e.target.value)}
                   placeholder="ejemplo@correo.com"
@@ -581,9 +714,13 @@ ${submittedAppointment.notes ? `Notas: ${submittedAppointment.notes}\n` : ''}
               </div>
 
               <div className="space-y-1">
-                <label className="text-[11px] text-slate-400">Notas o Requerimientos Especiales</label>
+                <div className="flex justify-between items-center">
+                  <label className="text-[11px] text-slate-400">Notas o Requerimientos Especiales</label>
+                  <span className="text-[10px] text-slate-500">{notes.length}/300</span>
+                </div>
                 <textarea
                   rows={2}
+                  maxLength={300}
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="Ej. Es mi primera sesión, prefiero presión moderada..."
@@ -601,13 +738,21 @@ ${submittedAppointment.notes ? `Notas: ${submittedAppointment.notes}\n` : ''}
           <button
             type="submit"
             form="service-booking-form"
-            className={`w-full py-3 rounded-xl text-white text-xs font-bold transition cursor-pointer ${
+            disabled={bookingCooldownRemaining > 0}
+            className={`w-full py-3 rounded-xl text-white text-xs font-bold transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
               isZenit
                 ? 'bg-emerald-700 hover:bg-emerald-600 shadow-lg shadow-emerald-700/20'
                 : 'bg-indigo-600 hover:bg-indigo-500 shadow-lg shadow-indigo-600/20'
             }`}
           >
-            Enviar Solicitud de Cita
+            {bookingCooldownRemaining > 0 ? (
+              <span className="inline-flex items-center justify-center gap-1.5 text-amber-200">
+                <Clock className="w-4 h-4 animate-spin" />
+                <span>Espera ({bookingCooldownRemaining}s) para enviar</span>
+              </span>
+            ) : (
+              <span>Enviar Solicitud de Cita</span>
+            )}
           </button>
         </div>
       </div>
