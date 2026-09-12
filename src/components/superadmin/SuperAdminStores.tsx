@@ -38,6 +38,7 @@ import {
   deactivateStore,
   suspendStore,
   deleteSuperAdminStorePermanently,
+  fetchSuperAdminStores,
   CreateStoreInput,
   UpdateStoreInput,
 } from '../../lib/superadminService';
@@ -179,6 +180,18 @@ export const SuperAdminStores: React.FC = () => {
       setSelectedStore(refreshed || null);
     }
   };
+
+  useEffect(() => {
+    let mounted = true;
+    fetchSuperAdminStores().then((loaded) => {
+      if (mounted) {
+        setStores(loaded);
+      }
+    });
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     const handleStoresChanged = () => {

@@ -335,14 +335,12 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
     );
   }
 
-  const isRestaurant = store.store_type === 'restaurante' || store.slug === 'restaurante-roma';
-  const isFashion = store.store_type === 'moda' || store.slug === 'boutique-milano';
-  const isServices = store.store_type === 'servicios' || store.slug === 'spa-zenit';
+  const isRestaurant = store.store_type === 'restaurante';
+  const isFashion = store.store_type === 'moda';
+  const isServices = store.store_type === 'servicios';
   const isRetail =
     store.store_type === 'retail' ||
-    store.store_type === 'supermercado' ||
-    store.slug === 'los-andes-express' ||
-    store.slug?.includes('andes');
+    store.store_type === 'supermercado';
 
   const primaryColor = isFashion
     ? '#1c1917'

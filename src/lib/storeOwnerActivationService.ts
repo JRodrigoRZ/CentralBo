@@ -17,66 +17,21 @@ import { StoreOwnerInvitation, InvitationStatus } from '../types';
 
 const INVITATIONS_STORAGE_KEY = 'centralbo_store_owner_invitations_v1';
 
-// Invitaciones iniciales para los comercios base preexistentes (con acceso ya activado)
-const INITIAL_INVITATIONS: StoreOwnerInvitation[] = [
-  {
-    id: 'inv-roma-001',
-    token: 'act_roma_b82a7f01',
-    storeId: 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d',
-    storeName: 'Restaurante Gourmet Roma',
-    storeSlug: 'restaurante-roma',
-    ownerName: 'Marco Antonio Rossi',
-    ownerEmail: 'admin@roma.com',
-    ownerPhone: '+591 71023456',
-    status: 'Acceso activado',
-    createdAt: '2026-08-01T10:00:00Z',
-    activatedAt: '2026-08-01T11:30:00Z',
-    // Hash o credencial preestablecida para demo
-    passwordHash: 'roma2026',
-  },
-  {
-    id: 'inv-milano-002',
-    token: 'act_milano_c43b9e12',
-    storeId: 'b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e',
-    storeName: 'Boutique Milano Moda',
-    storeSlug: 'boutique-milano',
-    ownerName: 'Lucía Fernández Soria',
-    ownerEmail: 'admin@milano.com',
-    ownerPhone: '+591 72198765',
-    status: 'Acceso activado',
-    createdAt: '2026-07-15T12:00:00Z',
-    activatedAt: '2026-07-15T14:10:00Z',
-    passwordHash: 'milano2026',
-  },
-  {
-    id: 'inv-zenit-003',
-    token: 'act_zenit_d54c0f23',
-    storeId: 'c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f',
-    storeName: 'Salón & Spa Zenit',
-    storeSlug: 'spa-zenit',
-    ownerName: 'Claudia Morales Paz',
-    ownerEmail: 'admin@spazenit.com',
-    ownerPhone: '+591 73456789',
-    status: 'Acceso activado',
-    createdAt: '2026-08-10T09:00:00Z',
-    activatedAt: '2026-08-10T10:15:00Z',
-    passwordHash: 'zenit2026',
-  },
-  {
-    id: 'inv-andes-004',
-    token: 'act_andes_e65d1a34',
-    storeId: 'e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b',
-    storeName: 'SuperMarket Los Andes Express',
-    storeSlug: 'los-andes-express',
-    ownerName: 'Gonzalo Peñaranda',
-    ownerEmail: 'admin@losandesexpress.com',
-    ownerPhone: '+591 79812345',
-    status: 'Acceso activado',
-    createdAt: '2026-06-01T08:30:00Z',
-    activatedAt: '2026-06-01T09:45:00Z',
-    passwordHash: 'andes2026',
-  },
-];
+// Invitaciones iniciales vacías (se generan dinámicamente para comercios reales)
+const INITIAL_INVITATIONS: StoreOwnerInvitation[] = [];
+
+const MOCK_STORE_IDS = new Set([
+  'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d',
+  'b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e',
+  'c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f',
+  'e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b',
+]);
+const MOCK_SLUGS = new Set([
+  'restaurante-roma',
+  'boutique-milano',
+  'spa-zenit',
+  'los-andes-express',
+]);
 
 let memoryInvitationsCache: StoreOwnerInvitation[] = [...INITIAL_INVITATIONS];
 
@@ -91,9 +46,12 @@ export function getStoreOwnerInvitations(): StoreOwnerInvitation[] {
     const raw = localStorage.getItem(INVITATIONS_STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        memoryInvitationsCache = [...parsed];
-        return parsed;
+      if (Array.isArray(parsed)) {
+        const filtered = parsed.filter(
+          (inv) => inv && !MOCK_STORE_IDS.has(inv.storeId) && !MOCK_SLUGS.has(inv.storeSlug)
+        );
+        memoryInvitationsCache = [...filtered];
+        return filtered;
       }
     }
   } catch (e) {

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   ShieldCheck,
   Store as StoreIcon,
@@ -12,7 +12,8 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useRouter } from '../context/RouterContext';
-import { BASELINE_STORES } from '../lib/multiTenantService';
+import { getPublicStores } from '../lib/multiTenantService';
+import { Store } from '../types';
 
 interface StoreCardMetadata {
   icon: React.ElementType;
@@ -30,8 +31,8 @@ interface StoreCardMetadata {
 const getCardMetadata = (store: { slug?: string; store_type?: string; name?: string; id?: string }): StoreCardMetadata => {
   const identifier = `${store.slug || ''} ${store.store_type || ''} ${store.name || ''}`.toLowerCase();
 
-  // Tienda 1: restaurante-roma o vertical restaurante
-  if (identifier.includes('roma') || identifier.includes('restaurante')) {
+  // Vertical restaurante / gastronomía
+  if (identifier.includes('roma') || identifier.includes('restaurante') || identifier.includes('gastronom')) {
     return {
       icon: Utensils,
       cat: 'GASTRONOMÍA & RESTAURANTE',
@@ -46,7 +47,7 @@ const getCardMetadata = (store: { slug?: string; store_type?: string; name?: str
     };
   }
 
-  // Tienda 2: boutique-milano o vertical moda
+  // Vertical moda / boutique
   if (identifier.includes('milano') || identifier.includes('moda') || identifier.includes('boutique')) {
     return {
       icon: ShoppingBag,
@@ -62,7 +63,7 @@ const getCardMetadata = (store: { slug?: string; store_type?: string; name?: str
     };
   }
 
-  // Tienda 3: spa-zenit o vertical servicios
+  // Vertical servicios profesionales / spa
   if (identifier.includes('zenit') || identifier.includes('spa') || identifier.includes('servicio')) {
     return {
       icon: Sparkles,
@@ -78,7 +79,7 @@ const getCardMetadata = (store: { slug?: string; store_type?: string; name?: str
     };
   }
 
-  // Tienda 4: los-andes-express o vertical general
+  // Comercio general por omisión
   return {
     icon: ShoppingCart,
     cat: 'COMERCIO GENERAL',
@@ -93,71 +94,76 @@ const getCardMetadata = (store: { slug?: string; store_type?: string; name?: str
   };
 };
 
-const HERO_MARQUEE_STORES = [
-  {
-    id: 'milano-moda-hero',
-    name: 'Boutique Milano Moda',
-    category: 'Moda & Boutique',
-    badge: 'Estilo & Colección',
-    icon: ShoppingBag,
-    iconBg: 'bg-rose-100/90 dark:bg-rose-950/50 border-rose-200 dark:border-rose-800/50',
-    iconColor: 'text-rose-700 dark:text-rose-300',
-    catColor: 'text-rose-600 dark:text-rose-400',
-    badgeBg: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20',
-  },
-  {
-    id: 'restaurante-roma-hero',
-    name: 'Restaurante Gourmet Roma',
-    category: 'Gastronomía & Restaurante',
-    badge: 'Cocina & Menú',
-    icon: Utensils,
-    iconBg: 'bg-amber-100/90 dark:bg-amber-950/50 border-amber-200 dark:border-amber-800/50',
-    iconColor: 'text-amber-700 dark:text-amber-300',
-    catColor: 'text-amber-600 dark:text-amber-400',
-    badgeBg: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
-  },
-  {
-    id: 'zenit-spa-hero',
-    name: 'Salón & Spa Zenit',
-    category: 'Servicios Profesionales',
-    badge: 'Bienestar & Spa',
-    icon: Sparkles,
-    iconBg: 'bg-emerald-100/90 dark:bg-emerald-950/50 border-emerald-200 dark:border-emerald-800/50',
-    iconColor: 'text-emerald-700 dark:text-emerald-300',
-    catColor: 'text-emerald-600 dark:text-emerald-400',
-    badgeBg: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
-  },
-  {
-    id: 'los-andes-hero',
-    name: 'SuperMarket Los Andes Express',
-    category: 'Comercio General',
-    badge: 'Mercado & Provisiones',
-    icon: ShoppingCart,
-    iconBg: 'bg-sky-100/90 dark:bg-sky-950/50 border-sky-200 dark:border-sky-800/50',
-    iconColor: 'text-sky-700 dark:text-sky-300',
-    catColor: 'text-sky-600 dark:text-sky-400',
-    badgeBg: 'bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20',
-  },
-];
-
-const HERO_MARQUEE_ITEMS = [...HERO_MARQUEE_STORES, ...HERO_MARQUEE_STORES];
-
 export const PortalHome: React.FC = () => {
   const { user, profile, signOut } = useAuth();
   const { navigate } = useRouter();
+  const [stores, setStores] = useState<Store[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [rubroFiltro, setRubroFiltro] = useState<'todos' | 'restaurante' | 'moda' | 'servicios' | 'general'>('todos');
 
+  useEffect(() => {
+    let mounted = true;
+    setIsLoading(true);
+    getPublicStores()
+      .then((data) => {
+        if (mounted) {
+          setStores(data);
+          setIsLoading(false);
+        }
+      })
+      .catch((err) => {
+        console.warn('[CentralBo PortalHome] Error al cargar comercios:', err);
+        if (mounted) {
+          setStores([]);
+          setIsLoading(false);
+        }
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const heroMarqueeItems = useMemo(() => {
+    if (stores.length === 0) return [];
+    const items = stores.map((s) => {
+      const meta = getCardMetadata(s);
+      return {
+        id: s.id,
+        name: s.name,
+        category: meta.cat,
+        badge: meta.badge,
+        icon: meta.icon,
+        iconBg: `${meta.iconBg} border-slate-200 dark:border-slate-800/50`,
+        iconColor: meta.iconColor,
+        catColor: meta.badgeText,
+        badgeBg: `${meta.badgeBg} ${meta.badgeText} ${meta.badgeBorder}`,
+      };
+    });
+    return [...items, ...items];
+  }, [stores]);
+
   const comerciosFiltrados = useMemo(() => {
-    if (rubroFiltro === 'todos') return BASELINE_STORES;
-    return BASELINE_STORES.filter((store: any) => {
-      const id = (store.slug || store.tipo || store.store_type || '').toLowerCase();
-      if (rubroFiltro === 'restaurante') return id.includes('roma') || id.includes('restaurante') || id.includes('gastronom');
-      if (rubroFiltro === 'moda') return id.includes('milano') || id.includes('moda') || id.includes('boutique');
-      if (rubroFiltro === 'servicios') return id.includes('zenit') || id.includes('spa') || id.includes('servicio');
-      if (rubroFiltro === 'general') return id.includes('andes') || id.includes('general') || id.includes('super');
+    if (rubroFiltro === 'todos') return stores;
+    return stores.filter((store: Store) => {
+      const type = (store.store_type || '').toLowerCase();
+      const slug = (store.slug || '').toLowerCase();
+      const name = (store.name || '').toLowerCase();
+      if (rubroFiltro === 'restaurante') {
+        return type === 'restaurante' || type.includes('gastro') || slug.includes('restaurante') || name.includes('restaurante');
+      }
+      if (rubroFiltro === 'moda') {
+        return type === 'moda' || type.includes('boutique') || slug.includes('moda') || name.includes('moda') || slug.includes('boutique');
+      }
+      if (rubroFiltro === 'servicios') {
+        return type === 'servicios' || type.includes('spa') || slug.includes('servicio') || name.includes('servicio') || slug.includes('spa');
+      }
+      if (rubroFiltro === 'general') {
+        return type === 'retail' || type === 'supermercado' || type === 'general' || slug.includes('super') || name.includes('super');
+      }
       return true;
     });
-  }, [rubroFiltro]);
+  }, [stores, rubroFiltro]);
 
   const handleScrollToStores = () => {
     const section = document.getElementById('comercios');
@@ -250,56 +256,72 @@ export const PortalHome: React.FC = () => {
             </div>
           </div>
 
-          {/* Lado derecho: Anclaje visual decorativo (~40%) — Carrusel Infinito Vertical (Marquee) */}
+          {/* Lado derecho: Anclaje visual decorativo (~40%) — Carrusel Infinito Vertical (Marquee) o Tarjeta de Plataforma */}
           <div className="lg:col-span-5 relative select-none">
             {/* Halo ambiental suave para profundidad */}
             <div className="absolute -inset-4 bg-gradient-to-tr from-blue-500/10 via-amber-500/5 to-rose-500/5 rounded-3xl blur-2xl pointer-events-none opacity-80 dark:opacity-50" />
 
             {/* Contenedor con altura fija visible y overflow-hidden */}
-            <div className="relative w-full max-w-sm sm:max-w-md mx-auto lg:max-w-none h-[400px] overflow-hidden rounded-2xl group">
-              {/* Máscara de desvanecimiento superior */}
-              <div className="absolute top-0 left-0 right-0 h-16 bg-gradient-to-b from-[#F8FAFC] dark:from-[#0B0F17] to-transparent z-10 pointer-events-none" />
+            <div className="relative w-full max-w-sm sm:max-w-md mx-auto lg:max-w-none h-[400px] overflow-hidden rounded-2xl group flex items-center justify-center">
+              {heroMarqueeItems.length > 0 ? (
+                <>
+                  {/* Máscara de desvanecimiento superior */}
+                  <div className="absolute top-0 left-0 right-0 h-16 bg-gradient-to-b from-[#F8FAFC] dark:from-[#0B0F17] to-transparent z-10 pointer-events-none" />
 
-              {/* Máscara de desvanecimiento inferior */}
-              <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-[#F8FAFC] dark:from-[#0B0F17] to-transparent z-10 pointer-events-none" />
+                  {/* Máscara de desvanecimiento inferior */}
+                  <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-[#F8FAFC] dark:from-[#0B0F17] to-transparent z-10 pointer-events-none" />
 
-              {/* Tira animada de flujo continuo vertical */}
-              <div className="flex flex-col gap-3.5 animate-marquee-vertical hover:[animation-play-state:paused] py-2">
-                {HERO_MARQUEE_ITEMS.map((store, index) => {
-                  const Icon = store.icon;
-                  return (
-                    <div
-                      key={`${store.id}-${index}`}
-                      className="p-4 rounded-2xl bg-white/95 dark:bg-[#0f1523]/95 border border-slate-200/90 dark:border-slate-800/90 shadow-sm transition-all duration-300 hover:shadow-md hover:border-slate-300 dark:hover:border-slate-700"
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-3">
-                          <div
-                            className={`w-10 h-10 rounded-xl border flex items-center justify-center ${store.iconBg} ${store.iconColor}`}
-                          >
-                            <Icon className="w-5 h-5" />
-                          </div>
-                          <div>
+                  {/* Tira animada de flujo continuo vertical */}
+                  <div className="w-full flex flex-col gap-3.5 animate-marquee-vertical hover:[animation-play-state:paused] py-2">
+                    {heroMarqueeItems.map((store, index) => {
+                      const Icon = store.icon;
+                      return (
+                        <div
+                          key={`${store.id}-${index}`}
+                          className="p-4 rounded-2xl bg-white/95 dark:bg-[#0f1523]/95 border border-slate-200/90 dark:border-slate-800/90 shadow-sm transition-all duration-300 hover:shadow-md hover:border-slate-300 dark:hover:border-slate-700"
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-3">
+                              <div
+                                className={`w-10 h-10 rounded-xl border flex items-center justify-center ${store.iconBg} ${store.iconColor}`}
+                              >
+                                <Icon className="w-5 h-5" />
+                              </div>
+                              <div>
+                                <span
+                                  className={`text-[11px] font-semibold uppercase tracking-wider block ${store.catColor}`}
+                                >
+                                  {store.category}
+                                </span>
+                                <h4 className="text-sm font-bold text-slate-900 dark:text-white leading-tight">
+                                  {store.name}
+                                </h4>
+                              </div>
+                            </div>
                             <span
-                              className={`text-[11px] font-semibold uppercase tracking-wider block ${store.catColor}`}
+                              className={`text-[10px] font-semibold px-2.5 py-1 rounded-full border ${store.badgeBg}`}
                             >
-                              {store.category}
+                              {store.badge}
                             </span>
-                            <h4 className="text-sm font-bold text-slate-900 dark:text-white leading-tight">
-                              {store.name}
-                            </h4>
                           </div>
                         </div>
-                        <span
-                          className={`text-[10px] font-semibold px-2.5 py-1 rounded-full border ${store.badgeBg}`}
-                        >
-                          {store.badge}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+                      );
+                    })}
+                  </div>
+                </>
+              ) : (
+                <div className="w-full p-8 text-center bg-white/95 dark:bg-[#0f1523]/95 border border-slate-200/90 dark:border-slate-800/90 rounded-2xl shadow-sm">
+                  <div className="w-14 h-14 rounded-2xl bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800/50 flex items-center justify-center text-blue-600 dark:text-blue-400 mx-auto mb-4">
+                    <StoreIcon className="w-7 h-7" />
+                  </div>
+                  <h4 className="text-base font-bold text-slate-900 dark:text-white mb-2">
+                    CentralBo Ecosistema
+                  </h4>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed max-w-xs mx-auto">
+                    Plataforma multitienda con PWA independiente, pagos por QR y pedidos directos en Bolivia.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -423,7 +445,33 @@ export const PortalHome: React.FC = () => {
         </div>
 
         {/* Grid equilibrada de escaparates o Estado vacío si no hay coincidencias */}
-        {comerciosFiltrados.length === 0 ? (
+        {isLoading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 sm:gap-6">
+            {[1, 2, 3, 4].map((i) => (
+              <div
+                key={i}
+                className="rounded-2xl bg-white dark:bg-[#0d131f] border border-slate-200/90 dark:border-slate-800/90 p-5 sm:p-6 animate-pulse space-y-4"
+              >
+                <div className="h-16 bg-slate-100 dark:bg-slate-800/60 rounded-xl" />
+                <div className="h-4 bg-slate-100 dark:bg-slate-800/60 rounded w-1/3" />
+                <div className="h-6 bg-slate-100 dark:bg-slate-800/60 rounded w-2/3" />
+                <div className="h-10 bg-slate-100 dark:bg-slate-800/60 rounded-xl mt-4" />
+              </div>
+            ))}
+          </div>
+        ) : stores.length === 0 ? (
+          <div className="p-12 text-center rounded-2xl bg-white dark:bg-[#0d131f] border border-slate-200/80 dark:border-slate-800">
+            <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 dark:text-slate-400 mx-auto mb-3">
+              <StoreIcon className="w-6 h-6" />
+            </div>
+            <h3 className="text-base font-bold text-slate-900 dark:text-white mb-1">
+              No hay comercios disponibles por el momento
+            </h3>
+            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto">
+              Actualmente no existen comercios registrados en la base de datos de CentralBo.
+            </p>
+          </div>
+        ) : comerciosFiltrados.length === 0 ? (
           <div className="p-12 text-center rounded-2xl bg-white dark:bg-[#0d131f] border border-slate-200/80 dark:border-slate-800">
             <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
               No se encontraron comercios registrados en esta vertical.

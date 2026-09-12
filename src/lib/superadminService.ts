@@ -14,8 +14,7 @@ import {
   StoreType,
   PlanId,
 } from '../types';
-import { BASELINE_STORES } from './multiTenantService';
-import { MOCK_SUPERADMIN_USERS } from './mockUsersData';
+import { supabase } from './supabase';
 
 // ----------------------------------------------------------------------------
 // 4. PLANES OFICIALES DE CENTRALBO
@@ -65,255 +64,44 @@ export const CENTRALBO_PLANS: PlanDefinition[] = [
 // ----------------------------------------------------------------------------
 // 2. COMERCIOS REGISTRADOS (CON DETALLE COMPLETO)
 // ----------------------------------------------------------------------------
-export const INITIAL_SUPERADMIN_STORES: SuperAdminStoreRecord[] = [
-  {
-    ...BASELINE_STORES[0], // Restaurante Gourmet Roma
-    status: 'activo' as StoreStatus,
-    owner: {
-      name: 'Marco Antonio Rossi',
-      email: 'admin@roma.com',
-      phone: '+591 71023456',
-      socials: {
-        whatsapp: '+591 71023456',
-        instagram: '@roma_gourmet_bo',
-        facebook: 'RomaGourmetBolivia',
-      },
-    },
-    subscription: {
-      planId: 'pro',
-      planName: 'Pro',
-      status: 'activa',
-      startDate: '2026-08-01',
-      renewalDate: '2026-09-01',
-      billingCycle: 'mensual',
-      paymentHistory: [
-        {
-          id: 'pay-roma-01',
-          date: '2026-08-01',
-          amount: 99,
-          currency: 'Bs',
-          period: 'Agosto 2026',
-          status: 'completado',
-          reference: 'TRANS-BOB-90211',
-        },
-        {
-          id: 'pay-roma-02',
-          date: '2026-07-01',
-          amount: 99,
-          currency: 'Bs',
-          period: 'Julio 2026',
-          status: 'completado',
-          reference: 'TRANS-BOB-81452',
-        },
-      ],
-    },
-    activity: {
-      visitas: 3420,
-      pedidos: 184,
-      productos: 36,
-      ventas: 14850,
-      ultimaActividad: 'Hace 12 minutos',
-    },
-  },
-  {
-    ...BASELINE_STORES[1], // Boutique Milano Moda
-    status: 'activo' as StoreStatus,
-    owner: {
-      name: 'Lucía Fernández Soria',
-      email: 'admin@milano.com',
-      phone: '+591 72198765',
-      socials: {
-        whatsapp: '+591 72198765',
-        instagram: '@milanomoda_bo',
-      },
-    },
-    subscription: {
-      planId: 'basic',
-      planName: 'Basic',
-      status: 'activa',
-      startDate: '2026-07-15',
-      renewalDate: '2026-09-15',
-      billingCycle: 'mensual',
-      paymentHistory: [
-        {
-          id: 'pay-milano-01',
-          date: '2026-08-15',
-          amount: 49,
-          currency: 'Bs',
-          period: 'Agosto - Septiembre 2026',
-          status: 'completado',
-          reference: 'TRANS-BOB-92301',
-        },
-        {
-          id: 'pay-milano-02',
-          date: '2026-07-15',
-          amount: 49,
-          currency: 'Bs',
-          period: 'Julio - Agosto 2026',
-          status: 'completado',
-          reference: 'TRANS-BOB-84719',
-        },
-      ],
-    },
-    activity: {
-      visitas: 2150,
-      pedidos: 92,
-      productos: 64,
-      ventas: 9800,
-      ultimaActividad: 'Hace 45 minutos',
-    },
-  },
-  {
-    ...BASELINE_STORES[2], // Salón & Spa Zenit
-    status: 'prueba' as StoreStatus,
-    owner: {
-      name: 'Valeria Domínguez',
-      email: 'valeria@spazenit.com',
-      phone: '+591 73456123',
-      socials: {
-        whatsapp: '+591 73456123',
-        instagram: '@spazenit_bo',
-        facebook: 'SpaZenitBolivia',
-      },
-    },
-    subscription: {
-      planId: 'pro',
-      planName: 'Pro (Periodo de Prueba)',
-      status: 'prueba',
-      startDate: '2026-08-25',
-      renewalDate: '2026-09-08',
-      billingCycle: 'mensual',
-      paymentHistory: [
-        {
-          id: 'pay-zenit-01',
-          date: '2026-08-25',
-          amount: 0,
-          currency: 'Bs',
-          period: 'Prueba Gratuita 14 días',
-          status: 'completado',
-          reference: 'TRIAL-ZENIT-001',
-        },
-      ],
-    },
-    activity: {
-      visitas: 620,
-      pedidos: 18,
-      productos: 14,
-      ventas: 2300,
-      ultimaActividad: 'Hace 2 horas',
-    },
-  },
-  {
-    id: 'd4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a',
-    name: 'Calzados Altiplano & Cuero',
-    slug: 'calzados-altiplano',
-    store_type: 'moda',
-    status: 'inactivo' as StoreStatus,
-    logo_url: null,
-    created_at: '2026-07-10T10:00:00Z',
-    updated_at: '2026-08-15T15:00:00Z',
-    owner: {
-      name: 'Jorge Alarcón',
-      email: 'jorge@calzadosaltiplano.bo',
-      phone: '+591 76543210',
-    },
-    subscription: {
-      planId: 'basic',
-      planName: 'Basic',
-      status: 'vencida',
-      startDate: '2026-07-10',
-      renewalDate: '2026-08-10',
-      billingCycle: 'mensual',
-      paymentHistory: [
-        {
-          id: 'pay-altiplano-01',
-          date: '2026-07-10',
-          amount: 49,
-          currency: 'Bs',
-          period: 'Julio 2026',
-          status: 'completado',
-          reference: 'TRANS-BOB-78100',
-        },
-      ],
-    },
-    activity: {
-      visitas: 410,
-      pedidos: 9,
-      productos: 22,
-      ventas: 1150,
-      ultimaActividad: 'Hace 2 semanas',
-    },
-  },
-  {
-    id: 'e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b',
-    name: 'SuperMarket Los Andes Express',
-    slug: 'los-andes-express',
-    store_type: 'general',
-    status: 'suspendido' as StoreStatus,
-    logo_url: null,
-    created_at: '2026-06-01T08:30:00Z',
-    updated_at: '2026-08-20T11:00:00Z',
-    owner: {
-      name: 'Gonzalo Peñaranda',
-      email: 'admin@losandesexpress.com',
-      phone: '+591 79812345',
-    },
-    subscription: {
-      planId: 'pro',
-      planName: 'Pro',
-      status: 'cancelada',
-      startDate: '2026-06-01',
-      renewalDate: '2026-08-01',
-      billingCycle: 'mensual',
-      paymentHistory: [
-        {
-          id: 'pay-andes-01',
-          date: '2026-07-01',
-          amount: 99,
-          currency: 'Bs',
-          period: 'Julio 2026',
-          status: 'completado',
-          reference: 'TRANS-BOB-80911',
-        },
-        {
-          id: 'pay-andes-02',
-          date: '2026-06-01',
-          amount: 99,
-          currency: 'Bs',
-          period: 'Junio 2026',
-          status: 'completado',
-          reference: 'TRANS-BOB-72144',
-        },
-      ],
-    },
-    activity: {
-      visitas: 1200,
-      pedidos: 45,
-      productos: 110,
-      ventas: 5400,
-      ultimaActividad: 'Hace 1 mes',
-    },
-  },
-];
+export const INITIAL_SUPERADMIN_STORES: SuperAdminStoreRecord[] = [];
 
 const SUPERADMIN_STORES_STORAGE_KEY = 'centralbo_superadmin_stores_v2';
 
+const MOCK_STORE_IDS = new Set([
+  'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d',
+  'b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e',
+  'c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f',
+  'e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b',
+  'd4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a',
+]);
+const MOCK_SLUGS = new Set([
+  'restaurante-roma',
+  'boutique-milano',
+  'spa-zenit',
+  'los-andes-express',
+  'calzados-altiplano',
+]);
+
 function loadStoresFromStorage(): SuperAdminStoreRecord[] {
   if (typeof window === 'undefined') {
-    return [...INITIAL_SUPERADMIN_STORES];
+    return [];
   }
   try {
     const raw = localStorage.getItem(SUPERADMIN_STORES_STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
+      if (Array.isArray(parsed)) {
+        const filtered = parsed.filter(
+          (s) => s && !MOCK_STORE_IDS.has(s.id) && !MOCK_SLUGS.has(s.slug)
+        );
+        return filtered;
       }
     }
   } catch (e) {
     console.warn('[CentralBo SuperAdmin] Error al cargar comercios:', e);
   }
-  return [...INITIAL_SUPERADMIN_STORES];
+  return [];
 }
 
 function persistStores(stores: SuperAdminStoreRecord[]): void {
@@ -330,6 +118,88 @@ function persistStores(stores: SuperAdminStoreRecord[]): void {
 }
 
 export const SUPERADMIN_STORES: SuperAdminStoreRecord[] = loadStoresFromStorage();
+
+/**
+ * Consulta la base de datos Supabase para cargar los comercios reales existentes
+ * y los combina con la configuración local sin inyectar datos ficticios.
+ */
+export async function fetchSuperAdminStores(): Promise<SuperAdminStoreRecord[]> {
+  try {
+    const { data, error } = await supabase
+      .from('stores')
+      .select('id, name, slug, store_type, status, logo_url, created_at, updated_at')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.warn('[CentralBo SuperAdmin] Error al consultar comercios en Supabase:', error);
+      return loadStoresFromStorage();
+    }
+
+    if (!data || data.length === 0) {
+      persistStores([]);
+      return [];
+    }
+
+    const localStores = loadStoresFromStorage();
+    const localMap = new Map(localStores.map((s) => [s.id, s]));
+
+    const merged: SuperAdminStoreRecord[] = data.map((st) => {
+      const existing = localMap.get(st.id);
+      if (existing) {
+        return {
+          ...st,
+          name: st.name,
+          slug: st.slug,
+          store_type: st.store_type,
+          status: st.status as StoreStatus,
+          logo_url: st.logo_url,
+          created_at: st.created_at,
+          updated_at: st.updated_at,
+          owner: existing.owner,
+          subscription: existing.subscription,
+          activity: existing.activity,
+        };
+      }
+      return {
+        id: st.id,
+        name: st.name,
+        slug: st.slug,
+        store_type: st.store_type,
+        status: st.status as StoreStatus,
+        logo_url: st.logo_url,
+        created_at: st.created_at,
+        updated_at: st.updated_at,
+        owner: {
+          name: 'Dueño de Comercio',
+          email: 'contacto@centralbo.com',
+          phone: '+591 70000000',
+        },
+        subscription: {
+          planId: 'basic',
+          planName: 'Basic',
+          status: st.status === 'activo' ? 'activa' : st.status === 'prueba' ? 'prueba' : 'cancelada',
+          startDate: st.created_at ? st.created_at.slice(0, 10) : '2026-09-01',
+          renewalDate: '2026-10-01',
+          billingCycle: 'mensual',
+          paymentHistory: [],
+        },
+        activity: {
+          visitas: 0,
+          pedidos: 0,
+          productos: 0,
+          ventas: 0,
+          ultimaActividad: 'Sin actividad registrada',
+        },
+      };
+    });
+
+    persistStores(merged);
+    return merged;
+  } catch (err) {
+    console.warn('[CentralBo SuperAdmin] Excepción al sincronizar comercios:', err);
+    return loadStoresFromStorage();
+  }
+}
 
 export interface CreateStoreInput {
   name: string;
@@ -568,7 +438,7 @@ export function deleteSuperAdminStorePermanently(id: string): boolean {
 // ----------------------------------------------------------------------------
 // 3. USUARIOS REGISTRADOS (CON DISTINCIÓN CLARA DE LOS 3 PERFILES OFICIALES)
 // ----------------------------------------------------------------------------
-export const SUPERADMIN_USERS: SuperAdminUserRecord[] = [...MOCK_SUPERADMIN_USERS];
+export const SUPERADMIN_USERS: SuperAdminUserRecord[] = [];
 
 // ----------------------------------------------------------------------------
 // MÉTRICAS Y RESUMEN DEL DASHBOARD
@@ -580,10 +450,14 @@ export function getSuperAdminDashboardMetrics() {
   const suspendedStores = SUPERADMIN_STORES.filter((s) => s.status === 'suspendido').length;
   const trialStores = SUPERADMIN_STORES.filter((s) => s.status === 'prueba').length;
 
-  const totalUsers = SUPERADMIN_USERS.length;
-  const superAdminUsers = SUPERADMIN_USERS.filter((u) => u.profile === 'superadmin').length;
-  const storeAdminUsers = SUPERADMIN_USERS.filter((u) => u.profile === 'store_admin').length;
-  const publicClientUsers = SUPERADMIN_USERS.filter((u) => u.profile === 'public_client').length;
+  const baseUsers = SUPERADMIN_USERS;
+  const storeOwnersCount = SUPERADMIN_STORES.filter((s) => s.owner?.email).length;
+  const totalUsers = baseUsers.length > 0 ? baseUsers.length : storeOwnersCount;
+  const superAdminUsers = baseUsers.filter((u) => u.profile === 'superadmin').length;
+  const storeAdminUsers = baseUsers.length > 0
+    ? baseUsers.filter((u) => u.profile === 'store_admin').length
+    : storeOwnersCount;
+  const publicClientUsers = baseUsers.filter((u) => u.profile === 'public_client').length;
 
   const totalPlans = CENTRALBO_PLANS.length;
   const totalSubscriptions = SUPERADMIN_STORES.length;
@@ -633,7 +507,10 @@ export function getSuperAdminDashboardMetrics() {
       totalPedidos,
       totalProductos,
       totalVentasBs,
-      ultimaActividadGeneral: 'Hace 12 minutos (Restaurante Gourmet Roma)',
+      ultimaActividadGeneral:
+        SUPERADMIN_STORES.length > 0
+          ? `Actividad reciente (${SUPERADMIN_STORES[0].name})`
+          : 'Sin actividad registrada',
     },
   };
 }

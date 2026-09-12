@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { AuthenticatedUser, CentralBoProfile } from '../types';
-import { DEMO_IDENTITIES, resolveUserProfile } from '../lib/multiTenantService';
+import { resolveUserProfile } from '../lib/multiTenantService';
 
 const SESSION_STORAGE_KEY = 'centralbo_auth_session';
 
@@ -139,23 +139,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Selector rápido de perfiles oficiales para verificación de Módulos 2, 3 y 4
+  // Selector rápido de perfiles (solo permite limpiar sesión o cerrar acceso; no inyecta identidades ficticias)
   const switchDemoProfile = (
     type: 'superadmin' | 'adminRoma' | 'adminMilano' | 'adminZenit' | 'adminLosAndes' | 'public'
   ) => {
     setError(null);
     if (type === 'public') {
       setUser(null);
-      try {
-        localStorage.removeItem(SESSION_STORAGE_KEY);
-      } catch {}
-      return;
-    }
-
-    const demoUser = DEMO_IDENTITIES[type];
-    if (demoUser) {
-      setUser(demoUser);
-      // Las identidades demo solo existen en memoria volátil si se usan aisladamente; nunca se persisten en localStorage
       try {
         localStorage.removeItem(SESSION_STORAGE_KEY);
       } catch {}

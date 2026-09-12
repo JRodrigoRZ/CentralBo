@@ -66,7 +66,7 @@ export const Header: React.FC<HeaderProps> = ({ pwaStatus, onInstallClick }) => 
           </button>
 
           <button
-            onClick={() => handleNavigate('/tienda/restaurante-roma')}
+            onClick={() => handleNavigate('/#comercios')}
             className={`px-3 py-1.5 rounded-lg transition cursor-pointer text-xs font-medium ${
               currentPath.startsWith('/tienda')
                 ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white font-semibold'
@@ -195,7 +195,7 @@ export const Header: React.FC<HeaderProps> = ({ pwaStatus, onInstallClick }) => 
                 Inicio
               </button>
               <button
-                onClick={() => handleNavigate('/tienda/restaurante-roma')}
+                onClick={() => handleNavigate('/#comercios')}
                 className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200 text-left font-medium"
               >
                 Tiendas Públicas

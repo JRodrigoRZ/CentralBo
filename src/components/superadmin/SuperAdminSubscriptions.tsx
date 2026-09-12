@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   TrendingUp,
   CreditCard,
@@ -12,8 +12,12 @@ import {
   Receipt,
   Store as StoreIcon,
 } from 'lucide-react';
-import { SUPERADMIN_STORES } from '../../lib/superadminService';
-import { SubscriptionStatus } from '../../types';
+import {
+  SUPERADMIN_STORES,
+  getSuperAdminStores,
+  fetchSuperAdminStores,
+} from '../../lib/superadminService';
+import { SubscriptionStatus, SuperAdminStoreRecord } from '../../types';
 
 const statusBadgeStyles: Record<SubscriptionStatus, { label: string; bg: string; text: string; border: string }> = {
   activa: { label: 'Activa / Al Día', bg: 'bg-emerald-500/15', text: 'text-emerald-400', border: 'border-emerald-500/30' },
@@ -23,14 +27,34 @@ const statusBadgeStyles: Record<SubscriptionStatus, { label: string; bg: string;
 };
 
 export const SuperAdminSubscriptions: React.FC = () => {
+  const [stores, setStores] = useState<SuperAdminStoreRecord[]>(() => getSuperAdminStores());
   const [expandedStoreId, setExpandedStoreId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('todos');
+
+  useEffect(() => {
+    let mounted = true;
+    fetchSuperAdminStores().then((loaded) => {
+      if (mounted) {
+        setStores(loaded);
+      }
+    });
+
+    const handleStoresChanged = () => {
+      setStores(getSuperAdminStores());
+    };
+    window.addEventListener('centralbo:superadmin_stores_changed', handleStoresChanged);
+
+    return () => {
+      mounted = false;
+      window.removeEventListener('centralbo:superadmin_stores_changed', handleStoresChanged);
+    };
+  }, []);
 
   const toggleExpand = (storeId: string) => {
     setExpandedStoreId(expandedStoreId === storeId ? null : storeId);
   };
 
-  const filteredStores = SUPERADMIN_STORES.filter((store) => {
+  const filteredStores = stores.filter((store) => {
     if (statusFilter !== 'todos' && store.subscription.status !== statusFilter) return false;
     return true;
   });

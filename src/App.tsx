@@ -18,14 +18,11 @@ function AppContent() {
   const { currentRoute } = useRouter();
   const pwaStatus = usePWA();
   const isPublicStore = currentRoute.type === 'public_store';
-  const isBoutique = currentRoute.type === 'public_store' && currentRoute.slug === 'boutique-milano';
 
   return (
     <div
       className={`min-h-screen ${
-        isBoutique
-          ? 'bg-[#FAF8F5] dark:bg-[#101012] text-stone-900 dark:text-stone-100 selection:bg-rose-500 selection:text-white'
-          : isPublicStore
+        isPublicStore
           ? 'bg-stone-50 dark:bg-stone-950 text-stone-900 dark:text-stone-100 selection:bg-amber-500 selection:text-white'
           : 'bg-slate-50 dark:bg-[#090d16] text-slate-900 dark:text-slate-100 selection:bg-amber-500 selection:text-white'
       } flex flex-col transition-colors`}

@@ -25,7 +25,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useRouter } from '../context/RouterContext';
 import { Store, StoreAdminTab } from '../types';
-import { resolveStoreById, BASELINE_STORES } from '../lib/multiTenantService';
+import { resolveStoreById } from '../lib/multiTenantService';
 import { getStorePlan } from '../lib/storeAdminService';
 
 // Subcomponentes del Panel Admin de Tienda (Módulo 4)

@@ -34,7 +34,6 @@ import {
   OrderStatus,
   StoreType,
 } from '../types';
-import { BASELINE_STORES } from './multiTenantService';
 import { SUPERADMIN_STORES } from './superadminService';
 
 // ----------------------------------------------------------------------------
@@ -409,27 +408,19 @@ export function calculateScheduleStatus(schedule: StoreScheduleDay[]): {
 // 2. PERFIL DE TIENDA
 // ----------------------------------------------------------------------------
 export function getStoreProfile(tenantId: string): StoreProfileSettings {
-  const baseStore = BASELINE_STORES.find((s) => s.id === tenantId);
   const adminRecord = SUPERADMIN_STORES.find((s) => s.id === tenantId);
 
   const defaultProfile: StoreProfileSettings = {
-    logoUrl: baseStore?.logo_url || '',
-    name: baseStore?.name || 'Mi Comercio',
-    description:
-      baseStore?.store_type === 'restaurante'
-        ? 'Auténtica gastronomía italiana artesanal, pizzas al horno de piedra y pastas frescas en La Paz.'
-        : baseStore?.store_type === 'moda'
-        ? 'Colecciones exclusivas de temporada, calzado y confección de alta calidad.'
-        : baseStore?.store_type === 'servicios'
-        ? 'Centro integral de bienestar, estética facial, masoterapia y spa relajante.'
-        : 'Variedad en abarrotes, productos frescos y artículos de primera necesidad.',
-    address: 'Av. Ballivián #1234, Calacoto, La Paz - Bolivia',
-    phone: adminRecord?.owner.phone || '+591 2 2789012',
-    whatsapp: adminRecord?.owner.socials?.whatsapp || '+591 71023456',
+    logoUrl: adminRecord?.logo_url || '',
+    name: adminRecord?.name || 'Mi Comercio',
+    description: 'Comercio registrado en la plataforma CentralBo.',
+    address: 'Bolivia',
+    phone: adminRecord?.owner.phone || '+591 70000000',
+    whatsapp: adminRecord?.owner.socials?.whatsapp || '+591 70000000',
     email: adminRecord?.owner.email || 'contacto@comercio.bo',
-    attentionInfo: 'Atención presencial y pedidos online de Lunes a Sábado.',
+    attentionInfo: 'Atención presencial y pedidos online.',
     socials: {
-      whatsapp: adminRecord?.owner.socials?.whatsapp || '+591 71023456',
+      whatsapp: adminRecord?.owner.socials?.whatsapp || '+591 70000000',
       instagram: adminRecord?.owner.socials?.instagram || '@comercio_bo',
       facebook: adminRecord?.owner.socials?.facebook || 'ComercioBolivia',
       tiktok: '@comercio.bolivia',
@@ -457,7 +448,7 @@ export function getStoreAppearance(tenantId: string): StoreAppearanceSettings {
     brandPrimaryColor: plan === 'pro' ? '#4f46e5' : '#4f46e5',
     brandSecondaryColor: plan === 'pro' ? '#06b6d4' : '#06b6d4',
     brandAccentColor: plan === 'pro' ? '#f59e0b' : '#f59e0b',
-    customDomain: plan === 'pro' ? 'roma-gourmet.bo' : '',
+    customDomain: '',
     domainVerified: plan === 'pro',
     visualStyle: 'modern',
   };
@@ -1117,7 +1108,7 @@ export function getStoreProducts(tenantId: string, storeType: StoreType): Produc
             id: 'prod-rest-3',
             tenant_id: tenantId,
             category_id: 'cat-rest-1',
-            name: 'Combo Pareja Romana',
+            name: 'Combo Especial Pareja',
             description: '1 Pizza Familiar a elección + 2 Pastas clásicas + 2 Bebidas artesanales y 1 Tiramisú para compartir.',
             price: 155,
             is_available: true,
@@ -1167,7 +1158,7 @@ export function getStoreProducts(tenantId: string, storeType: StoreType): Produc
             id: 'prod-moda-1',
             tenant_id: tenantId,
             category_id: 'cat-moda-1',
-            name: 'Vestido Midi Plisado Milano',
+            name: 'Vestido Midi Plisado Clásico',
             description: 'Vestido midi con caída fluida, escote en V y cinto ajustable. Tejido transpirable de alta resistencia.',
             price: 240,
             is_available: true,
@@ -1225,7 +1216,7 @@ export function getStoreProducts(tenantId: string, storeType: StoreType): Produc
             id: 'prod-moda-3',
             tenant_id: tenantId,
             category_id: 'cat-moda-1',
-            name: 'Blusa Seda Satín Milano',
+            name: 'Blusa Seda Satín Elegante',
             description: 'Blusa en seda satinada de tacto sutil con cuello camisero atelier y puños drapeados. Confección refinada para eventos.',
             price: 195,
             is_available: true,

@@ -12,111 +12,17 @@
 import { supabase } from './supabase';
 import { Store, StoreUserRole, CentralBoProfile, AuthenticatedUser } from '../types';
 
-// Comercios base validados (definidos en la suite de pruebas de la Fase 1: 04_validation_tests.sql)
-export const BASELINE_STORES: Store[] = [
-  {
-    id: 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d',
-    name: 'Restaurante Gourmet Roma',
-    slug: 'restaurante-roma',
-    store_type: 'restaurante',
-    status: 'activo',
-    logo_url: null,
-    created_at: '2026-09-01T12:00:00Z',
-    updated_at: '2026-09-01T12:00:00Z',
-  },
-  {
-    id: 'b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e',
-    name: 'Boutique Milano Moda',
-    slug: 'boutique-milano',
-    store_type: 'moda',
-    status: 'activo',
-    logo_url: null,
-    created_at: '2026-09-02T12:00:00Z',
-    updated_at: '2026-09-02T12:00:00Z',
-  },
-  {
-    id: 'c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f',
-    name: 'Salón & Spa Zenit',
-    slug: 'spa-zenit',
-    store_type: 'servicios',
-    status: 'activo',
-    logo_url: null,
-    created_at: '2026-09-03T12:00:00Z',
-    updated_at: '2026-09-03T12:00:00Z',
-  },
-  {
-    id: 'e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b',
-    name: 'SuperMarket Los Andes Express',
-    slug: 'los-andes-express',
-    store_type: 'general',
-    status: 'activo',
-    logo_url: null,
-    created_at: '2026-09-04T12:00:00Z',
-    updated_at: '2026-09-04T12:00:00Z',
-  },
-];
-
-// Perfiles oficiales de demostración para pruebas inmediatas de los 4 tipos de tienda
-export const DEMO_IDENTITIES = {
-  superadmin: {
-    id: 'sa-00000000-0000-4000-8000-000000000001',
-    email: 'superadmin@centralbo.com',
-    fullName: 'SuperAdmin Global CentralBo',
-    profile: 'superadmin' as CentralBoProfile,
-    tenantId: null,
-    store: null,
-    storeRole: 'superadmin' as StoreUserRole,
-  },
-  adminRoma: {
-    id: 'adm-11111111-1111-4111-8111-111111111111',
-    email: 'admin@roma.com',
-    fullName: 'Administrador Restaurante Roma',
-    profile: 'store_admin' as CentralBoProfile,
-    tenantId: BASELINE_STORES[0].id,
-    store: BASELINE_STORES[0],
-    storeRole: 'admin' as StoreUserRole,
-  },
-  adminMilano: {
-    id: 'adm-22222222-2222-4222-8222-222222222222',
-    email: 'admin@milano.com',
-    fullName: 'Administrador Boutique Milano',
-    profile: 'store_admin' as CentralBoProfile,
-    tenantId: BASELINE_STORES[1].id,
-    store: BASELINE_STORES[1],
-    storeRole: 'admin' as StoreUserRole,
-  },
-  adminZenit: {
-    id: 'adm-33333333-3333-4333-8333-333333333333',
-    email: 'admin@spazenit.com',
-    fullName: 'Administradora Salón & Spa Zenit',
-    profile: 'store_admin' as CentralBoProfile,
-    tenantId: BASELINE_STORES[2].id,
-    store: BASELINE_STORES[2],
-    storeRole: 'admin' as StoreUserRole,
-  },
-  adminLosAndes: {
-    id: 'adm-44444444-4444-4444-8444-444444444444',
-    email: 'admin@losandes.com',
-    fullName: 'Administrador SuperMarket Los Andes',
-    profile: 'store_admin' as CentralBoProfile,
-    tenantId: BASELINE_STORES[3].id,
-    store: BASELINE_STORES[3],
-    storeRole: 'admin' as StoreUserRole,
-  },
-};
-
 /**
  * Resuelve un comercio público a partir de su slug único
- * No requiere autenticación (acceso público para clientes)
+ * Consulta directamente Supabase respetando RLS y devuelve null si no existe.
  */
 export async function resolveStoreBySlug(slug: string): Promise<Store | null> {
   const normalizedSlug = slug.trim().toLowerCase();
 
   try {
-    // 1. Consultar base de datos Supabase respetando RLS stores_public_read
     const { data, error } = await supabase
       .from('stores')
-      .select('*')
+      .select('id, name, slug, store_type, status, logo_url, created_at, updated_at')
       .eq('slug', normalizedSlug)
       .in('status', ['activo', 'prueba'])
       .maybeSingle();
@@ -128,22 +34,18 @@ export async function resolveStoreBySlug(slug: string): Promise<Store | null> {
     console.warn('[CentralBo] Consulta remota de slug:', err);
   }
 
-  // 2. Fallback a catálogo base validado de la Fase 1
-  const baseline = BASELINE_STORES.find(
-    (s) => s.slug?.toLowerCase() === normalizedSlug
-  );
-
-  return baseline || null;
+  return null;
 }
 
 /**
  * Resuelve un comercio por su UUID tenant_id
+ * Consulta directamente Supabase y devuelve null si no existe.
  */
 export async function resolveStoreById(tenantId: string): Promise<Store | null> {
   try {
     const { data, error } = await supabase
       .from('stores')
-      .select('*')
+      .select('id, name, slug, store_type, status, logo_url, created_at, updated_at')
       .eq('id', tenantId)
       .maybeSingle();
 
@@ -154,29 +56,29 @@ export async function resolveStoreById(tenantId: string): Promise<Store | null> 
     console.warn('[CentralBo] Consulta remota de tenant por ID:', err);
   }
 
-  const baseline = BASELINE_STORES.find((s) => s.id === tenantId);
-  return baseline || null;
+  return null;
 }
 
 /**
- * Obtiene la lista de comercios públicos activos
+ * Obtiene la lista de comercios públicos activos desde Supabase.
+ * Si no existen comercios en la base de datos, devuelve un arreglo vacío [].
  */
 export async function getPublicStores(): Promise<Store[]> {
   try {
     const { data, error } = await supabase
       .from('stores')
-      .select('*')
+      .select('id, name, slug, store_type, status, logo_url, created_at, updated_at')
       .in('status', ['activo', 'prueba'])
       .order('name');
 
-    if (!error && data && data.length > 0) {
+    if (!error && data) {
       return data as Store[];
     }
   } catch (err) {
     console.warn('[CentralBo] Consulta remota de comercios públicos:', err);
   }
 
-  return BASELINE_STORES;
+  return [];
 }
 
 /**
