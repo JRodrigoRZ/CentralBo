@@ -174,7 +174,8 @@ export type SuperAdminSection =
   | 'planes'
   | 'suscripciones'
   | 'actividad'
-  | 'configuracion';
+  | 'configuracion'
+  | 'gestion_tiendas';
 
 export type PlanId = 'basic' | 'pro';
 export type PlanBillingCycle = 'mensual' | 'semestral' | 'anual';

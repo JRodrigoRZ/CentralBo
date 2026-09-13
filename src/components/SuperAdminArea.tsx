@@ -11,6 +11,7 @@ import {
   ArrowLeft,
   LogOut,
   ShieldAlert,
+  Building2,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useRouter } from '../context/RouterContext';
@@ -22,6 +23,7 @@ import { SuperAdminPlans } from './superadmin/SuperAdminPlans';
 import { SuperAdminSubscriptions } from './superadmin/SuperAdminSubscriptions';
 import { SuperAdminActivity } from './superadmin/SuperAdminActivity';
 import { SuperAdminSettings } from './superadmin/SuperAdminSettings';
+import { SuperAdminGestionTiendas } from './superadmin/SuperAdminGestionTiendas';
 import { ThemeToggle } from './ThemeToggle';
 
 interface MenuTabItem {
@@ -39,6 +41,7 @@ const MENU_ITEMS: MenuTabItem[] = [
   { id: 'suscripciones', label: '5. Suscripciones', shortLabel: 'Suscripciones', icon: TrendingUp },
   { id: 'actividad', label: '6. Actividad', shortLabel: 'Actividad', icon: Activity },
   { id: 'configuracion', label: '7. Configuración Global', shortLabel: 'Configuración', icon: Settings },
+  { id: 'gestion_tiendas', label: '8. Gestión de Tiendas', shortLabel: 'Gestión Tiendas', icon: Building2 },
 ];
 
 export const SuperAdminArea: React.FC = () => {
@@ -162,6 +165,8 @@ export const SuperAdminArea: React.FC = () => {
         {activeSection === 'actividad' && <SuperAdminActivity />}
 
         {activeSection === 'configuracion' && <SuperAdminSettings />}
+
+        {activeSection === 'gestion_tiendas' && <SuperAdminGestionTiendas />}
       </section>
     </div>
   );

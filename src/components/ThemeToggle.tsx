@@ -9,48 +9,29 @@ interface ThemeToggleProps {
 
 export const ThemeToggle: React.FC<ThemeToggleProps> = ({
   className = '',
-  showLabel = true,
+  showLabel = false,
 }) => {
-  const { theme, isDark, toggleTheme } = useTheme();
+  const { isDark, toggleTheme } = useTheme();
 
   return (
     <button
       type="button"
       onClick={toggleTheme}
-      className={`relative inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border transition-all duration-200 cursor-pointer select-none text-xs font-semibold shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 ${
-        isDark
-          ? 'bg-slate-900 hover:bg-slate-800 text-amber-300 border-slate-700 hover:border-slate-600'
-          : 'bg-white hover:bg-slate-100 text-indigo-600 border-slate-300 hover:border-slate-400'
-      } ${className}`}
-      title={isDark ? 'Cambiar a Modo Claro (☀️)' : 'Cambiar a Modo Oscuro (🌙)'}
-      aria-label={isDark ? 'Cambiar a Modo Claro' : 'Cambiar a Modo Oscuro'}
+      className={`inline-flex items-center justify-center w-8 h-8 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#121d36] border border-slate-200/80 dark:border-[#1c2a47] transition-colors cursor-pointer select-none focus:outline-none focus:ring-2 focus:ring-blue-500/40 ${className}`}
+      title={isDark ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+      aria-label={isDark ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
     >
       {isDark ? (
-        <>
-          <span className="text-sm leading-none select-none" role="img" aria-label="Modo Oscuro">
-            🌙
-          </span>
-          {showLabel && (
-            <span className="hidden sm:inline text-slate-200 font-medium text-[11px]">
-              Oscuro
-            </span>
-          )}
-        </>
+        <Sun className="w-4 h-4 text-amber-400" />
       ) : (
-        <>
-          <span className="text-sm leading-none select-none" role="img" aria-label="Modo Claro">
-            ☀️
-          </span>
-          {showLabel && (
-            <span className="hidden sm:inline text-slate-700 font-medium text-[11px]">
-              Claro
-            </span>
-          )}
-        </>
+        <Moon className="w-4 h-4 text-slate-600 dark:text-slate-400" />
       )}
-      <span className="sr-only">
-        {isDark ? 'Activar modo claro' : 'Activar modo oscuro'}
-      </span>
+      {showLabel && (
+        <span className="ml-2 text-xs font-medium text-slate-700 dark:text-slate-300">
+          {isDark ? 'Modo claro' : 'Modo oscuro'}
+        </span>
+      )}
     </button>
   );
 };
+

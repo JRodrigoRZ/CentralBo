@@ -67,13 +67,13 @@ html.dark,
 [data-theme="dark"] {
   color-scheme: dark;
 
-  /* Niveles Visuales de Superficie — Modo Oscuro con Separación Clara */
-  --cb-bg-main: #090d16;              /* 1. Fondo principal: base profunda y limpia */
-  --cb-surface: #111827;              /* 2. Superficie de cards y paneles (elevada sobre el fondo) */
-  --cb-surface-elevated: #1e293b;     /* 3. Superficie elevada (modales, dropdowns, popovers) */
-  --cb-surface-subtle: #172236;       /* 4. Contenedores internos, sub-cabeceras */
-  --cb-border: #1f293d;               /* 5. Borde estructural nítido (nunca desaparece) */
-  --cb-border-subtle: #182030;        /* 5b. Divisores internos suaves */
+  /* Niveles Visuales de Superficie — Modo Oscuro Dark Navy Premium */
+  --cb-bg-main: #080d1a;              /* 1. Fondo principal: base profunda navy, no negro puro */
+  --cb-surface: #0d162b;              /* 2. Superficie de cards y paneles (elevada sobre el fondo) */
+  --cb-surface-elevated: #131e36;     /* 3. Superficie elevada (modales, dropdowns, popovers) */
+  --cb-surface-subtle: #101a30;       /* 4. Contenedores internos, sub-cabeceras */
+  --cb-border: #1c2a47;               /* 5. Borde estructural nítido (azul grisáceo sutil) */
+  --cb-border-subtle: #16223b;        /* 5b. Divisores internos suaves */
 
   /* Jerarquía de Texto — Modo Oscuro con Alto Contraste */
   --cb-text-primary: #ffffff;         /* 6. Texto principal: blanco nítido, máxima legibilidad */
@@ -123,7 +123,7 @@ html.light body {
 }
 
 html.dark body {
-  background-color: #090d16;
+  background-color: #080d1a;
   color: #ffffff;
 }
 
@@ -163,9 +163,9 @@ html.light select option {
 html.dark input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]),
 html.dark textarea,
 html.dark select {
-  background-color: #090d16 !important;
+  background-color: #0b1224 !important;
   color: #ffffff !important;
-  border-color: #334155 !important;
+  border-color: #1c2a47 !important;
 }
 
 html.dark input:focus,
@@ -182,7 +182,7 @@ html.dark textarea::placeholder {
 }
 
 html.dark select option {
-  background-color: #111827;
+  background-color: #0d162b;
   color: #ffffff;
 }
 

@@ -49,15 +49,21 @@ import { ThemeToggle } from './ThemeToggle';
 
 interface StoreAdminAreaProps {
   tenantId?: string;
+  initialStore?: Store;
+  onBack?: () => void;
 }
 
-export const StoreAdminArea: React.FC<StoreAdminAreaProps> = ({ tenantId }) => {
+export const StoreAdminArea: React.FC<StoreAdminAreaProps> = ({
+  tenantId,
+  initialStore,
+  onBack,
+}) => {
   const { user, profile, signOut } = useAuth();
   const { navigate } = useRouter();
 
   const [activeTab, setActiveTab] = useState<StoreAdminTab>('inicio_resumen');
-  const [store, setStore] = useState<Store | null>(user?.store || null);
-  const [loading, setLoading] = useState<boolean>(!user?.store);
+  const [store, setStore] = useState<Store | null>(initialStore || user?.store || null);
+  const [loading, setLoading] = useState<boolean>(!initialStore && !user?.store);
 
   // Para store_admin, se fuerza estrictamente su propio tenantId autorizado; sólo superadmin puede alternar tenantId arbitrario
   const activeTenantId =
@@ -66,9 +72,10 @@ export const StoreAdminArea: React.FC<StoreAdminAreaProps> = ({ tenantId }) => {
   useEffect(() => {
     let cancelled = false;
     if (activeTenantId) {
-      setLoading(true);
-      // Limpiar inmediatamente datos de la tienda anterior para evitar fugas en el panel y en la PWA
-      setStore(null);
+      if (!store || store.id !== activeTenantId) {
+        setLoading(true);
+        setStore(initialStore && initialStore.id === activeTenantId ? initialStore : null);
+      }
       resolveStoreById(activeTenantId)
         .then((s) => {
           if (!cancelled && s) setStore(s);
@@ -114,6 +121,29 @@ export const StoreAdminArea: React.FC<StoreAdminAreaProps> = ({ tenantId }) => {
     );
   }
 
+  if (!activeTenantId && user?.profile === 'superadmin') {
+    return (
+      <div className="max-w-xl mx-auto p-6 sm:p-8 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-center space-y-4 shadow-sm my-10">
+        <div className="w-14 h-14 rounded-2xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/40 flex items-center justify-center text-blue-600 dark:text-blue-400 mx-auto">
+          <StoreIcon className="w-8 h-8" />
+        </div>
+        <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white">
+          Seleccionar Tienda a Administrar
+        </h2>
+        <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+          Como SuperAdmin Global, puedes administrar cualquier comercio existente accediendo desde la sección de <strong>Gestión de Tiendas</strong>.
+        </p>
+        <button
+          onClick={() => navigate('/superadmin')}
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition cursor-pointer shadow-xs"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span>Ir a Gestión de Tiendas</span>
+        </button>
+      </div>
+    );
+  }
+
   if (loading || !store) {
     return (
       <div className="w-full max-w-6xl mx-auto py-20 flex flex-col items-center justify-center space-y-4">
@@ -143,15 +173,34 @@ export const StoreAdminArea: React.FC<StoreAdminAreaProps> = ({ tenantId }) => {
 
   return (
     <div className="w-full max-w-6xl mx-auto space-y-6">
+      {/* Banner de SuperAdmin cuando está administrando una tienda seleccionada */}
+      {onBack && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-2xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/40 text-blue-800 dark:text-blue-200 text-xs shadow-xs">
+          <div className="flex items-center gap-2.5">
+            <ShieldCheck className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+            <span>
+              Sesión SuperAdmin: Administrando <strong>{currentStore.name}</strong> con todas las funciones de tienda.
+            </span>
+          </div>
+          <button
+            onClick={onBack}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition cursor-pointer shadow-xs whitespace-nowrap self-start sm:self-auto"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>Cambiar de Tienda</span>
+          </button>
+        </div>
+      )}
+
       {/* Barra de Migas de Pan y Salida */}
       <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200 dark:border-slate-800">
         <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
           <button
-            onClick={() => navigate('/')}
+            onClick={() => (onBack ? onBack() : navigate('/'))}
             className="hover:text-slate-900 dark:hover:text-white transition flex items-center gap-1 cursor-pointer font-medium"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
-            <span>CentralBo</span>
+            <span>{onBack ? 'Gestión de Tiendas' : 'CentralBo'}</span>
           </button>
           <span>/</span>
           <span className="text-slate-800 dark:text-slate-200 font-semibold">{currentStore.name}</span>

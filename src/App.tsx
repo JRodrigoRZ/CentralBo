@@ -24,7 +24,7 @@ function AppContent() {
       className={`min-h-screen ${
         isPublicStore
           ? 'bg-stone-50 dark:bg-stone-950 text-stone-900 dark:text-stone-100 selection:bg-amber-500 selection:text-white'
-          : 'bg-slate-50 dark:bg-[#090d16] text-slate-900 dark:text-slate-100 selection:bg-amber-500 selection:text-white'
+          : 'bg-slate-50 dark:bg-[#080d1a] text-slate-900 dark:text-slate-100 selection:bg-amber-500 selection:text-white'
       } flex flex-col transition-colors`}
     >
       {/* Barra de navegación superior responsive - Excluida en tienda pública */}

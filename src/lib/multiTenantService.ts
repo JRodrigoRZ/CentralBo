@@ -11,6 +11,7 @@
 
 import { supabase } from './supabase';
 import { Store, StoreUserRole, CentralBoProfile, AuthenticatedUser } from '../types';
+import { getSuperAdminStores } from './superadminService';
 
 /**
  * Resuelve un comercio público a partir de su slug único
@@ -34,6 +35,29 @@ export async function resolveStoreBySlug(slug: string): Promise<Store | null> {
     console.warn('[CentralBo] Consulta remota de slug:', err);
   }
 
+  // Respaldo de tiendas de SuperAdmin en caso de sincronización local o desconexión
+  try {
+    const local = getSuperAdminStores().find(
+      (s) =>
+        (s.slug || '').toLowerCase() === normalizedSlug &&
+        (s.status === 'activo' || s.status === 'prueba')
+    );
+    if (local) {
+      return {
+        id: local.id,
+        name: local.name,
+        slug: local.slug,
+        store_type: local.store_type,
+        status: local.status,
+        logo_url: local.logo_url,
+        created_at: local.created_at,
+        updated_at: local.updated_at,
+      };
+    }
+  } catch (e) {
+    // ignore
+  }
+
   return null;
 }
 
@@ -54,6 +78,25 @@ export async function resolveStoreById(tenantId: string): Promise<Store | null> 
     }
   } catch (err) {
     console.warn('[CentralBo] Consulta remota de tenant por ID:', err);
+  }
+
+  // Respaldo de tiendas de SuperAdmin en caso de sincronización local
+  try {
+    const local = getSuperAdminStores().find((s) => s.id === tenantId);
+    if (local) {
+      return {
+        id: local.id,
+        name: local.name,
+        slug: local.slug,
+        store_type: local.store_type,
+        status: local.status,
+        logo_url: local.logo_url,
+        created_at: local.created_at,
+        updated_at: local.updated_at,
+      };
+    }
+  } catch (e) {
+    // ignore
   }
 
   return null;

@@ -5,7 +5,7 @@ export const Footer: React.FC = () => {
   return (
     <footer
       id="centralbo-main-footer"
-      className="w-full border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 py-8 px-4 sm:px-6 lg:px-8 text-xs text-slate-500 dark:text-slate-400 mt-12 transition-colors"
+      className="w-full border-t border-slate-200 dark:border-[#1a2744] bg-white dark:bg-[#080d1a] py-8 px-4 sm:px-6 lg:px-8 text-xs text-slate-500 dark:text-slate-400 mt-12 transition-colors"
     >
       <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-3">
