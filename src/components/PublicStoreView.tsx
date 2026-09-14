@@ -58,6 +58,8 @@ import {
 import { CartItem } from './publicStore/types';
 import { ThemeToggle } from './ThemeToggle';
 import { PriceDisplay } from './common/PriceDisplay';
+import { StorePWAInstallButton } from './publicStore/StorePWAInstallButton';
+import { StoreHighlights } from './publicStore/StoreHighlights';
 
 interface PublicStoreViewProps {
   slug: string;
@@ -329,7 +331,7 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
           className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition cursor-pointer shadow-xs"
         >
           <ArrowLeft className="w-4 h-4" />
-          Volver al Inicio de CentralBo
+          Volver al inicio
         </button>
       </div>
     );
@@ -401,18 +403,29 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
         }`}
       >
         <div className="h-14 flex items-center justify-between px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto w-full">
-          {/* Micro-Botón de Retorno Minimalista */}
-          <button
-            onClick={() => navigate('/')}
-            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-stone-100 hover:bg-stone-200 dark:bg-stone-900 dark:hover:bg-stone-800 text-stone-500 dark:text-stone-400 text-[11px] font-semibold transition-colors border border-stone-200 dark:border-stone-800 cursor-pointer"
-            title="Volver a CentralBo"
-          >
-            <span>←</span>
-            <span>CentralBo</span>
-          </button>
+          {/* Identidad de marca del comercio */}
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div
+              className="w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 text-white shadow-2xs"
+              style={{ backgroundColor: primaryColor }}
+            >
+              {(profile.name || store.name).charAt(0).toUpperCase()}
+            </div>
+            <span className="font-bold text-xs sm:text-sm text-stone-900 dark:text-stone-100 truncate max-w-[150px] sm:max-w-[260px]">
+              {profile.name || store.name}
+            </span>
+          </div>
 
-          {/* Derecha: Utilidades unificadas */}
-          <div className="flex items-center gap-2 sm:gap-3">
+          {/* Utilidades de la tienda */}
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            {/* Botón PWA condicional de la tienda */}
+            <StorePWAInstallButton
+              storeName={profile.name || store.name}
+              storeSlug={store.slug}
+              tenantId={store.id}
+              primaryColor={primaryColor}
+            />
+
             {/* 1. Un solo selector de tema */}
             <ThemeToggle />
 
@@ -518,6 +531,7 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
         <PublicStoreHeader
           store={store}
           profile={profile}
+          appearance={appearance}
           schedule={schedule}
           cartCount={totalCartCount}
           onOpenCart={() => setIsCartOpen(true)}
@@ -525,126 +539,63 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
           primaryColor={primaryColor}
         />
 
-        {/* BARRA DE SELLOS DE ABASTECIMIENTO & ENTREGA (TRUST BADGES) PARA SUPERMERCADO / RETAIL */}
-        {isRetail && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 my-8">
-            {[
-              { icon: '⚡', title: 'Entrega lo más rápido posible', desc: 'Despacho directo a tu puerta' },
-              { icon: '🥬', title: 'Frescura Diaria', desc: 'Selección rigurosa en frescos y lácteos' },
-              { icon: '🏷️', title: 'Precios de Mercado', desc: 'Variedad, ofertas y ahorro real' },
-              { icon: '🛡️', title: 'Confiabilidad y Seguridad', desc: 'En todas tus entregas a domicilio' },
-            ].map((badge, idx) => (
-              <div
-                key={idx}
-                className="flex items-center gap-3 p-3.5 rounded-2xl bg-white/80 dark:bg-[#0F172A]/60 border border-blue-900/10 dark:border-blue-500/15 shadow-sm"
-              >
-                <span className="text-xl">{badge.icon}</span>
-                <div className="text-left">
-                  <p className="text-xs font-bold text-slate-900 dark:text-slate-100">{badge.title}</p>
-                  <p className="text-[10px] text-slate-500 dark:text-slate-400">{badge.desc}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* BARRA DE SELLOS DE BIENESTAR (TRUST BADGES) PARA SERVICIOS / SPA */}
-        {isServices && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 my-8">
-            {[
-              { icon: '🌿', title: 'Cosmética Orgánica', desc: 'Fórmulas sin parabenos' },
-              { icon: '🩺', title: 'Terapeutas Certificados', desc: 'Atención personalizada' },
-              { icon: '🕯️', title: 'Cabinas Climatizadas', desc: 'Aromaterapia y música zen' },
-              { icon: '⏱️', title: 'Puntualidad Estricta', desc: 'Turnos sin esperas' },
-            ].map((badge, idx) => (
-              <div
-                key={idx}
-                className="flex items-center gap-3 p-3.5 rounded-2xl bg-white/80 dark:bg-[#121A15]/60 border border-emerald-900/10 dark:border-emerald-500/15 shadow-sm"
-              >
-                <span className="text-xl">{badge.icon}</span>
-                <div className="text-left">
-                  <p className="text-xs font-bold text-stone-900 dark:text-stone-100">{badge.title}</p>
-                  <p className="text-[10px] text-stone-500 dark:text-stone-400">{badge.desc}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* BARRA DE SELLOS TEXTILES & CONFECCIÓN (TRUST BADGES) BAJO EL BANNER */}
-        {isFashion && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 my-8">
-            {[
-              { icon: '🧵', title: 'Confección Nacional', desc: 'Fibras selectas y acabados finos' },
-              { icon: '📐', title: 'Calce & Tallas Reales', desc: 'Guía de medidas en centímetros' },
-              { icon: '🔄', title: 'Cambio Ágil de Talla', desc: 'Coordinación directa por WhatsApp' },
-              { icon: '📦', title: 'Empaque de Boutique', desc: 'Protección para prendas delicadas' },
-            ].map((badge, idx) => (
-              <div
-                key={idx}
-                className="flex items-center gap-3 p-3.5 rounded-2xl bg-white/70 dark:bg-stone-900/50 border border-stone-200/70 dark:border-stone-800/70 shadow-sm"
-              >
-                <span className="text-xl">{badge.icon}</span>
-                <div className="text-left">
-                  <p className="text-xs font-bold text-stone-900 dark:text-stone-100">{badge.title}</p>
-                  <p className="text-[10px] text-stone-500 dark:text-stone-400">{badge.desc}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* BARRA DE SELLOS ARTESANALES (TRUST BADGES) BAJO EL BANNER PARA RESTAURANTES */}
-        {isRestaurant && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 my-8">
-            {[
-              { icon: '🔥', title: 'Horno a la Leña', desc: 'Cocción tradicional' },
-              { icon: '🌾', title: 'Masa Madre 48h', desc: 'Fermentación natural' },
-              { icon: '📦', title: 'Envío Térmico', desc: 'Llega caliente a casa' },
-              { icon: '🇮🇹', title: 'Receta Tradicional', desc: 'Ingredientes selectos' },
-            ].map((badge, idx) => (
-              <div key={idx} className="flex items-center gap-3 p-3 rounded-xl bg-stone-100/70 dark:bg-stone-900/50 border border-stone-200/60 dark:border-stone-800/60">
-                <span className="text-xl">{badge.icon}</span>
-                <div className="text-left">
-                  <p className="text-xs font-bold text-stone-800 dark:text-stone-200">{badge.title}</p>
-                  <p className="text-[10px] text-stone-500 dark:text-stone-400">{badge.desc}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+        {/* DESTACADOS DEL COMERCIO (Sistema Dinámico, Configurable y Auténtico) */}
+        <StoreHighlights
+          highlights={appearance?.highlights}
+          layout={appearance?.highlightsLayout || 'balanced'}
+          showHighlights={appearance?.showHighlights ?? true}
+          brandPrimaryColor={primaryColor}
+          brandSecondaryColor={appearance?.brandSecondaryColor}
+          brandAccentColor={appearance?.brandAccentColor}
+          storeType={store.store_type}
+        />
 
         {/* SECCIÓN PRINCIPAL: CATÁLOGO PÚBLICO (Sección 2) */}
         <div className="space-y-4 pt-2">
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <h2 className={`text-lg font-bold ${
-                isRestaurant || isFashion || isServices ? 'text-stone-900 dark:text-stone-100 font-serif' : 'text-slate-900 dark:text-white'
-              }`}>
-                {isRestaurant
-                  ? 'La Carta & Especialidades'
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 pb-2 border-b border-stone-200/70 dark:border-stone-800/70">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span
+                  className="w-2 h-2 rounded-full inline-block shrink-0"
+                  style={{ backgroundColor: primaryColor }}
+                />
+                <span
+                  className="text-[11px] font-bold uppercase tracking-wider"
+                  style={{ color: primaryColor }}
+                >
+                  {store.store_type === 'servicios'
+                    ? 'Nuestros Servicios'
+                    : store.store_type === 'moda'
+                    ? 'Catálogo & Colección'
+                    : isRestaurant
+                    ? 'Menú & Carta'
+                    : 'Catálogo de Productos'}
+                </span>
+              </div>
+              <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-stone-900 dark:text-white">
+                {store.store_type === 'servicios'
+                  ? 'Servicios & Sesiones Disponibles'
                   : store.store_type === 'moda'
-                  ? 'Colección & Catálogo'
-                  : store.store_type === 'servicios'
-                  ? 'Servicios & Tratamientos Disponibles'
-                  : isRetail
-                  ? 'Pasillos & Despensa Disponible'
-                  : 'Catálogo de Productos'}
+                  ? 'Prendas & Colecciones'
+                  : isRestaurant
+                  ? 'Especialidades & Carta'
+                  : 'Productos Disponibles'}
               </h2>
-              <p className={`text-xs ${isRestaurant || isFashion || isServices ? 'text-stone-500 dark:text-stone-400' : 'text-slate-500 dark:text-slate-400'}`}>
-                {isRestaurant
-                  ? 'Pizzas al horno de barro, pastas artesanales y recetas de trattoria para ordenar directo.'
-                  : store.store_type === 'servicios'
-                  ? 'Reserva tu sesión de bienestar y cosmética botánica con agendamiento directo.'
-                  : isRetail
-                  ? 'Abarrotes, lácteos, limpieza y productos esenciales con entrega directa en tu domicilio.'
-                  : 'Explora las opciones y realiza tu pedido directo sin necesidad de registro.'}
+              <p className="text-xs text-stone-500 dark:text-stone-400 max-w-xl">
+                {store.store_type === 'servicios'
+                  ? `Agenda tus sesiones en ${profile.name || store.name} con atención directa y personalizada.`
+                  : `Explora y realiza tus pedidos en ${profile.name || store.name} con confirmación directa por WhatsApp.`}
               </p>
+            </div>
+            <div className="text-xs font-semibold text-stone-600 dark:text-stone-300 shrink-0 self-start sm:self-auto flex items-center gap-2 px-3 py-1.5 rounded-full bg-stone-100/80 dark:bg-stone-800/80 border border-stone-200/80 dark:border-stone-700/60 shadow-2xs">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>{products.filter((p) => p.status === 'activo').length} disponibles</span>
             </div>
           </div>
 
           <CatalogView
             storeType={store.store_type}
+            storeName={profile.name || store.name}
             products={products}
             categories={categories}
             fashionSettings={fashionSettings || undefined}
@@ -662,297 +613,47 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
                 : undefined
             }
             primaryColor={primaryColor}
+            brandSecondaryColor={appearance?.brandSecondaryColor}
+            brandAccentColor={appearance?.brandAccentColor}
           />
         </div>
 
-        {/* CARRUSEL FOTOGRÁFICO: GALERÍA & AMBIENTE DEL RESTAURANTE */}
-        {isRestaurant && (
-          <section className="my-14">
-            <div className="mb-4">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
-                Nuestra Cocina & Espacio
+
+
+        {/* BLOQUE DE ATENCIÓN DIRECTA Y CONSULTAS */}
+        {(profile.whatsapp || profile.phone) && (
+          <div className="my-10 p-6 sm:p-8 rounded-3xl border flex flex-col sm:flex-row items-center justify-between gap-6 shadow-2xs transition bg-white/70 dark:bg-stone-900/60 border-stone-200/80 dark:border-stone-800/80">
+            <div className="space-y-1 text-center sm:text-left">
+              <span
+                className="text-[11px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full border inline-block"
+                style={{
+                  backgroundColor: `${primaryColor}12`,
+                  color: primaryColor,
+                  borderColor: `${primaryColor}33`,
+                }}
+              >
+                Atención Directa
               </span>
-              <h3 className="text-xl font-black text-stone-900 dark:text-white">
-                Conoce la experiencia en Gourmet Roma
-              </h3>
+              <h4 className="text-lg sm:text-xl font-bold text-stone-900 dark:text-white pt-1">
+                ¿Tienes alguna consulta antes de realizar tu pedido?
+              </h4>
+              <p className="text-xs sm:text-sm text-stone-600 dark:text-stone-400 max-w-xl">
+                Contáctanos directamente por WhatsApp para asistirte con consultas sobre productos, pedidos o disponibilidad de {profile.name || store.name}.
+              </p>
             </div>
-            <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar snap-x snap-mandatory">
-              {[
-                {
-                  url: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=600&q=80',
-                  label: 'Horno de piedra artesanal',
-                },
-                {
-                  url: 'https://images.unsplash.com/photo-1559339352-11d035aa65de?auto=format&fit=crop&w=600&q=80',
-                  label: 'Salón principal & Cava',
-                },
-                {
-                  url: 'https://images.unsplash.com/photo-1551183053-bf91a1d81141?auto=format&fit=crop&w=600&q=80',
-                  label: 'Pastas hechas a mano',
-                },
-                {
-                  url: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=600&q=80',
-                  label: 'Terraza exterior',
-                },
-              ].map((photo, i) => (
-                <div
-                  key={i}
-                  className="snap-start shrink-0 w-72 h-44 rounded-2xl overflow-hidden relative group border border-stone-200 dark:border-stone-800"
-                >
-                  <img
-                    src={photo.url}
-                    alt={photo.label}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    loading="lazy"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent flex items-end p-3">
-                    <span className="text-white text-xs font-semibold">{photo.label}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* BLOQUE DE ATENCIÓN PERSONALIZADA (PERSONAL SHOPPER) & AMBIENTE (EL ATELIER) PARA MODA */}
-        {isFashion && (
-          <>
-            <div className="my-12 p-6 sm:p-8 rounded-3xl bg-gradient-to-r from-stone-100 via-stone-50 to-[#F5EFEB] dark:from-[#181615] dark:via-[#141312] dark:to-[#1A1817] border border-stone-200/80 dark:border-stone-800 flex flex-col sm:flex-row items-center justify-between gap-6 shadow-sm">
-              <div className="space-y-1 text-center sm:text-left">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">
-                  Atención Personalizada
-                </span>
-                <h4 className="text-lg sm:text-xl font-black text-stone-900 dark:text-white">
-                  ¿Dudas con tu talla o combinación?
-                </h4>
-                <p className="text-xs sm:text-sm text-stone-600 dark:text-stone-400 max-w-xl">
-                  Nuestra asesora de estilo te asiste en tiempo real para confirmar medidas exactas y coordinar tu pedido.
-                </p>
-              </div>
-              <a
-                href={
-                  profile.whatsapp
-                    ? `https://wa.me/${profile.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(
-                        'Hola, quisiera asesoría personalizada de estilo y tallas en Milano Moda'
-                      )}`
-                    : 'https://wa.me/59171023456?text=Hola%2C%20quisiera%20asesor%C3%ADa%20personalizada%20de%20estilo%20y%20tallas%20en%20Milano%20Moda'
-                }
-                target="_blank"
-                rel="noopener noreferrer"
-                className="whitespace-nowrap px-6 py-3 rounded-xl bg-stone-900 hover:bg-stone-800 text-white dark:bg-white dark:hover:bg-stone-200 dark:text-stone-950 font-bold text-xs shadow-md transition-transform active:scale-95 flex items-center gap-2"
-              >
-                <span>Hablar con una Asesora</span>
-                <span>→</span>
-              </a>
-            </div>
-
-            <section className="my-14">
-              <div className="mb-4">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">
-                  Nuestro Espacio & Estilo
-                </span>
-                <h3 className="text-xl font-black text-stone-900 dark:text-white">
-                  El Atelier Milano Moda
-                </h3>
-              </div>
-              <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar snap-x snap-mandatory">
-                {[
-                  {
-                    url: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=600&q=80',
-                    label: 'Salón de Colecciones & Percheros',
-                  },
-                  {
-                    url: 'https://images.unsplash.com/photo-1558769132-cb1aea458c5e?auto=format&fit=crop&w=600&q=80',
-                    label: 'Corte Artesanal & Fibras Nobles',
-                  },
-                  {
-                    url: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=600&q=80',
-                    label: 'Campaña Editorial Otoño',
-                  },
-                  {
-                    url: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=600&q=80',
-                    label: 'Zona de Calce & Probadores',
-                  },
-                ].map((photo, i) => (
-                  <div
-                    key={i}
-                    className="snap-start shrink-0 w-72 h-44 rounded-2xl overflow-hidden relative group border border-stone-200 dark:border-stone-800 shadow-sm"
-                  >
-                    <img
-                      src={photo.url}
-                      alt={photo.label}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                      loading="lazy"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-transparent to-transparent flex items-end p-3.5">
-                      <span className="text-white text-xs font-semibold">{photo.label}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
-          </>
-        )}
-
-        {/* BLOQUE DE ATENCIÓN PERSONALIZADA & ESPACIOS ZEN PARA SALÓN & SPA ZENIT */}
-        {isServices && (
-          <>
-            <div className="my-12 p-6 sm:p-8 rounded-3xl bg-gradient-to-r from-emerald-50 via-[#EBF3EB] to-stone-100 dark:from-[#101914] dark:via-[#131E18] dark:to-[#0E1511] border border-emerald-900/10 dark:border-emerald-500/15 flex flex-col sm:flex-row items-center justify-between gap-6 shadow-sm">
-              <div className="space-y-1 text-center sm:text-left">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
-                  Atención Personalizada
-                </span>
-                <h4 className="text-lg sm:text-xl font-black text-stone-900 dark:text-white">
-                  ¿Dudas sobre el tratamiento ideal para ti?
-                </h4>
-                <p className="text-xs sm:text-sm text-stone-600 dark:text-stone-400 max-w-xl">
-                  Consulta con nuestra cosmetóloga o terapeuta en vivo antes de reservar para definir la sesión que tu cuerpo necesita.
-                </p>
-              </div>
-              <a
-                href={
-                  profile.whatsapp
-                    ? `https://wa.me/${profile.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(
-                        'Hola, quisiera asesoría personalizada sobre los tratamientos en Spa Zenit'
-                      )}`
-                    : 'https://wa.me/59173456123?text=Hola%2C%20quisiera%20asesor%C3%ADa%20personalizada%20sobre%20los%20tratamientos%20en%20Spa%20Zenit.'
-                }
-                target="_blank"
-                rel="noopener noreferrer"
-                className="whitespace-nowrap px-6 py-3 rounded-xl bg-emerald-800 hover:bg-emerald-700 text-white dark:bg-emerald-600 dark:hover:bg-emerald-500 font-bold text-xs shadow-md transition-transform active:scale-95 flex items-center gap-2"
-              >
-                <span>Consultar por WhatsApp</span>
-                <span>→</span>
-              </a>
-            </div>
-
-            <section className="my-14">
-              <div className="mb-4">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
-                  Ambiente & Calma
-                </span>
-                <h3 className="text-xl font-black text-stone-900 dark:text-white">
-                  Conoce los Espacios de Spa Zenit
-                </h3>
-              </div>
-              <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar snap-x snap-mandatory">
-                {[
-                  {
-                    url: 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=600&q=80',
-                    label: 'Cabina de Masajes & Piedras Calientes',
-                  },
-                  {
-                    url: 'https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?auto=format&fit=crop&w=600&q=80',
-                    label: 'Área Facial & Dermoestética',
-                  },
-                  {
-                    url: 'https://images.unsplash.com/photo-1600334089648-b0d9d3028eb2?auto=format&fit=crop&w=600&q=80',
-                    label: 'Zona de Hidroterapia & Infusiones',
-                  },
-                  {
-                    url: 'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&w=600&q=80',
-                    label: 'Recepción Botánica & Aromaterapia',
-                  },
-                ].map((photo, i) => (
-                  <div
-                    key={i}
-                    className="snap-start shrink-0 w-72 h-44 rounded-2xl overflow-hidden relative group border border-emerald-900/10 dark:border-emerald-500/15 shadow-sm"
-                  >
-                    <img
-                      src={photo.url}
-                      alt={photo.label}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                      loading="lazy"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-transparent to-transparent flex items-end p-3.5">
-                      <span className="text-white text-xs font-semibold">{photo.label}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
-          </>
-        )}
-
-        {/* SECCIÓN ADICIONAL PARA SUPERMERCADO / RETAIL */}
-        {isRetail && (
-          <>
-            {/* CTA BANNER: PEDIDO POR LISTA DE WHATSAPP */}
-            <section className="mt-12 rounded-3xl p-6 sm:p-8 bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-lg relative overflow-hidden">
-              <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
-                <div className="space-y-2 text-center md:text-left">
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 text-white text-xs font-bold backdrop-blur-xs">
-                    <span>⚡</span>
-                    <span>Abastecimiento Rápido</span>
-                  </div>
-                  <h3 className="text-xl sm:text-2xl font-black tracking-tight">
-                    ¿Tienes una lista de compras larga?
-                  </h3>
-                  <p className="text-blue-100 text-xs sm:text-sm max-w-xl">
-                    Envíanos tu lista escrita o una foto directa por WhatsApp. Nuestro equipo armará tu pedido al instante con los mejores precios del mercado y confirmará el total contigo.
-                  </p>
-                </div>
-                <a
-                  href={`https://wa.me/${profile?.phone ? profile.phone.replace(/[^0-9]/g, '') : '59170000000'}?text=${encodeURIComponent(
-                    `¡Hola ${profile?.name || store.name}! Quiero enviar mi lista de compras para cotizar y coordinar el despacho a domicilio.`
-                  )}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="shrink-0 inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-white text-blue-700 hover:bg-blue-50 font-bold text-sm shadow-md transition-all hover:scale-105 active:scale-95"
-                >
-                  <MessageCircle className="w-4 h-4" />
-                  <span>Enviar lista por WhatsApp</span>
-                </a>
-              </div>
-            </section>
-
-            {/* CARRUSEL DE PASILLOS, VARIEDAD & ENVÍOS */}
-            <section className="mt-10 space-y-4">
-              <div className="space-y-1">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
-                  Pasillos, Variedad & Envíos
-                </span>
-                <h3 className="text-xl font-black text-slate-900 dark:text-white">
-                  Frescura & Calidad Garantizada
-                </h3>
-              </div>
-              <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar snap-x snap-mandatory">
-                {[
-                  {
-                    url: 'https://images.unsplash.com/photo-1610348725531-843dff563e2c?auto=format&fit=crop&w=600&q=80',
-                    label: 'Frutas & Verduras Seleccionadas',
-                  },
-                  {
-                    url: 'https://images.unsplash.com/photo-1550583724-b2692b85b150?auto=format&fit=crop&w=600&q=80',
-                    label: 'Lácteos, Quesos & Embutidos',
-                  },
-                  {
-                    url: 'https://images.unsplash.com/photo-1578916171728-46686eac8d58?auto=format&fit=crop&w=600&q=80',
-                    label: 'Despensa, Granos & Abarrotes',
-                  },
-                  {
-                    url: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=600&q=80',
-                    label: 'Despacho Exprés & Empaque Seguro',
-                  },
-                ].map((photo, i) => (
-                  <div
-                    key={i}
-                    className="snap-start shrink-0 w-72 h-44 rounded-2xl overflow-hidden relative group border border-blue-900/10 dark:border-blue-500/15 shadow-sm"
-                  >
-                    <img
-                      src={photo.url}
-                      alt={photo.label}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                      loading="lazy"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-transparent to-transparent flex items-end p-3.5">
-                      <span className="text-white text-xs font-semibold">{photo.label}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
-          </>
+            <a
+              href={`https://wa.me/${(profile.whatsapp || profile.phone || '').replace(/\D/g, '')}?text=${encodeURIComponent(
+                `Hola ${profile.name || store.name}, tengo una consulta sobre sus productos.`
+              )}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="whitespace-nowrap px-5 py-2.5 rounded-xl font-bold text-xs shadow-xs transition flex items-center gap-2 text-white hover:opacity-95 active:scale-98"
+              style={{ backgroundColor: primaryColor }}
+            >
+              <MessageCircle className="w-4 h-4" />
+              <span>Contactar por WhatsApp</span>
+            </a>
+          </div>
         )}
       </div>
 
@@ -977,11 +678,23 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
           {/* Lado Derecho (Sello de Plataforma CentralBo) */}
           <button
             onClick={() => navigate('/')}
-            className="inline-flex items-center gap-1.5 text-stone-500 hover:text-stone-800 dark:text-stone-400 dark:hover:text-stone-200 font-medium transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1.5 text-stone-500 hover:text-stone-700 dark:text-stone-400 dark:hover:text-stone-200 font-medium transition-colors cursor-pointer group"
           >
-            <span>Potenciado por</span>
-            <span className="font-black text-stone-900 dark:text-white">CentralBo</span>
-            <span className={`font-bold ml-1 transition-colors ${getAccentClass()}`}>
+            <span className="text-stone-500 dark:text-stone-400">Potenciado por</span>
+            <span className="inline-flex items-center gap-1.5">
+              <img
+                src="/icon.svg"
+                alt="CentralBo"
+                className="w-3.5 h-3.5 rounded-[3px] inline-block shrink-0 opacity-80 group-hover:opacity-100 transition-opacity"
+              />
+              <span
+                className="font-bold tracking-tight transition-opacity"
+                style={{ color: primaryColor }}
+              >
+                CentralBo
+              </span>
+            </span>
+            <span className="font-semibold text-stone-400 dark:text-stone-500 group-hover:text-stone-600 dark:group-hover:text-stone-300 transition-colors ml-0.5">
               · Crea tu tienda digital →
             </span>
           </button>
@@ -1011,7 +724,7 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
                 type="button"
                 id="btn-toast-continue"
                 onClick={() => setCartToast(null)}
-                className="px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-[11px] transition cursor-pointer"
+                className="px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-[11px] transition-all duration-150 active:scale-95 cursor-pointer"
                 title="Seguir comprando"
               >
                 Seguir
@@ -1026,8 +739,8 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
                 style={!isFashion ? { backgroundColor: primaryColor } : undefined}
                 className={
                   isFashion
-                    ? 'px-3 py-1.5 rounded-xl bg-stone-900 hover:bg-stone-800 text-white dark:bg-white dark:hover:bg-stone-200 dark:text-stone-950 font-bold text-[11px] shadow transition cursor-pointer'
-                    : 'px-3 py-1.5 rounded-xl text-white font-bold text-[11px] shadow hover:opacity-90 transition cursor-pointer'
+                    ? 'px-3 py-1.5 rounded-xl bg-stone-900 hover:bg-stone-800 text-white dark:bg-white dark:hover:bg-stone-200 dark:text-stone-950 font-bold text-[11px] shadow transition-all duration-150 active:scale-95 cursor-pointer'
+                    : 'px-3 py-1.5 rounded-xl text-white font-bold text-[11px] shadow hover:opacity-90 transition-all duration-150 active:scale-95 cursor-pointer'
                 }
                 title="Abrir el carrito"
               >
@@ -1047,31 +760,35 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
             style={!isFashion ? { backgroundColor: primaryColor } : undefined}
             className={
               isFashion
-                ? 'flex items-center gap-3 px-4 sm:px-5 py-3 rounded-2xl bg-stone-900 hover:bg-stone-800 text-white dark:bg-white dark:hover:bg-stone-200 dark:text-stone-950 font-bold text-xs shadow-2xl transition cursor-pointer border border-stone-800 dark:border-stone-200'
-                : 'flex items-center gap-3 px-4 sm:px-5 py-3 rounded-2xl text-white font-bold text-xs shadow-xl hover:opacity-95 transition cursor-pointer border border-white/20'
+                ? 'flex items-center gap-3 px-4 sm:px-5 py-3 rounded-2xl bg-stone-900 hover:bg-stone-800 text-white dark:bg-white dark:hover:bg-stone-200 dark:text-stone-950 font-bold text-xs shadow-2xl transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer border border-stone-800 dark:border-stone-200'
+                : 'flex items-center gap-3 px-4 sm:px-5 py-3 rounded-2xl text-white font-bold text-xs shadow-xl hover:opacity-95 transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer border border-white/20'
             }
             title="Ver los productos en tu canasta acumulativa"
           >
-            <div className="relative">
-              <ShoppingBag className="w-5 h-5" />
+            <div className="relative shrink-0">
+              <ShoppingBag className="w-5 h-5 text-current" />
               <span
                 className={
                   isFashion
                     ? 'absolute -top-2.5 -right-2.5 min-w-5 h-5 px-1.5 rounded-full bg-rose-500/15 text-rose-600 dark:text-rose-300 border border-rose-500/20 text-[11px] font-black flex items-center justify-center shadow'
-                    : 'absolute -top-2.5 -right-2.5 min-w-5 h-5 px-1 rounded-full bg-white text-slate-950 text-[11px] font-black flex items-center justify-center shadow'
+                    : 'absolute -top-2.5 -right-2.5 min-w-5 h-5 px-1.5 rounded-full bg-white text-slate-950 text-[11px] font-black flex items-center justify-center shadow-md'
                 }
               >
                 {totalCartCount}
               </span>
             </div>
             <div className="text-left">
-              <p className="text-[10px] uppercase font-bold tracking-wider opacity-90">
+              <p
+                className={`text-[10px] uppercase font-bold tracking-wider select-none ${
+                  isFashion ? 'text-white/85 dark:text-stone-900/80' : 'text-white/90'
+                }`}
+              >
                 Canasta ({totalCartCount} {totalCartCount === 1 ? 'unidad' : 'unidades'})
               </p>
               <PriceDisplay
                 amount={cartSubtotal}
                 size="sm"
-                className={isFashion ? 'text-white dark:text-stone-950 font-black' : 'text-white'}
+                colorVariant={isFashion ? 'fashion' : 'white'}
               />
             </div>
           </button>
@@ -1083,6 +800,8 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
         <ProductDetailModal
           product={selectedProduct}
           storeType={store.store_type}
+          storeName={profile.name || store.name}
+          categories={categories}
           fashionSettings={fashionSettings || undefined}
           onAddToCart={(item) => handleAddToCart(item, false)}
           onOpenCart={() => setIsCartOpen(true)}
@@ -1114,6 +833,7 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
         onClearCart={handleClearCart}
         onProceedToCheckout={handleProceedToCheckout}
         primaryColor={primaryColor}
+        storeName={profile.name || store.name}
       />
 
       {/* MODAL: CHECKOUT DE PEDIDO */}
@@ -1141,6 +861,7 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
           professionals={professionals}
           preselectedServiceId={bookingServiceId}
           onClose={() => setIsBookingOpen(false)}
+          primaryColor={primaryColor}
         />
       )}
 
@@ -1149,6 +870,7 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
         <FashionSizeGuideModal
           settings={fashionSettings}
           onClose={() => setIsSizeGuideOpen(false)}
+          primaryColor={primaryColor}
         />
       )}
 
@@ -1159,6 +881,7 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
           storeName={store.name}
           storeWhatsapp={profile.whatsapp || profile.phone || ''}
           onClose={() => setIsOrdersHistoryOpen(false)}
+          primaryColor={primaryColor}
         />
       )}
     </div>

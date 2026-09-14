@@ -33,6 +33,8 @@ import {
   StoreStatistics,
   OrderStatus,
   StoreType,
+  StoreHighlightItem,
+  StoreHighlightsLayout,
 } from '../types';
 import { SUPERADMIN_STORES } from './superadminService';
 
@@ -441,6 +443,97 @@ export function saveStoreProfile(
 // ----------------------------------------------------------------------------
 // 3. APARIENCIA Y PLAN (Basic vs Pro)
 // ----------------------------------------------------------------------------
+export function getDefaultStoreHighlights(tenantId: string): StoreHighlightItem[] {
+  const items: StoreHighlightItem[] = [];
+
+  // 1. Envíos reales configurados
+  try {
+    const shipping = getStoreShipping(tenantId);
+    if (shipping && shipping.offersShipping) {
+      items.push({
+        id: 'shipping',
+        icon: '📦',
+        title: 'Envíos a Domicilio',
+        description:
+          shipping.shippingType === 'free'
+            ? 'Envíos sin costo adicional según monto'
+            : `Tarifa fija de envío Bs ${shipping.fixedCost}`,
+        badge: shipping.shippingType === 'free' ? 'Gratis' : 'Delivery',
+      });
+    }
+  } catch (e) {
+    // ignore
+  }
+
+  // 2. Pedidos programados o citas
+  try {
+    const scheduled = getStoreScheduledOrders(tenantId);
+    if (scheduled && scheduled.enabled) {
+      items.push({
+        id: 'scheduled',
+        icon: '📅',
+        title: 'Pedidos Programados',
+        description: `Coordina tu entrega con hasta ${scheduled.maxAdvanceDays} días de anticipación`,
+        badge: 'Planifica',
+      });
+    }
+  } catch (e) {
+    // ignore
+  }
+
+  // 3. Atención directa por WhatsApp
+  try {
+    const prof = getStoreProfile(tenantId);
+    if (prof && (prof.whatsapp || prof.phone)) {
+      items.push({
+        id: 'whatsapp',
+        icon: '💬',
+        title: 'Atención Directa',
+        description: 'Consultas y confirmación de pedidos vía WhatsApp',
+        badge: 'Respuesta Rápida',
+      });
+    }
+  } catch (e) {
+    // ignore
+  }
+
+  // 4. Métodos de pago
+  try {
+    const payment = getStorePaymentSettings(tenantId);
+    if (payment && payment.qrSimple) {
+      items.push({
+        id: 'payment',
+        icon: '📱',
+        title: 'Pago Rápido con QR',
+        description: 'Aceptamos transferencias y cobro QR directo',
+        badge: 'QR Simple',
+      });
+    }
+  } catch (e) {
+    // ignore
+  }
+
+  // Si no hay suficientes elementos basados en configuración específica, proveer un destacado neutro y verídico
+  if (items.length === 0) {
+    items.push({
+      id: 'store-direct',
+      icon: '✨',
+      title: 'Venta Directa',
+      description: 'Precios directos del comercio sin intermediarios',
+      badge: 'Oficial',
+    });
+    items.push({
+      id: 'online-catalog',
+      icon: '🛒',
+      title: 'Catálogo en Línea',
+      description: 'Explora y haz tu pedido directamente desde tu dispositivo',
+      badge: '24/7',
+    });
+  }
+
+  return items;
+}
+
 export function getStoreAppearance(tenantId: string): StoreAppearanceSettings {
   const plan = getStorePlan(tenantId);
   const defaultAppearance: StoreAppearanceSettings = {
@@ -451,9 +544,25 @@ export function getStoreAppearance(tenantId: string): StoreAppearanceSettings {
     customDomain: '',
     domainVerified: plan === 'pro',
     visualStyle: 'modern',
+    showHighlights: true,
+    highlightsLayout: 'balanced',
+    highlights: getDefaultStoreHighlights(tenantId),
   };
 
-  return loadFromStorage<StoreAppearanceSettings>(tenantId, 'appearance', defaultAppearance);
+  const stored = loadFromStorage<StoreAppearanceSettings>(tenantId, 'appearance', defaultAppearance);
+
+  // Asegurar que si stored no tiene highlights definidos, reciba los highlights por defecto reales
+  if (!stored.highlights || stored.highlights.length === 0) {
+    stored.highlights = getDefaultStoreHighlights(tenantId);
+  }
+  if (!stored.highlightsLayout) {
+    stored.highlightsLayout = 'balanced';
+  }
+  if (stored.showHighlights === undefined) {
+    stored.showHighlights = true;
+  }
+
+  return stored;
 }
 
 export function saveStoreAppearance(
@@ -462,10 +571,10 @@ export function saveStoreAppearance(
 ): { success: boolean; error?: string } {
   const plan = getStorePlan(tenantId);
 
-  // Validación de seguridad de plan: Si es Basic, rechazar modificaciones Pro
+  // Validación de seguridad de plan: Si es Basic, rechazar modificaciones Pro de colores/dominio
   if (plan === 'basic') {
     const existing = getStoreAppearance(tenantId);
-    // Solo permitir cambiar tema claro/oscuro
+    // Permitir cambiar tema y configuración de destacados
     const sanitized: StoreAppearanceSettings = {
       ...existing,
       theme: settings.theme,
@@ -474,6 +583,9 @@ export function saveStoreAppearance(
       brandAccentColor: '#f59e0b',
       customDomain: '',
       domainVerified: false,
+      showHighlights: settings.showHighlights ?? existing.showHighlights,
+      highlightsLayout: settings.highlightsLayout ?? existing.highlightsLayout,
+      highlights: settings.highlights ?? existing.highlights,
     };
     saveToStorage(tenantId, 'appearance', sanitized);
     return { success: true };

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Search,
   Star,
@@ -14,7 +14,10 @@ import {
   Ruler,
   Calendar,
   Plus,
+  Tag,
+  X,
 } from 'lucide-react';
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import {
   Product,
   Category,
@@ -22,10 +25,11 @@ import {
   FashionSettings,
   GeneralSettings,
 } from '../../types';
-import { PriceDisplay } from '../common/PriceDisplay';
+import { getVerticalMotionProfile } from './motionSystem';
 
 interface CatalogViewProps {
   storeType: StoreType;
+  storeName?: string;
   products: Product[];
   categories: Category[];
   fashionSettings?: FashionSettings;
@@ -35,13 +39,28 @@ interface CatalogViewProps {
   onRequestAppointment?: (serviceId: string) => void;
   onOpenSizeGuide?: () => void;
   primaryColor?: string;
+  brandSecondaryColor?: string;
+  brandAccentColor?: string;
+}
+
+// Determinar el color de texto (blanco o negro suave) según el contraste del color de marca
+function getContrastColor(hexColor?: string): '#ffffff' | '#18181b' {
+  if (!hexColor || !hexColor.startsWith('#')) return '#ffffff';
+  let c = hexColor.substring(1);
+  if (c.length === 3) c = c.split('').map((x) => x + x).join('');
+  if (c.length !== 6) return '#ffffff';
+  const r = parseInt(c.substring(0, 2), 16);
+  const g = parseInt(c.substring(2, 4), 16);
+  const b = parseInt(c.substring(4, 6), 16);
+  const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+  return yiq >= 160 ? '#18181b' : '#ffffff';
 }
 
 export const CatalogView: React.FC<CatalogViewProps> = ({
   storeType,
+  storeName,
   products,
   categories,
-  fashionSettings,
   generalSettings,
   onSelectProduct,
   onQuickAddToCart,
@@ -52,34 +71,50 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
   const isRestaurant = storeType === 'restaurante';
   const isFashion = storeType === 'moda';
   const isServices = storeType === 'servicios';
-  const isRetail = storeType === 'retail' || (storeType as string) === 'supermercado';
+  const shouldReduceMotion = useReducedMotion();
+
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all');
   const [copiedProductId, setCopiedProductId] = useState<string | null>(null);
   const [imgErrors, setImgErrors] = useState<Record<string, boolean>>({});
 
-  // Filtrar únicamente productos activos para el público
-  const publicProducts = products.filter((p) => p.status === 'activo');
+  // Filtrar únicamente productos activos para la vitrina pública
+  const publicProducts = useMemo(
+    () => products.filter((p) => p.status === 'activo'),
+    [products]
+  );
 
   // Categorías activas
-  const activeCategories = categories.filter((c) => c.status === 'activo');
+  const activeCategories = useMemo(
+    () => categories.filter((c) => c.status === 'activo'),
+    [categories]
+  );
 
-  // Filtrado por categoría y búsqueda
-  const filteredProducts = publicProducts.filter((p) => {
-    const matchesCategory =
-      selectedCategoryId === 'all' || p.category_id === selectedCategoryId;
+  // Mapa de nombres de categorías por ID para asociación rápida y verídica
+  const categoryMap = useMemo(
+    () => new Map(categories.map((c) => [c.id, c.name])),
+    [categories]
+  );
 
-    const matchesSearch =
-      searchQuery.trim() === '' ||
-      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (p.description && p.description.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (p.attributes?.specialty &&
-        String(p.attributes.specialty).toLowerCase().includes(searchQuery.toLowerCase()));
+  // Filtrado reactivo por categoría y texto de búsqueda (nombre, descripción, especialidad)
+  const filteredProducts = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return publicProducts.filter((p) => {
+      const matchesCategory =
+        selectedCategoryId === 'all' || p.category_id === selectedCategoryId;
 
-    return matchesCategory && matchesSearch;
-  });
+      const matchesSearch =
+        q === '' ||
+        p.name.toLowerCase().includes(q) ||
+        (p.description && p.description.toLowerCase().includes(q)) ||
+        (p.attributes?.specialty &&
+          String(p.attributes.specialty).toLowerCase().includes(q));
 
-  // Copiar enlace directo del producto
+      return matchesCategory && matchesSearch;
+    });
+  }, [publicProducts, selectedCategoryId, searchQuery]);
+
+  // Compartir enlace del producto o copiar al portapapeles
   const handleShareProduct = (e: React.MouseEvent, productId: string, productName: string) => {
     e.stopPropagation();
     const url = `${window.location.origin}${window.location.pathname}#prod-${productId}`;
@@ -101,136 +136,174 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
     setTimeout(() => setCopiedProductId(null), 2500);
   };
 
+  const contrastColor = getContrastColor(primaryColor);
   const layout = generalSettings?.catalogLayout || 'grid';
+  const isListLayout = layout === 'list';
+
+  // Perfil de movimiento adaptativo por vertical (Gastronomía, Moda, Servicios, General)
+  const motionProfile = getVerticalMotionProfile(storeType, shouldReduceMotion);
+
+  // Variantes de animación para microinteracciones fluidas
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: motionProfile.stagger,
+        delayChildren: shouldReduceMotion ? 0 : 0.035,
+      },
+    },
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: motionProfile.subtleY },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: { duration: motionProfile.duration, ease: motionProfile.ease },
+    },
+  };
+
+  // Escala sutil de hover fotográfico adaptada al tono de la vertical
+  const imageHoverClass = shouldReduceMotion
+    ? ''
+    : isRestaurant
+    ? 'group-hover:scale-[1.035]'
+    : isFashion
+    ? 'group-hover:scale-[1.025]'
+    : isServices
+    ? 'group-hover:scale-[1.02]'
+    : 'group-hover:scale-[1.03]';
 
   return (
     <div className="space-y-6">
-      {/* Barra de Filtros y Búsqueda */}
+      {/* BARRA DE HERRAMIENTAS: BUSCADOR & GUÍA DE TALLAS */}
       <div className="space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          {/* Campo de Búsqueda */}
+          {/* Campo de Búsqueda Integrado con la Identidad del Comercio */}
           <div className="relative flex-1 max-w-md">
             <Search
-              className={`w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 ${
-                isFashion ? 'text-stone-400 dark:text-rose-300/70' : isRestaurant ? 'text-stone-400' : 'text-slate-400'
-              }`}
+              className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-200"
+              style={{ color: searchQuery ? primaryColor : 'inherit' }}
             />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={
-                storeType === 'servicios'
-                  ? 'Buscar servicio, masaje, tratamiento...'
-                  : storeType === 'restaurante'
-                  ? 'Buscar pizza, pasta, postre, bebida...'
-                  : storeType === 'moda'
-                  ? 'Buscar prenda, vestido, blusa, calzado...'
-                  : isRetail
-                  ? 'Buscar frutas, verduras, lácteos, abarrotes, limpieza...'
+                isServices
+                  ? 'Buscar servicios o tratamientos...'
+                  : isRestaurant
+                  ? 'Buscar en la carta o menú...'
+                  : isFashion
+                  ? 'Buscar prendas o catálogo...'
                   : 'Buscar productos en el catálogo...'
               }
-              className={
-                isFashion
-                  ? 'w-full pl-10 pr-4 py-2.5 rounded-2xl bg-white/80 dark:bg-stone-900/80 border border-stone-200/80 dark:border-stone-800 text-sm text-stone-900 dark:text-white placeholder-stone-400 focus:outline-hidden focus:ring-2 focus:ring-rose-400/30 transition'
-                  : isServices
-                  ? 'w-full pl-10 pr-4 py-2.5 rounded-2xl bg-white/90 dark:bg-[#121A15]/90 border border-emerald-900/15 dark:border-emerald-500/20 text-sm text-stone-900 dark:text-white placeholder-emerald-800/40 dark:placeholder-emerald-300/40 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/30 transition'
-                  : isRetail
-                  ? 'w-full pl-10 pr-4 py-2.5 rounded-2xl bg-white/90 dark:bg-[#0F172A]/90 border border-blue-900/15 dark:border-blue-500/20 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500/30 transition'
-                  : isRestaurant
-                  ? 'w-full pl-10 pr-4 py-2.5 rounded-2xl bg-white dark:bg-stone-900/80 border border-stone-200 dark:border-stone-800 text-sm text-stone-900 dark:text-white placeholder-stone-400 focus:outline-hidden focus:ring-2 focus:ring-amber-500/30 transition'
-                  : 'w-full pl-10 pr-4 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-hidden focus:border-blue-500 transition'
-              }
+              className="w-full pl-10 pr-10 py-2.5 rounded-2xl bg-white dark:bg-stone-900/90 border border-stone-200/80 dark:border-stone-800 text-sm text-stone-900 dark:text-white placeholder-stone-400 shadow-2xs transition-all duration-200 focus:outline-hidden focus:ring-2 focus:ring-opacity-20"
+              style={{
+                borderColor: searchQuery ? primaryColor : undefined,
+              }}
             />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 dark:hover:text-white text-xs cursor-pointer"
-              >
-                ✕
-              </button>
-            )}
+            <AnimatePresence>
+              {searchQuery && (
+                <motion.button
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  transition={{ duration: 0.15 }}
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full flex items-center justify-center text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800 transition active:scale-90 cursor-pointer"
+                  title="Limpiar búsqueda"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </motion.button>
+              )}
+            </AnimatePresence>
           </div>
 
-          {/* Botón Guía de Tallas (Moda) */}
-          {storeType === 'moda' && onOpenSizeGuide && (
+          {/* Botón Guía de Tallas (Específico y auténtico de Moda) */}
+          {isFashion && onOpenSizeGuide && (
             <button
+              type="button"
               onClick={onOpenSizeGuide}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-2xl bg-white/90 dark:bg-stone-900/90 hover:bg-stone-100 dark:hover:bg-stone-800 border border-stone-200/80 dark:border-stone-800 text-stone-800 dark:text-stone-200 hover:text-stone-950 dark:hover:text-white text-xs font-semibold shadow-xs transition cursor-pointer self-start sm:self-auto"
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-white dark:bg-stone-900/90 hover:bg-stone-50 dark:hover:bg-stone-800 border border-stone-200/80 dark:border-stone-800 text-stone-800 dark:text-stone-200 text-xs font-semibold shadow-2xs transition cursor-pointer self-start sm:self-auto hover:scale-[1.01] active:scale-[0.98]"
             >
-              <Ruler className="w-3.5 h-3.5 text-rose-500 dark:text-rose-400" />
-              <span>Guía de Tallas & Cambios</span>
+              <Ruler className="w-3.5 h-3.5" style={{ color: primaryColor }} />
+              <span>Guía de Tallas & Medidas</span>
             </button>
           )}
         </div>
 
-        {/* Pestañas de Categorías */}
+        {/* SELECTOR DE CATEGORÍAS: REDISEÑADO CON IDENTIDAD DE MARCA */}
         {activeCategories.length > 0 && (
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1.5 pt-0.5 no-scrollbar scroll-smooth">
+            {/* Píldora "Todos" */}
             <button
+              type="button"
               onClick={() => setSelectedCategoryId('all')}
-              className={
-                isFashion
-                  ? `px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
-                      selectedCategoryId === 'all'
-                        ? 'bg-stone-900 text-white dark:bg-white dark:text-stone-950 font-bold shadow-sm'
-                        : 'bg-white/80 hover:bg-stone-100 dark:bg-stone-900/80 dark:hover:bg-stone-800 text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white border border-stone-200/80 dark:border-stone-800 font-medium'
-                    }`
-                  : isServices
-                  ? `px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
-                      selectedCategoryId === 'all'
-                        ? 'bg-emerald-800 text-white dark:bg-emerald-600 dark:text-white font-bold shadow-sm'
-                        : 'bg-white/90 hover:bg-emerald-50/80 dark:bg-[#121A15]/90 dark:hover:bg-[#17221C] text-stone-600 dark:text-stone-300 hover:text-emerald-900 dark:hover:text-emerald-200 border border-emerald-900/15 dark:border-emerald-500/20 font-medium'
-                    }`
-                  : isRestaurant
-                  ? `px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
-                      selectedCategoryId === 'all'
-                        ? 'bg-amber-600 text-white font-bold shadow-sm'
-                        : 'bg-stone-100 hover:bg-stone-200 dark:bg-stone-900 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-300 border border-stone-200 dark:border-stone-800 text-xs font-medium'
-                    }`
-                  : `px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
-                      selectedCategoryId === 'all'
-                        ? 'bg-blue-600 text-white shadow-xs'
-                        : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800'
-                    }`
+              className={`px-4 py-2 rounded-2xl text-xs font-semibold whitespace-nowrap transition-all duration-200 flex items-center gap-2 cursor-pointer shrink-0 select-none ${
+                selectedCategoryId === 'all'
+                  ? 'shadow-sm active:scale-95'
+                  : 'bg-stone-100/90 dark:bg-stone-800/80 hover:bg-stone-200/80 dark:hover:bg-stone-700/80 text-stone-700 dark:text-stone-300 border border-stone-200/70 dark:border-stone-700/60 hover:scale-[1.01] active:scale-95'
+              }`}
+              style={
+                selectedCategoryId === 'all'
+                  ? {
+                      backgroundColor: primaryColor,
+                      color: contrastColor,
+                      boxShadow: `0 2px 10px -2px ${primaryColor}45`,
+                    }
+                  : undefined
               }
             >
-              Todos ({publicProducts.length})
+              <span>Todos</span>
+              <span
+                className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold leading-none ${
+                  selectedCategoryId === 'all'
+                    ? 'bg-black/15 dark:bg-white/20'
+                    : 'bg-stone-200/90 dark:bg-stone-700/90 text-stone-500 dark:text-stone-400'
+                }`}
+              >
+                {publicProducts.length}
+              </span>
             </button>
 
+            {/* Píldoras de Categorías Reales */}
             {activeCategories.map((cat) => {
               const count = publicProducts.filter((p) => p.category_id === cat.id).length;
+              const isSelected = selectedCategoryId === cat.id;
+
               return (
                 <button
                   key={cat.id}
+                  type="button"
                   onClick={() => setSelectedCategoryId(cat.id)}
-                  className={
-                    isFashion
-                      ? `px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
-                          selectedCategoryId === cat.id
-                            ? 'bg-stone-900 text-white dark:bg-white dark:text-stone-950 font-bold shadow-sm'
-                            : 'bg-white/80 hover:bg-stone-100 dark:bg-stone-900/80 dark:hover:bg-stone-800 text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white border border-stone-200/80 dark:border-stone-800 font-medium'
-                        }`
-                      : isServices
-                      ? `px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
-                          selectedCategoryId === cat.id
-                            ? 'bg-emerald-800 text-white dark:bg-emerald-600 dark:text-white font-bold shadow-sm'
-                            : 'bg-white/90 hover:bg-emerald-50/80 dark:bg-[#121A15]/90 dark:hover:bg-[#17221C] text-stone-600 dark:text-stone-300 hover:text-emerald-900 dark:hover:text-emerald-200 border border-emerald-900/15 dark:border-emerald-500/20 font-medium'
-                        }`
-                      : isRestaurant
-                      ? `px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
-                          selectedCategoryId === cat.id
-                            ? 'bg-amber-600 text-white font-bold shadow-sm'
-                            : 'bg-stone-100 hover:bg-stone-200 dark:bg-stone-900 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-300 border border-stone-200 dark:border-stone-800 text-xs font-medium'
-                        }`
-                      : `px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
-                          selectedCategoryId === cat.id
-                            ? 'bg-blue-600 text-white shadow-xs'
-                            : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800'
-                        }`
+                  className={`px-4 py-2 rounded-2xl text-xs font-semibold whitespace-nowrap transition-all duration-200 flex items-center gap-2 cursor-pointer shrink-0 select-none ${
+                    isSelected
+                      ? 'shadow-sm active:scale-95'
+                      : 'bg-stone-100/90 dark:bg-stone-800/80 hover:bg-stone-200/80 dark:hover:bg-stone-700/80 text-stone-700 dark:text-stone-300 border border-stone-200/70 dark:border-stone-700/60 hover:scale-[1.01] active:scale-95'
+                  }`}
+                  style={
+                    isSelected
+                      ? {
+                          backgroundColor: primaryColor,
+                          color: contrastColor,
+                          boxShadow: `0 2px 10px -2px ${primaryColor}45`,
+                        }
+                      : undefined
                   }
                 >
-                  {cat.name} ({count})
+                  <span>{cat.name}</span>
+                  <span
+                    className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold leading-none ${
+                      isSelected
+                        ? 'bg-black/15 dark:bg-white/20'
+                        : 'bg-stone-200/90 dark:bg-stone-700/90 text-stone-500 dark:text-stone-400'
+                    }`}
+                  >
+                    {count}
+                  </span>
                 </button>
               );
             })}
@@ -238,127 +311,176 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
         )}
       </div>
 
-      {/* Rejilla o Lista de Productos */}
+      {/* ESTADO VACÍO CUANDO NO HAY COINCIDENCIAS */}
       {filteredProducts.length === 0 ? (
-        <div className={`py-16 text-center space-y-2 rounded-2xl border shadow-xs ${
-          isRestaurant
-            ? 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800 text-stone-400'
-            : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-400'
-        }`}>
-          <ShoppingBag className="w-10 h-10 mx-auto text-stone-400 dark:text-stone-600 mb-1" />
-          <p className="text-sm font-semibold text-stone-800 dark:text-stone-200">No se encontraron productos disponibles</p>
-          <p className="text-xs text-stone-500">
-            {searchQuery
-              ? `No hay coincidencias para "${searchQuery}". Intenta con otra búsqueda.`
-              : 'Este comercio aún no ha publicado productos en esta categoría.'}
-          </p>
+        <div className="py-16 text-center space-y-3 rounded-3xl border border-stone-200/80 dark:border-stone-800/80 bg-white/60 dark:bg-stone-900/60 backdrop-blur-xs p-6">
+          <div
+            className="w-12 h-12 mx-auto rounded-2xl flex items-center justify-center shadow-2xs"
+            style={{ backgroundColor: `${primaryColor}14`, color: primaryColor }}
+          >
+            <ShoppingBag className="w-6 h-6" />
+          </div>
+          <div className="space-y-1">
+            <h3 className="text-base font-bold text-stone-900 dark:text-white">
+              No se encontraron productos disponibles
+            </h3>
+            <p className="text-xs text-stone-500 dark:text-stone-400 max-w-md mx-auto">
+              {searchQuery
+                ? `No encontramos resultados que coincidan con "${searchQuery}". Intenta con otra palabra o revisa otra categoría.`
+                : 'No hay productos activos listados en esta categoría actualmente.'}
+            </p>
+          </div>
           {searchQuery && (
             <button
+              type="button"
               onClick={() => setSearchQuery('')}
-              className={`mt-2 text-xs font-medium cursor-pointer hover:underline ${
-                isRestaurant ? 'text-amber-600 dark:text-amber-400' : 'text-blue-600 dark:text-blue-400'
-              }`}
+              className="mt-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer inline-flex items-center gap-1.5 active:scale-98"
+              style={{ backgroundColor: `${primaryColor}14`, color: primaryColor }}
             >
-              Limpiar búsqueda
+              <span>Restablecer búsqueda</span>
             </button>
           )}
         </div>
       ) : (
-        <div
+        /* REJILLA / LISTADO DE PRODUCTOS Y SERVICIOS */
+        <motion.div
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
           className={
-            layout === 'grid'
-              ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'
-              : 'space-y-3'
+            isListLayout
+              ? 'flex flex-col gap-3.5'
+              : 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6'
           }
         >
           {filteredProducts.map((product) => {
             const previousPrice = product.attributes?.previous_price as number | undefined;
-            const hasOffer = previousPrice && previousPrice > product.price;
+            const hasOffer = previousPrice != null && previousPrice > product.price;
+            const discountPercent = hasOffer
+              ? Math.round(((previousPrice - product.price) / previousPrice) * 100)
+              : 0;
             const isFeatured = Boolean(product.attributes?.is_featured);
+            const hasBrokenImage = !product.image_url || imgErrors[product.id];
+            const categoryName = product.category_id ? categoryMap.get(product.category_id) : undefined;
 
-            // Moda
+            // Atributos de Moda (solo si existen de verdad)
             const sizes = (product.attributes?.sizes as string[]) || [];
             const colors = (product.attributes?.colors as Array<{ name: string; hex: string }>) || [];
 
-            // Restaurante
+            // Atributos de Gastronomía
             const isCombo = Boolean(product.attributes?.is_combo);
             const modifiers = (product.attributes?.modifiers as Array<{ name: string; price: number }>) || [];
 
-            // Servicios
-            const isService = storeType === 'servicios' || Boolean(product.attributes?.is_service);
-            const duration = (product.attributes?.duration_minutes as number) || 60;
+            // Atributos de Servicios
+            const isService = isServices || Boolean(product.attributes?.is_service);
+            const duration =
+              typeof product.attributes?.duration_minutes === 'number' &&
+              product.attributes.duration_minutes > 0
+                ? product.attributes.duration_minutes
+                : null;
             const specialty = (product.attributes?.specialty as string) || '';
             const professionalName = (product.attributes?.professional_name as string) || '';
 
-            // Renderizado especializado para Gastronomía / Restaurante
-            if (isRestaurant) {
-              const hasBrokenImage = !product.image_url || imgErrors[product.id];
+            // Proporción visual de la fotografía adaptada armónicamente a la vertical
+            const imageAspectClass = isFashion
+              ? 'aspect-[3/4]'
+              : isRestaurant || isServices
+              ? 'aspect-[16/10]'
+              : 'aspect-[4/3]';
 
-              return (
-                <div
-                  key={product.id}
-                  id={`prod-${product.id}`}
-                  onClick={() => onSelectProduct(product)}
-                  className="group rounded-2xl bg-white dark:bg-stone-900/90 border border-stone-200/80 dark:border-stone-800/80 hover:border-stone-300 dark:hover:border-stone-700 overflow-hidden shadow-sm hover:shadow-md transition-all flex flex-col justify-between cursor-pointer relative"
-                >
-                  {/* Área Fotográfica con Fallback Robusto */}
-                  <div className={`relative h-48 sm:h-52 w-full overflow-hidden bg-stone-100 dark:bg-stone-800 border-b border-stone-100 dark:border-stone-800/60 ${
-                    !product.is_available ? 'grayscale-[35%] opacity-75' : ''
-                  }`}>
+            return (
+              <motion.div
+                key={product.id}
+                id={`prod-${product.id}`}
+                variants={itemVariants}
+                onClick={() => onSelectProduct(product)}
+                className={`group rounded-3xl bg-white dark:bg-stone-900/90 border border-stone-200/80 dark:border-stone-800/80 hover:border-stone-300 dark:hover:border-stone-700 p-3.5 sm:p-4 transition-all duration-300 ${motionProfile.cardElevationClass} active:scale-[0.985] cursor-pointer relative overflow-hidden flex ${
+                  isListLayout ? 'flex-col sm:flex-row gap-4' : 'flex-col justify-between'
+                }`}
+                style={
+                  isFeatured
+                    ? {
+                        borderColor: `${primaryColor}45`,
+                      }
+                    : undefined
+                }
+              >
+                {/* ZONA DE CONTENIDO SUPERIOR / IMAGEN */}
+                <div className={isListLayout ? 'w-full sm:w-48 sm:h-36 shrink-0' : 'w-full'}>
+                  {/* Contenedor Fotográfico con Proporción Óptima */}
+                  <div
+                    className={`relative w-full ${
+                      isListLayout ? 'h-40 sm:h-full' : imageAspectClass
+                    } rounded-2xl overflow-hidden bg-stone-100 dark:bg-stone-800/80 border border-stone-200/60 dark:border-stone-800/60 mb-3 select-none`}
+                  >
                     {hasBrokenImage ? (
-                      <div className="w-full h-full bg-stone-100 dark:bg-stone-800/90 flex flex-col items-center justify-center gap-2 text-stone-400 select-none p-4 text-center">
-                        <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-600 dark:text-amber-400">
-                          <Utensils className="w-6 h-6" />
+                      /* Fallback Visual Neutro y Elegante (Sin textos ficticios ni de otros comercios) */
+                      <div
+                        className="w-full h-full flex flex-col items-center justify-center gap-2 p-4 text-center transition-colors"
+                        style={{ backgroundColor: `${primaryColor}0a` }}
+                      >
+                        <div
+                          className="w-11 h-11 rounded-2xl flex items-center justify-center shadow-2xs"
+                          style={{ backgroundColor: `${primaryColor}18`, color: primaryColor }}
+                        >
+                          {isRestaurant ? (
+                            <Utensils className="w-5 h-5" />
+                          ) : isFashion ? (
+                            <Shirt className="w-5 h-5" />
+                          ) : isServices ? (
+                            <Briefcase className="w-5 h-5" />
+                          ) : (
+                            <StoreIcon className="w-5 h-5" />
+                          )}
                         </div>
-                        <div className="space-y-0.5">
-                          <span className="text-xs font-semibold text-stone-700 dark:text-stone-300 block">
-                            Plato Artesanal
-                          </span>
-                          <span className="text-[10px] text-stone-400 dark:text-stone-500 block">
-                            Preparado en cocina
-                          </span>
-                        </div>
+                        <span className="text-[11px] font-semibold text-stone-600 dark:text-stone-300 line-clamp-1 max-w-[85%]">
+                          {categoryName || (isRestaurant ? 'Gastronomía' : isFashion ? 'Moda' : isServices ? 'Servicio' : 'Producto')}
+                        </span>
                       </div>
                     ) : (
                       <img
-                        src={product.image_url}
+                        src={product.image_url!}
                         alt={product.name}
                         onError={() => setImgErrors((prev) => ({ ...prev, [product.id]: true }))}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        className={`w-full h-full object-cover transition-transform duration-500 ease-out ${imageHoverClass}`}
                         loading="lazy"
                       />
                     )}
 
-                    {/* Insignia de Destacado */}
+                    {/* Insignia: Producto Destacado */}
                     {isFeatured && (
-                      <span className="top-3 left-3 absolute px-2.5 py-1 rounded-md bg-amber-500/90 text-stone-950 font-bold text-[10px] uppercase tracking-wider backdrop-blur-sm flex items-center gap-1 shadow-xs">
-                        <Star className="w-3 h-3 fill-stone-950 text-stone-950" />
+                      <span
+                        className="top-2.5 left-2.5 absolute px-2.5 py-1 rounded-lg text-white font-bold text-[10px] uppercase tracking-wider backdrop-blur-md flex items-center gap-1 shadow-xs"
+                        style={{ backgroundColor: `${primaryColor}ee` }}
+                      >
+                        <Star className="w-3 h-3 fill-current" />
                         <span>Destacado</span>
                       </span>
                     )}
 
-                    {/* Insignia de Oferta */}
+                    {/* Insignia: Oferta con Porcentaje Real */}
                     {hasOffer && (
-                      <span className="top-3 right-12 absolute px-2.5 py-1 rounded-md bg-rose-600 text-white font-bold text-[10px] shadow-xs">
-                        Oferta
+                      <span className="top-2.5 right-11 absolute px-2 py-0.5 rounded-lg bg-rose-600 text-white font-bold text-[10px] shadow-xs tracking-wide">
+                        {discountPercent > 0 ? `-${discountPercent}%` : 'Oferta'}
                       </span>
                     )}
 
-                    {/* Disponibilidad si está agotado */}
+                    {/* Estado: Agotado / No disponible */}
                     {!product.is_available && (
-                      <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px] flex items-center justify-center">
-                        <span className="px-3 py-1 rounded-full bg-stone-900/90 text-stone-200 border border-stone-700 font-semibold text-xs shadow-lg">
-                          Agotado
+                      <div className="absolute inset-0 bg-stone-950/65 backdrop-blur-[2px] flex items-center justify-center p-2">
+                        <span className="px-3 py-1 rounded-full bg-stone-900/95 text-stone-200 border border-stone-700 font-semibold text-xs shadow-lg flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-rose-500 inline-block" />
+                          <span>Agotado</span>
                         </span>
                       </div>
                     )}
 
-                    {/* Botón compartir producto flotante */}
+                    {/* Botón Discreto para Compartir Producto */}
                     <button
                       type="button"
                       onClick={(e) => handleShareProduct(e, product.id, product.name)}
-                      className="top-3 right-3 absolute w-7 h-7 rounded-full bg-stone-900/60 hover:bg-stone-900/90 text-white backdrop-blur-md flex items-center justify-center text-xs transition-colors shadow cursor-pointer"
-                      title="Compartir enlace de este plato"
+                      className="top-2.5 right-2.5 absolute w-7 h-7 rounded-full bg-black/50 hover:bg-black/80 text-white backdrop-blur-md flex items-center justify-center text-xs transition-all duration-200 hover:scale-110 active:scale-90 shadow-xs cursor-pointer opacity-90 group-hover:opacity-100"
+                      title="Compartir enlace directo de este producto"
                     >
                       {copiedProductId === product.id ? (
                         <Check className="w-3.5 h-3.5 text-emerald-400" />
@@ -367,359 +489,126 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
                       )}
                     </button>
                   </div>
+                </div>
 
-                  {/* Información del Plato */}
-                  <div className="p-4 sm:p-5 flex-1 flex flex-col justify-between">
-                    <div>
-                      <h3 className="text-base font-bold text-stone-900 dark:text-stone-100 leading-snug mb-1.5 group-hover:text-amber-600 dark:group-hover:text-amber-400 transition line-clamp-1">
-                        {product.name}
-                      </h3>
-                      {product.description && (
-                        <p className="text-xs text-stone-500 dark:text-stone-400 line-clamp-2 leading-relaxed mb-3">
-                          {product.description}
-                        </p>
-                      )}
+                {/* ZONA DE INFORMACIÓN: NOMBRE, DESCRIPCIÓN Y ATRIBUTOS REALES */}
+                <div className="flex-1 flex flex-col justify-between">
+                  <div className="space-y-1.5">
+                    {/* Etiqueta de Categoría o Especialidad Real */}
+                    {(categoryName || specialty) && (
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-stone-400 dark:text-stone-500 block truncate">
+                        {specialty || categoryName}
+                      </span>
+                    )}
 
-                      {/* Badges de Extras / Combo */}
-                      <div className="flex flex-wrap items-center gap-1.5">
+                    {/* Nombre del Producto */}
+                    <h3 className="text-base font-bold text-stone-900 dark:text-stone-100 leading-snug line-clamp-1 group-hover:text-stone-950 dark:group-hover:text-white transition-colors">
+                      {product.name}
+                    </h3>
+
+                    {/* Descripción Real */}
+                    {product.description && (
+                      <p className="text-xs text-stone-500 dark:text-stone-400 line-clamp-2 leading-relaxed">
+                        {product.description}
+                      </p>
+                    )}
+
+                    {/* Atributos Reales de Vertical (Solo cuando existen en los datos) */}
+                    {/* MODA: Tallas y Muestras de Color */}
+                    {isFashion && (sizes.length > 0 || colors.length > 0) && (
+                      <div className="pt-1 flex flex-wrap items-center gap-2 text-[10px]">
+                        {sizes.length > 0 && (
+                          <div className="flex items-center gap-1 flex-wrap">
+                            <span className="font-semibold text-stone-400">Tallas:</span>
+                            {sizes.map((s) => (
+                              <span
+                                key={s}
+                                className="px-1.5 py-0.5 rounded bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-300 font-mono font-medium border border-stone-200/80 dark:border-stone-700/60"
+                              >
+                                {s}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        {colors.length > 0 && (
+                          <div className="flex items-center gap-1 ml-auto">
+                            {colors.slice(0, 5).map((c, idx) => (
+                              <span
+                                key={idx}
+                                title={c.name}
+                                className="w-3 h-3 rounded-full border border-stone-300 dark:border-stone-600 inline-block shadow-2xs"
+                                style={{ backgroundColor: c.hex }}
+                              />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* GASTRONOMÍA: Extras y Combo Especial */}
+                    {isRestaurant && (modifiers.length > 0 || isCombo) && (
+                      <div className="pt-1 flex flex-wrap items-center gap-1.5">
                         {modifiers.length > 0 && (
-                          <span className="text-[11px] text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded border border-amber-200/50 dark:border-amber-800/40 inline-block mb-3 font-medium">
+                          <span
+                            className="text-[10px] font-semibold px-2 py-0.5 rounded-md border"
+                            style={{
+                              backgroundColor: `${primaryColor}10`,
+                              color: primaryColor,
+                              borderColor: `${primaryColor}25`,
+                            }}
+                          >
                             {modifiers.length} extras disponibles
                           </span>
                         )}
                         {isCombo && (
-                          <span className="text-[11px] text-amber-800 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/40 px-2 py-0.5 rounded border border-amber-300 dark:border-amber-800/60 font-semibold inline-block mb-3">
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/25">
                             Combo Especial
                           </span>
                         )}
                       </div>
-                    </div>
+                    )}
 
-                    {/* Fila de precio y acciones */}
-                    <div className="pt-3 mt-3 border-t border-stone-200/80 dark:border-stone-800/80 flex items-center justify-between gap-2">
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-lg font-black text-stone-900 dark:text-white">
-                          Bs {product.price.toLocaleString('es-BO')}
-                        </span>
-                        {hasOffer && previousPrice && (
-                          <span className="text-xs text-stone-400 line-through">
-                            Bs {previousPrice.toLocaleString('es-BO')}
+                    {/* SERVICIOS: Duración y Profesional Asignado (Solo si existen) */}
+                    {isService && (duration !== null || professionalName) && (
+                      <div className="pt-1 flex flex-wrap items-center gap-2.5 text-[11px] text-stone-600 dark:text-stone-300">
+                        {duration !== null && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-stone-100 dark:bg-stone-800/80 border border-stone-200/80 dark:border-stone-700/60 font-medium">
+                            <Clock className="w-3 h-3 text-stone-400" />
+                            <span>{duration} min</span>
+                          </span>
+                        )}
+                        {professionalName && (
+                          <span className="inline-flex items-center gap-1 text-stone-500 dark:text-stone-400 truncate max-w-[140px]">
+                            <User className="w-3 h-3 text-stone-400 shrink-0" />
+                            <span className="truncate">{professionalName}</span>
                           </span>
                         )}
                       </div>
-
-                      <button
-                        type="button"
-                        disabled={!product.is_available}
-                        onClick={(e) => {
-                          if (!product.is_available) return;
-                          e.stopPropagation();
-                          if (modifiers.length > 0) {
-                            onSelectProduct(product);
-                          } else {
-                            onQuickAddToCart(product);
-                          }
-                        }}
-                        className={
-                          !product.is_available
-                            ? 'px-4 py-2 rounded-xl bg-stone-100 dark:bg-stone-800 text-stone-400 dark:text-stone-500 text-xs font-semibold cursor-not-allowed border border-stone-200 dark:border-stone-700/60 select-none'
-                            : modifiers.length > 0
-                            ? 'px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold shadow-sm transition-all flex items-center gap-1.5 active:scale-[0.98]'
-                            : 'px-4 py-2 rounded-xl bg-stone-900 hover:bg-amber-600 text-white dark:bg-stone-800 dark:hover:bg-amber-600 text-xs font-bold shadow-sm transition-all flex items-center gap-1.5 active:scale-[0.98]'
-                        }
-                      >
-                        {!product.is_available ? (
-                          <span>Agotado</span>
-                        ) : modifiers.length > 0 ? (
-                          <>
-                            <ShoppingBag className="w-3.5 h-3.5" />
-                            <span>Elegir</span>
-                          </>
-                        ) : (
-                          <>
-                            <Plus className="w-3.5 h-3.5" />
-                            <span>Agregar</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              );
-            }
-
-            // Renderizado especializado para Moda / Boutique (Lookbook Editorial)
-            if (isFashion) {
-              const hasBrokenImage = !product.image_url || imgErrors[product.id];
-
-              return (
-                <div
-                  key={product.id}
-                  id={`prod-${product.id}`}
-                  onClick={() => onSelectProduct(product)}
-                  className="group rounded-3xl bg-white/90 dark:bg-[#151518] border border-stone-200/80 dark:border-stone-800 hover:border-stone-400/80 dark:hover:border-stone-700 p-4 transition-all duration-300 hover:shadow-xl flex flex-col justify-between cursor-pointer relative"
-                >
-                  <div>
-                    {/* Imagen Editorial Vertical (Aspect 3:4) */}
-                    <div className="relative aspect-[3/4] w-full rounded-2xl overflow-hidden bg-stone-100 dark:bg-stone-900 border border-stone-200/60 dark:border-stone-800/80 mb-3.5">
-                      {hasBrokenImage ? (
-                        <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-stone-400 bg-stone-100 dark:bg-stone-900 select-none p-4 text-center">
-                          <Shirt className="w-10 h-10 text-stone-400 dark:text-stone-500" />
-                          <span className="text-xs font-serif text-stone-600 dark:text-stone-300">
-                            Prenda Milano
-                          </span>
-                        </div>
-                      ) : (
-                        <img
-                          src={product.image_url}
-                          alt={product.name}
-                          onError={() => setImgErrors((prev) => ({ ...prev, [product.id]: true }))}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                          loading="lazy"
-                        />
-                      )}
-
-                      {/* Insignia de Destacado */}
-                      {isFeatured && (
-                        <span className="top-3 left-3 absolute px-2.5 py-1 rounded-full bg-stone-900/85 text-white dark:bg-white/90 dark:text-stone-950 font-medium text-[10px] tracking-wider uppercase backdrop-blur-sm flex items-center gap-1 shadow-sm">
-                          <Star className="w-3 h-3 fill-current" />
-                          <span>Colección</span>
-                        </span>
-                      )}
-
-                      {/* Insignia de Oferta */}
-                      {hasOffer && (
-                        <span className="top-3 right-11 absolute px-2.5 py-0.5 rounded-full bg-rose-500/90 text-white font-bold text-[10px] shadow-sm tracking-wide">
-                          Oferta
-                        </span>
-                      )}
-
-                      {/* Disponibilidad si está agotado */}
-                      {!product.is_available && (
-                        <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] flex items-center justify-center">
-                          <span className="px-3.5 py-1 rounded-full bg-stone-900/95 text-stone-200 border border-stone-700 font-medium text-xs shadow-lg">
-                            Agotado
-                          </span>
-                        </div>
-                      )}
-
-                      {/* Botón compartir producto flotante */}
-                      <button
-                        type="button"
-                        onClick={(e) => handleShareProduct(e, product.id, product.name)}
-                        className="top-3 right-3 absolute w-7 h-7 rounded-full bg-stone-900/60 hover:bg-stone-900/90 text-white backdrop-blur-md flex items-center justify-center text-xs transition-colors shadow cursor-pointer"
-                        title="Compartir enlace de esta prenda"
-                      >
-                        {copiedProductId === product.id ? (
-                          <Check className="w-3.5 h-3.5 text-emerald-400" />
-                        ) : (
-                          <Share2 className="w-3.5 h-3.5" />
-                        )}
-                      </button>
-                    </div>
-
-                    {/* Nombre y descripción */}
-                    <div className="space-y-1">
-                      <h3 className="font-serif text-base font-bold text-stone-900 dark:text-stone-100 group-hover:text-rose-700 dark:group-hover:text-rose-300 transition line-clamp-1">
-                        {product.name}
-                      </h3>
-                      {product.description && (
-                        <p className="text-xs text-stone-500 dark:text-stone-400 line-clamp-2 leading-relaxed">
-                          {product.description}
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Tallas y Colores */}
-                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[10px] text-stone-500 dark:text-stone-400">
-                      {sizes.length > 0 && (
-                        <div className="flex items-center gap-1 flex-wrap">
-                          <span className="text-[10px] uppercase font-bold text-stone-400 mr-0.5">Tallas:</span>
-                          {sizes.map((sz) => (
-                            <span
-                              key={sz}
-                              className="px-1.5 py-0.5 rounded-md bg-stone-100 dark:bg-stone-900 border border-stone-200/80 dark:border-stone-800 text-stone-700 dark:text-stone-300 font-mono font-medium"
-                            >
-                              {sz}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* Muestras visuales de color (swatches) */}
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] uppercase font-bold text-stone-400 mr-1">Colores:</span>
-                        <div className="flex items-center gap-1">
-                          {(colors.length > 0 ? colors.map((c) => c.hex) : ['#8A3324', '#D4AF37', '#1C1917']).map((color, i) => (
-                            <span
-                              key={i}
-                              className="w-3.5 h-3.5 rounded-full border border-stone-300 dark:border-stone-700 shadow-sm inline-block"
-                              style={{ backgroundColor: color }}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    </div>
+                    )}
                   </div>
 
-                  {/* Fila de precio y acciones */}
-                  <div className="pt-3 mt-4 border-t border-stone-200/70 dark:border-stone-800/80 flex items-center justify-between gap-2">
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-base font-bold text-stone-900 dark:text-stone-100">
-                        Bs {product.price.toLocaleString('es-BO')}
+                  {/* PIE DE TARJETA: PRECIO COMERCIAL & ACCIÓN PRINCIPAL */}
+                  <div className="pt-3 mt-3.5 border-t border-stone-200/80 dark:border-stone-800/80 flex items-center justify-between gap-3">
+                    {/* Presentación del Precio en Bolivianos (Bs) */}
+                    <div className="flex items-baseline gap-1.5 min-w-0">
+                      <span className="text-xs text-stone-500 dark:text-stone-400 font-semibold select-none">
+                        Bs
+                      </span>
+                      <span className="text-lg font-black text-stone-900 dark:text-white tracking-tight">
+                        {product.price.toLocaleString('es-BO', {
+                          minimumFractionDigits: product.price % 1 === 0 ? 0 : 2,
+                          maximumFractionDigits: 2,
+                        })}
                       </span>
                       {hasOffer && previousPrice && (
-                        <span className="text-xs text-stone-400 line-through">
+                        <span className="text-xs text-stone-400 dark:text-stone-500 line-through select-none ml-0.5">
                           Bs {previousPrice.toLocaleString('es-BO')}
                         </span>
                       )}
                     </div>
 
-                    <button
-                      type="button"
-                      disabled={!product.is_available}
-                      onClick={(e) => {
-                        if (!product.is_available) return;
-                        e.stopPropagation();
-                        if (sizes.length > 0) {
-                          onSelectProduct(product);
-                        } else {
-                          onQuickAddToCart(product);
-                        }
-                      }}
-                      className={
-                        !product.is_available
-                          ? 'px-3.5 py-2 rounded-full bg-stone-100 dark:bg-stone-800 text-stone-400 dark:text-stone-500 text-xs font-semibold cursor-not-allowed border border-stone-200 dark:border-stone-700/60 select-none'
-                          : 'px-4 py-2 rounded-full bg-stone-900 hover:bg-stone-800 text-white dark:bg-white dark:hover:bg-stone-200 dark:text-stone-950 text-xs font-semibold shadow-sm transition active:scale-[0.98] flex items-center gap-1.5 cursor-pointer'
-                      }
-                    >
-                      <ShoppingBag className="w-3.5 h-3.5" />
-                      <span>{sizes.length > 0 ? 'Elegir Talla' : 'Agregar'}</span>
-                    </button>
-                  </div>
-                </div>
-              );
-            }
-
-            // Renderizado especializado para Spa & Servicios (Botánica & Bienestar Zen)
-            if (isServices) {
-              const hasBrokenImage = !product.image_url || imgErrors[product.id];
-
-              return (
-                <div
-                  key={product.id}
-                  id={`prod-${product.id}`}
-                  onClick={() => onSelectProduct(product)}
-                  className="group rounded-3xl bg-white/95 dark:bg-[#111914] border border-emerald-900/10 dark:border-emerald-500/15 hover:border-emerald-700/40 dark:hover:border-emerald-500/30 p-4 sm:p-5 transition-all duration-300 hover:shadow-lg flex flex-col justify-between cursor-pointer relative"
-                >
-                  <div>
-                    {/* Imagen del tratamiento con Aspect Ratio Calmo */}
-                    <div className="relative aspect-[16/10] sm:aspect-[4/3] w-full rounded-2xl overflow-hidden bg-[#EBF3EB] dark:bg-[#0A120E] border border-emerald-900/10 dark:border-emerald-500/15 mb-4">
-                      {hasBrokenImage ? (
-                        <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-emerald-700/60 dark:text-emerald-400/60 bg-[#EBF3EB] dark:bg-[#0A120E] select-none p-4 text-center">
-                          <Briefcase className="w-10 h-10 text-emerald-600/50 dark:text-emerald-400/50" />
-                          <span className="text-xs font-serif text-emerald-800 dark:text-emerald-200">
-                            Tratamiento Zenit
-                          </span>
-                        </div>
-                      ) : (
-                        <img
-                          src={product.image_url}
-                          alt={product.name}
-                          onError={() => setImgErrors((prev) => ({ ...prev, [product.id]: true }))}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                          loading="lazy"
-                        />
-                      )}
-
-                      {/* Insignia de Destacado */}
-                      {isFeatured && (
-                        <span className="top-3 left-3 absolute px-2.5 py-1 rounded-full bg-emerald-900/80 text-emerald-100 dark:bg-emerald-950/90 dark:text-emerald-200 font-bold text-[10px] uppercase tracking-wider backdrop-blur-xs flex items-center gap-1 shadow-xs border border-emerald-500/20">
-                          <Star className="w-3 h-3 fill-emerald-300 text-emerald-300" />
-                          <span>Destacado</span>
-                        </span>
-                      )}
-
-                      {/* Insignia de Oferta */}
-                      {hasOffer && (
-                        <span className="top-3 right-12 absolute px-2.5 py-1 rounded-full bg-rose-600/90 text-white font-bold text-[10px] shadow-xs">
-                          Oferta
-                        </span>
-                      )}
-
-                      {/* Disponibilidad */}
-                      {!product.is_available && (
-                        <div className="absolute inset-0 bg-stone-950/60 backdrop-blur-xs flex items-center justify-center">
-                          <span className="px-3.5 py-1.5 rounded-full bg-stone-900/90 text-stone-200 border border-stone-700 font-semibold text-xs shadow-lg">
-                            No disponible temporalmente
-                          </span>
-                        </div>
-                      )}
-
-                      {/* Botón compartir flotante */}
-                      <button
-                        type="button"
-                        onClick={(e) => handleShareProduct(e, product.id, product.name)}
-                        className="absolute bottom-2.5 right-2.5 p-2 rounded-xl bg-black/50 hover:bg-black/80 text-white transition shadow cursor-pointer opacity-90 group-hover:opacity-100"
-                        title="Compartir tratamiento"
-                      >
-                        {copiedProductId === product.id ? (
-                          <Check className="w-3.5 h-3.5 text-emerald-400" />
-                        ) : (
-                          <Share2 className="w-3.5 h-3.5" />
-                        )}
-                      </button>
-                    </div>
-
-                    {/* Categoría o especialidad */}
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <span className="text-[10px] uppercase font-bold tracking-wider text-emerald-700 dark:text-emerald-400">
-                        {specialty || 'Sesión Terapéutica'}
-                      </span>
-                    </div>
-
-                    {/* Nombre y descripción */}
-                    <div className="space-y-1">
-                      <h3 className="font-serif text-base font-bold text-stone-900 dark:text-stone-100 group-hover:text-emerald-800 dark:group-hover:text-emerald-300 transition line-clamp-1">
-                        {product.name}
-                      </h3>
-                      {product.description && (
-                        <p className="text-xs text-stone-600 dark:text-stone-400 line-clamp-2 leading-relaxed font-normal">
-                          {product.description}
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Fila de Duración & Terapeuta */}
-                    <div className="mt-3.5 flex flex-wrap items-center gap-3 text-xs text-stone-600 dark:text-stone-300">
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#EBF3EB] dark:bg-[#16231B] text-emerald-800 dark:text-emerald-300 font-medium text-[11px] border border-emerald-900/10 dark:border-emerald-500/15">
-                        <Clock className="w-3.5 h-3.5 text-emerald-700 dark:text-emerald-400" />
-                        <span>{duration} minutos</span>
-                      </span>
-
-                      {professionalName && (
-                        <span className="inline-flex items-center gap-1 text-[11px] text-stone-500 dark:text-stone-400">
-                          <User className="w-3.5 h-3.5 text-stone-400" />
-                          <span className="truncate max-w-[140px]">{professionalName}</span>
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Fila de precio y acciones */}
-                  <div className="pt-3.5 mt-4 border-t border-emerald-900/10 dark:border-emerald-500/15 flex items-center justify-between gap-2">
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-base font-bold text-stone-900 dark:text-stone-100 font-serif">
-                        Bs {product.price.toLocaleString('es-BO')}
-                      </span>
-                      {hasOffer && previousPrice && (
-                        <span className="text-xs text-stone-400 line-through">
-                          Bs {previousPrice.toLocaleString('es-BO')}
-                        </span>
-                      )}
-                    </div>
-
-                    {onRequestAppointment ? (
+                    {/* Botón de Acción con Identidad Visual del Comercio */}
+                    {isService && onRequestAppointment ? (
                       <button
                         type="button"
                         disabled={!product.is_available}
@@ -728,13 +617,18 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
                           e.stopPropagation();
                           onRequestAppointment(product.id);
                         }}
-                        className={
+                        className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all duration-200 shadow-2xs cursor-pointer ${
                           !product.is_available
-                            ? 'px-4 py-2 rounded-full bg-stone-100 dark:bg-stone-800 text-stone-400 dark:text-stone-500 text-xs font-semibold cursor-not-allowed border border-stone-200 dark:border-stone-700/60 select-none'
-                            : 'px-4 py-2 rounded-full bg-emerald-800 hover:bg-emerald-700 text-white dark:bg-emerald-600 dark:hover:bg-emerald-500 text-xs font-semibold shadow-sm transition active:scale-[0.98] flex items-center gap-1.5 cursor-pointer'
+                            ? 'bg-stone-100 dark:bg-stone-800 text-stone-400 dark:text-stone-500 cursor-not-allowed border border-stone-200 dark:border-stone-700/60 select-none'
+                            : 'active:scale-95 hover:brightness-105 hover:shadow-xs'
+                        }`}
+                        style={
+                          product.is_available
+                            ? { backgroundColor: primaryColor, color: contrastColor }
+                            : undefined
                         }
                       >
-                        <Calendar className="w-3.5 h-3.5" />
+                        <Calendar className="w-3.5 h-3.5 transition-transform duration-200 group-hover:scale-105" />
                         <span>Agendar Cita</span>
                       </button>
                     ) : (
@@ -744,202 +638,57 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
                         onClick={(e) => {
                           if (!product.is_available) return;
                           e.stopPropagation();
-                          onQuickAddToCart(product);
+                          if (
+                            (isFashion && (sizes.length > 0 || colors.length > 0)) ||
+                            (isRestaurant && modifiers.length > 0)
+                          ) {
+                            onSelectProduct(product);
+                          } else {
+                            onQuickAddToCart(product);
+                          }
                         }}
-                        className={
+                        className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all duration-200 shadow-2xs cursor-pointer ${
                           !product.is_available
-                            ? 'px-4 py-2 rounded-full bg-stone-100 dark:bg-stone-800 text-stone-400 dark:text-stone-500 text-xs font-semibold cursor-not-allowed border border-stone-200 dark:border-stone-700/60 select-none'
-                            : 'px-4 py-2 rounded-full bg-emerald-800 hover:bg-emerald-700 text-white dark:bg-emerald-600 dark:hover:bg-emerald-500 text-xs font-semibold shadow-sm transition active:scale-[0.98] flex items-center gap-1.5 cursor-pointer'
+                            ? 'bg-stone-100 dark:bg-stone-800 text-stone-400 dark:text-stone-500 cursor-not-allowed border border-stone-200 dark:border-stone-700/60 select-none'
+                            : 'active:scale-95 hover:brightness-105 hover:shadow-xs'
+                        }`}
+                        style={
+                          product.is_available
+                            ? { backgroundColor: primaryColor, color: contrastColor }
+                            : undefined
                         }
                       >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>Reservar</span>
+                        {!product.is_available ? (
+                          <span>Agotado</span>
+                        ) : isFashion && (sizes.length > 0 || colors.length > 0) ? (
+                          <>
+                            <ShoppingBag className="w-3.5 h-3.5" />
+                            <span>Elegir</span>
+                          </>
+                        ) : isRestaurant && modifiers.length > 0 ? (
+                          <>
+                            <ShoppingBag className="w-3.5 h-3.5" />
+                            <span>Elegir</span>
+                          </>
+                        ) : isService ? (
+                          <>
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>Reservar</span>
+                          </>
+                        ) : (
+                          <>
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>Agregar</span>
+                          </>
+                        )}
                       </button>
                     )}
                   </div>
                 </div>
-              );
-            }
-
-            // Renderizado para Servicios y Comercio General
-            return (
-              <div
-                key={product.id}
-                id={`prod-${product.id}`}
-                onClick={() => onSelectProduct(product)}
-                className="group rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 p-4 transition duration-200 hover:shadow-md flex flex-col justify-between cursor-pointer relative"
-              >
-                <div>
-                  {/* Imagen y Badges */}
-                  <div className="relative aspect-video sm:aspect-square w-full rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800/80 mb-3">
-                    {product.image_url ? (
-                      <img
-                        src={product.image_url}
-                        alt={product.name}
-                        className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-slate-400 dark:text-slate-600 bg-slate-100 dark:bg-slate-950">
-                        {storeType === 'moda' ? (
-                          <Shirt className="w-10 h-10" />
-                        ) : storeType === 'servicios' ? (
-                          <Briefcase className="w-10 h-10" />
-                        ) : (
-                          <StoreIcon className="w-10 h-10" />
-                        )}
-                      </div>
-                    )}
-
-                    {/* Insignia de Destacado */}
-                    {isFeatured && (
-                      <span className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-md bg-amber-500 text-slate-950 font-black text-[10px] shadow flex items-center gap-1">
-                        <Star className="w-3 h-3 fill-slate-950" />
-                        <span>Destacado</span>
-                      </span>
-                    )}
-
-                    {/* Insignia de Oferta */}
-                    {hasOffer && (
-                      <span className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-md bg-rose-600 text-white font-bold text-[10px] shadow">
-                        Oferta
-                      </span>
-                    )}
-
-                    {/* Disponibilidad si está agotado */}
-                    {!product.is_available && (
-                      <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] flex items-center justify-center">
-                        <span className="px-3 py-1 rounded-full bg-rose-600/90 text-white font-bold text-xs shadow-lg">
-                          Agotado
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Botón compartir producto flotante */}
-                    <button
-                      type="button"
-                      onClick={(e) => handleShareProduct(e, product.id, product.name)}
-                      className="absolute bottom-2.5 right-2.5 p-2 rounded-xl bg-black/60 hover:bg-black text-white transition shadow cursor-pointer opacity-90 group-hover:opacity-100"
-                      title="Compartir enlace de este producto"
-                    >
-                      {copiedProductId === product.id ? (
-                        <Check className="w-3.5 h-3.5 text-emerald-400" />
-                      ) : (
-                        <Share2 className="w-3.5 h-3.5" />
-                      )}
-                    </button>
-                  </div>
-
-                  {/* Nombre y descripción */}
-                  <div className="space-y-1">
-                    <h3 className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition line-clamp-1">
-                      {product.name}
-                    </h3>
-                    {product.description && (
-                      <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">
-                        {product.description}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Específico por Vertical */}
-                  {/* MODA */}
-                  {storeType === 'moda' && (
-                    <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-[10px] text-slate-500 dark:text-slate-400">
-                      {sizes.length > 0 && (
-                        <span className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 font-medium">
-                          Tallas: {sizes.join(', ')}
-                        </span>
-                      )}
-                      {colors.length > 0 && (
-                        <div className="flex items-center gap-1 ml-1">
-                          {colors.slice(0, 4).map((c) => (
-                            <span
-                              key={c.name}
-                              className="w-2.5 h-2.5 rounded-full border border-slate-300 dark:border-slate-700"
-                              style={{ backgroundColor: c.hex }}
-                              title={c.name}
-                            />
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* SERVICIOS */}
-                  {isService && (
-                    <div className="mt-2 space-y-1 text-[11px] text-slate-600 dark:text-slate-300">
-                      <div className="flex items-center gap-2">
-                        <span className="flex items-center gap-1 text-slate-500 dark:text-slate-400">
-                          <Clock className="w-3 h-3 text-blue-600 dark:text-blue-400" />
-                          <span>{duration} min</span>
-                        </span>
-                        {specialty && (
-                          <>
-                            <span className="text-slate-400">•</span>
-                            <span className="truncate text-slate-700 dark:text-slate-300">{specialty}</span>
-                          </>
-                        )}
-                      </div>
-                      {professionalName && (
-                        <p className="text-[10px] text-slate-500 flex items-center gap-1 truncate">
-                          <User className="w-3 h-3 text-slate-400" />
-                          <span>{professionalName}</span>
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* Fila de precio y acciones */}
-                <div className="pt-3 mt-3 border-t border-slate-200 dark:border-slate-800/80 flex items-center justify-between gap-2">
-                  <div className="flex items-baseline gap-2">
-                    <PriceDisplay amount={product.price} size="md" />
-                    {hasOffer && previousPrice && (
-                      <PriceDisplay amount={previousPrice} size="xs" isPreviousPrice />
-                    )}
-                  </div>
-
-                  {isService && onRequestAppointment ? (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onRequestAppointment(product.id);
-                      }}
-                      className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-xs"
-                    >
-                      <Calendar className="w-3.5 h-3.5" />
-                      <span>Cita</span>
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      disabled={!product.is_available}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (sizes.length > 0) {
-                          onSelectProduct(product);
-                        } else {
-                          onQuickAddToCart(product);
-                        }
-                      }}
-                      style={{ backgroundColor: product.is_available ? primaryColor : undefined }}
-                      className={`px-3 py-1.5 rounded-xl font-semibold text-xs flex items-center gap-1.5 transition cursor-pointer ${
-                        product.is_available
-                          ? 'text-white shadow-xs hover:opacity-90'
-                          : 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed'
-                      }`}
-                    >
-                      <ShoppingBag className="w-3.5 h-3.5" />
-                      <span>{sizes.length > 0 ? 'Elegir' : 'Agregar'}</span>
-                    </button>
-                  )}
-                </div>
-              </div>
+              </motion.div>
             );
           })}
-        </div>
+        </motion.div>
       )}
     </div>
   );

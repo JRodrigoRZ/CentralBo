@@ -15,6 +15,7 @@ import {
   PlanId,
 } from '../types';
 import { supabase } from './supabase';
+import { DirectStoreOwnerCredentials } from './storeOwnerActivationService';
 
 // ----------------------------------------------------------------------------
 // 4. PLANES OFICIALES DE CENTRALBO
@@ -234,84 +235,108 @@ export function getSuperAdminStoreById(id: string): SuperAdminStoreRecord | unde
   return getSuperAdminStores().find((s) => s.id === id);
 }
 
-export function createSuperAdminStore(input: CreateStoreInput): SuperAdminStoreRecord {
-  const current = getSuperAdminStores();
+export async function createSuperAdminStore(input: CreateStoreInput): Promise<{
+  store: SuperAdminStoreRecord;
+  credentials: DirectStoreOwnerCredentials;
+}> {
+  try {
+    // Obtener sesión activa para pasar el token de autorización si existe
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    const token = session?.access_token;
 
-  // Generación de slug limpio y único
-  const baseSlug = (input.slug || input.name)
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '') || `comercio-${Date.now().toString().slice(-4)}`;
-
-  let uniqueSlug = baseSlug;
-  let counter = 1;
-  while (current.some((s) => s.slug === uniqueSlug)) {
-    uniqueSlug = `${baseSlug}-${counter}`;
-    counter++;
-  }
-
-  const now = new Date().toISOString();
-  const dateOnly = now.split('T')[0];
-  const newId =
-    typeof crypto !== 'undefined' && crypto.randomUUID
-      ? crypto.randomUUID()
-      : `store-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-
-  const planName = input.planId === 'pro' ? 'Pro' : 'Basic';
-  const planPrice = input.planId === 'pro' ? 99 : 49;
-  const subStatus =
-    input.status === 'prueba' ? 'prueba' : input.status === 'activo' ? 'activa' : 'vencida';
-
-  const newStore: SuperAdminStoreRecord = {
-    id: newId,
-    name: input.name.trim(),
-    slug: uniqueSlug,
-    store_type: input.store_type,
-    status: input.status,
-    logo_url: null,
-    created_at: now,
-    updated_at: now,
-    owner: {
-      name: input.ownerName.trim(),
-      email: input.ownerEmail.trim().toLowerCase(),
-      phone: input.ownerPhone.trim(),
-      socials: {
-        whatsapp: input.ownerPhone.trim(),
+    const response = await fetch('/api/superadmin/create-store-owner', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-    },
-    subscription: {
-      planId: input.planId,
-      planName: input.status === 'prueba' ? `${planName} (Prueba 14d)` : planName,
-      status: subStatus,
-      startDate: dateOnly,
-      renewalDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      billingCycle: 'mensual',
-      paymentHistory: [
-        {
-          id: `pay-${Date.now()}`,
-          date: dateOnly,
-          amount: input.status === 'prueba' ? 0 : planPrice,
-          currency: 'Bs',
-          period: input.status === 'prueba' ? 'Prueba Inicial 14 días' : 'Primer Mes',
-          status: 'completado',
-          reference: `REG-BOB-${Math.floor(10000 + Math.random() * 90000)}`,
-        },
-      ],
-    },
-    activity: {
-      visitas: 0,
-      pedidos: 0,
-      productos: 0,
-      ventas: 0,
-      ultimaActividad: 'Recién creado',
-    },
-  };
+      body: JSON.stringify({
+        name: input.name.trim(),
+        store_type: input.store_type,
+        status: input.status,
+        planId: input.planId,
+        slug: input.slug,
+        ownerName: input.ownerName.trim(),
+        ownerEmail: input.ownerEmail.trim().toLowerCase(),
+        ownerPhone: input.ownerPhone.trim(),
+      }),
+    });
 
-  const updatedList = [newStore, ...current];
-  persistStores(updatedList);
-  return newStore;
+    const result = await response.json();
+
+    if (!response.ok || !result.success) {
+      throw new Error(result.error || 'Error al persistir el comercio en Supabase');
+    }
+
+    const { store, credentials } = result;
+
+    const planName = input.planId === 'pro' ? 'Pro' : 'Basic';
+    const planPrice = input.planId === 'pro' ? 99 : 49;
+    const subStatus =
+      store.status === 'prueba' ? 'prueba' : store.status === 'activo' ? 'activa' : 'vencida';
+    const dateOnly = store.created_at
+      ? store.created_at.slice(0, 10)
+      : new Date().toISOString().slice(0, 10);
+
+    const newStoreRecord: SuperAdminStoreRecord = {
+      id: store.id,
+      name: store.name,
+      slug: store.slug,
+      store_type: store.store_type,
+      status: store.status as StoreStatus,
+      logo_url: store.logo_url || null,
+      created_at: store.created_at,
+      updated_at: store.updated_at,
+      owner: {
+        name: input.ownerName.trim(),
+        email: input.ownerEmail.trim().toLowerCase(),
+        phone: input.ownerPhone.trim(),
+        socials: {
+          whatsapp: input.ownerPhone.trim(),
+        },
+      },
+      subscription: {
+        planId: input.planId,
+        planName: store.status === 'prueba' ? `${planName} (Prueba 14d)` : planName,
+        status: subStatus,
+        startDate: dateOnly,
+        renewalDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        billingCycle: 'mensual',
+        paymentHistory: [
+          {
+            id: `pay-${Date.now()}`,
+            date: dateOnly,
+            amount: store.status === 'prueba' ? 0 : planPrice,
+            currency: 'Bs',
+            period: store.status === 'prueba' ? 'Prueba Inicial 14 días' : 'Primer Mes',
+            status: 'completado',
+            reference: `REG-BOB-${Math.floor(10000 + Math.random() * 90000)}`,
+          },
+        ],
+      },
+      activity: {
+        visitas: 0,
+        pedidos: 0,
+        productos: 0,
+        ventas: 0,
+        ultimaActividad: 'Recién creado',
+      },
+    };
+
+    const current = getSuperAdminStores();
+    const updatedList = [newStoreRecord, ...current.filter((s) => s.id !== store.id)];
+    persistStores(updatedList);
+
+    return {
+      store: newStoreRecord,
+      credentials,
+    };
+  } catch (err: unknown) {
+    console.error('[CentralBo SuperAdmin] Error en createSuperAdminStore:', err);
+    throw err;
+  }
 }
 
 export function updateSuperAdminStore(id: string, updates: UpdateStoreInput): SuperAdminStoreRecord {

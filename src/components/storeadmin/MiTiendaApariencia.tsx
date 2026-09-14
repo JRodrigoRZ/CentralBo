@@ -11,12 +11,17 @@ import {
   Save,
   AlertTriangle,
   ExternalLink,
+  Plus,
+  Trash2,
+  RefreshCw,
+  LayoutGrid,
 } from 'lucide-react';
-import { Store, StoreAppearanceSettings } from '../../types';
+import { Store, StoreAppearanceSettings, StoreHighlightItem, StoreHighlightsLayout } from '../../types';
 import {
   getStoreAppearance,
   saveStoreAppearance,
   getStorePlan,
+  getDefaultStoreHighlights,
 } from '../../lib/storeAdminService';
 import { useTheme } from '../../context/ThemeContext';
 
@@ -361,13 +366,228 @@ export const MiTiendaApariencia: React.FC<MiTiendaAparienciaProps> = ({ store })
         </div>
       </div>
 
-      {/* 4. PWA (Disponible para ambos planes) */}
+      {/* 4. Destacados del Comercio (Vitrina Superior) */}
+      <div className="p-5 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-amber-400" />
+              <span>4. Destacados del Comercio (Vitrina Superior)</span>
+            </h3>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              Personaliza los sellos, compromisos o atributos clave que resaltan en la parte superior de tu tienda
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={appearance.showHighlights ?? true}
+                onChange={(e) =>
+                  setAppearance({ ...appearance, showHighlights: e.target.checked })
+                }
+                className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 bg-slate-900 border-slate-700"
+              />
+              <span>Mostrar destacados</span>
+            </label>
+
+            <button
+              type="button"
+              onClick={() => {
+                const real = getDefaultStoreHighlights(store.id);
+                setAppearance({ ...appearance, highlights: real });
+              }}
+              title="Restablecer con datos reales configurados (envíos, WhatsApp, pagos)"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-[11px] text-slate-300 hover:text-white transition cursor-pointer"
+            >
+              <RefreshCw className="w-3 h-3 text-slate-400" />
+              <span>Sincronizar Datos Reales</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Selector de Composición Visual */}
+        <div className="space-y-2">
+          <label className="block text-xs font-medium text-slate-300">
+            Composición Visual de los Destacados
+          </label>
+          <div className="grid grid-cols-1 sm:grid-cols-5 gap-2.5">
+            {[
+              {
+                id: 'balanced',
+                name: 'Equilibrada',
+                desc: 'Cuadrícula armónica adaptable',
+              },
+              {
+                id: 'featured',
+                name: '1 Principal + N',
+                desc: 'Jerarquía con foco prioritario',
+              },
+              {
+                id: 'horizontal',
+                name: 'Horizontal',
+                desc: 'Fila deslizable continua',
+              },
+              {
+                id: 'editorial',
+                name: 'Editorial',
+                desc: 'Estilo elegante con divisores',
+              },
+              {
+                id: 'minimal',
+                name: 'Minimalista',
+                desc: 'Insignias limpias y compactas',
+              },
+            ].map((comp) => (
+              <button
+                key={comp.id}
+                type="button"
+                onClick={() =>
+                  setAppearance({
+                    ...appearance,
+                    highlightsLayout: comp.id as StoreHighlightsLayout,
+                  })
+                }
+                className={`p-3 rounded-xl border text-left transition cursor-pointer ${
+                  (appearance.highlightsLayout || 'balanced') === comp.id
+                    ? 'bg-indigo-950/40 border-indigo-500 text-white shadow-xs'
+                    : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <p className="text-xs font-bold">{comp.name}</p>
+                <p className="text-[10px] text-slate-400 mt-0.5">{comp.desc}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Lista de Destacados Editables */}
+        <div className="space-y-3 pt-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-slate-300">
+              Elementos configurados ({appearance.highlights?.length || 0}/6)
+            </span>
+
+            {(appearance.highlights?.length || 0) < 6 && (
+              <button
+                type="button"
+                onClick={() => {
+                  const current = appearance.highlights || [];
+                  const newItem: StoreHighlightItem = {
+                    id: `h-${Date.now()}`,
+                    icon: '⭐',
+                    title: 'Nuevo Destacado',
+                    description: 'Detalle o beneficio directo de tu comercio',
+                    badge: 'Beneficio',
+                  };
+                  setAppearance({ ...appearance, highlights: [...current, newItem] });
+                }}
+                className="inline-flex items-center gap-1 px-3 py-1 rounded-lg bg-indigo-600/20 text-indigo-300 hover:bg-indigo-600/30 text-xs font-semibold border border-indigo-500/30 transition cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Agregar Elemento</span>
+              </button>
+            )}
+          </div>
+
+          <div className="space-y-2.5">
+            {(appearance.highlights || []).map((item, idx) => (
+              <div
+                key={item.id || idx}
+                className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center gap-3"
+              >
+                {/* Icono / Emoji */}
+                <div className="w-14">
+                  <label className="block text-[10px] text-slate-500 mb-1">Icono</label>
+                  <input
+                    type="text"
+                    value={item.icon || '✨'}
+                    maxLength={4}
+                    onChange={(e) => {
+                      const current = [...(appearance.highlights || [])];
+                      current[idx] = { ...current[idx], icon: e.target.value };
+                      setAppearance({ ...appearance, highlights: current });
+                    }}
+                    className="w-full px-2 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-center text-sm text-white"
+                  />
+                </div>
+
+                {/* Título */}
+                <div className="flex-1 min-w-[140px]">
+                  <label className="block text-[10px] text-slate-500 mb-1">Título</label>
+                  <input
+                    type="text"
+                    value={item.title}
+                    onChange={(e) => {
+                      const current = [...(appearance.highlights || [])];
+                      current[idx] = { ...current[idx], title: e.target.value };
+                      setAppearance({ ...appearance, highlights: current });
+                    }}
+                    className="w-full px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-xs text-white"
+                    placeholder="Ej. Envíos Rápidos"
+                  />
+                </div>
+
+                {/* Descripción */}
+                <div className="flex-1 min-w-[180px]">
+                  <label className="block text-[10px] text-slate-500 mb-1">Descripción</label>
+                  <input
+                    type="text"
+                    value={item.description || ''}
+                    onChange={(e) => {
+                      const current = [...(appearance.highlights || [])];
+                      current[idx] = { ...current[idx], description: e.target.value };
+                      setAppearance({ ...appearance, highlights: current });
+                    }}
+                    className="w-full px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-xs text-white"
+                    placeholder="Ej. Despacho directo a tu puerta"
+                  />
+                </div>
+
+                {/* Badge opcional */}
+                <div className="w-24">
+                  <label className="block text-[10px] text-slate-500 mb-1">Insignia</label>
+                  <input
+                    type="text"
+                    value={item.badge || ''}
+                    onChange={(e) => {
+                      const current = [...(appearance.highlights || [])];
+                      current[idx] = { ...current[idx], badge: e.target.value };
+                      setAppearance({ ...appearance, highlights: current });
+                    }}
+                    className="w-full px-2 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-xs text-white"
+                    placeholder="Ej. Gratis"
+                  />
+                </div>
+
+                {/* Botón eliminar */}
+                <div className="self-end sm:self-center pt-2 sm:pt-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const current = (appearance.highlights || []).filter((_, i) => i !== idx);
+                      setAppearance({ ...appearance, highlights: current });
+                    }}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-950/40 transition cursor-pointer"
+                    title="Eliminar este destacado"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* 5. PWA (Disponible para ambos planes) */}
       <div className="p-5 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-4">
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
               <Smartphone className="w-4 h-4 text-emerald-400" />
-              <span>4. Aplicación Web Progresiva (PWA Instalable)</span>
+              <span>5. Aplicación Web Progresiva (PWA Instalable)</span>
             </h3>
             <p className="text-[11px] text-slate-400 mt-0.5">
               Tus clientes pueden instalar tu tienda como icono en su pantalla de inicio en Android, iOS y PC

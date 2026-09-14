@@ -35,6 +35,7 @@ interface ServiceBookingModalProps {
   professionals: ProfessionalItem[];
   preselectedServiceId?: string;
   onClose: () => void;
+  primaryColor?: string;
 }
 
 // SEC-14A-03: Rate Limiting y Protección contra Abuso en Solicitud de Citas
@@ -49,8 +50,8 @@ export const ServiceBookingModal: React.FC<ServiceBookingModalProps> = ({
   professionals,
   preselectedServiceId,
   onClose,
+  primaryColor = '#10b981',
 }) => {
-  const isZenit = storeName.toLowerCase().includes('zenit') || tenantId.includes('zenit') || storeName.toLowerCase().includes('spa');
   const [selectedServiceId, setSelectedServiceId] = useState<string>(
     preselectedServiceId || (services[0]?.id || '')
   );
@@ -324,44 +325,44 @@ ${submittedAppointment.notes ? `Notas: ${submittedAppointment.notes}\n` : ''}
       : null;
 
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-        <div className="w-full max-w-lg rounded-2xl bg-slate-900 border border-slate-800 p-6 sm:p-8 shadow-2xl space-y-6 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center mx-auto">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs animate-in fade-in duration-200">
+        <div className="w-full max-w-lg rounded-3xl bg-white dark:bg-stone-900 border border-stone-200/90 dark:border-stone-800 p-6 sm:p-8 shadow-2xl space-y-6 text-center">
+          <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto">
             <CheckCircle2 className="w-8 h-8" />
           </div>
 
           <div className="space-y-2">
-            <h2 className="text-xl sm:text-2xl font-bold text-white">
+            <h2 className="text-xl sm:text-2xl font-bold text-stone-900 dark:text-white">
               ¡Solicitud de Cita Enviada!
             </h2>
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-semibold">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-400 text-xs font-semibold">
               <AlertCircle className="w-3.5 h-3.5" />
               <span>La cita está pendiente de confirmación por el profesional</span>
             </div>
           </div>
 
-          <div className="rounded-xl bg-slate-950/80 border border-slate-800 p-4 text-left space-y-2 text-xs text-slate-300">
-            <div className="flex justify-between border-b border-slate-800 pb-2">
-              <span className="text-slate-400">Servicio:</span>
-              <span className="font-semibold text-white">{submittedAppointment.serviceName}</span>
+          <div className="rounded-2xl bg-stone-50 dark:bg-stone-950/80 border border-stone-200/80 dark:border-stone-800 p-4 text-left space-y-2 text-xs text-stone-700 dark:text-stone-300">
+            <div className="flex justify-between border-b border-stone-200/80 dark:border-stone-800 pb-2">
+              <span className="text-stone-500 dark:text-stone-400">Servicio:</span>
+              <span className="font-semibold text-stone-900 dark:text-white">{submittedAppointment.serviceName}</span>
             </div>
-            <div className="flex justify-between border-b border-slate-800 pb-2">
-              <span className="text-slate-400">Profesional:</span>
-              <span className="font-semibold text-white">{submittedAppointment.professionalName}</span>
+            <div className="flex justify-between border-b border-stone-200/80 dark:border-stone-800 pb-2">
+              <span className="text-stone-500 dark:text-stone-400">Profesional:</span>
+              <span className="font-semibold text-stone-900 dark:text-white">{submittedAppointment.professionalName}</span>
             </div>
-            <div className="flex justify-between border-b border-slate-800 pb-2">
-              <span className="text-slate-400">Fecha y Hora:</span>
-              <span className="font-mono font-bold text-indigo-400">
+            <div className="flex justify-between border-b border-stone-200/80 dark:border-stone-800 pb-2">
+              <span className="text-stone-500 dark:text-stone-400">Fecha y Hora:</span>
+              <span className="font-mono font-bold" style={{ color: primaryColor }}>
                 {submittedAppointment.date} a las {submittedAppointment.time}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-400">Estado:</span>
-              <span className="text-amber-400 font-semibold">Pendiente de Aprobación</span>
+              <span className="text-stone-500 dark:text-stone-400">Estado:</span>
+              <span className="text-amber-600 dark:text-amber-400 font-semibold">Pendiente de Aprobación</span>
             </div>
           </div>
 
-          <p className="text-xs text-slate-400 leading-relaxed">
+          <p className="text-xs text-stone-500 dark:text-stone-400 leading-relaxed">
             El profesional revisará su disponibilidad y confirmará o coordinará la cita directamente a través de WhatsApp.
           </p>
 
@@ -371,7 +372,7 @@ ${submittedAppointment.notes ? `Notas: ${submittedAppointment.notes}\n` : ''}
                 href={waUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-full py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2 transition cursor-pointer"
+                className="w-full py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md shadow-emerald-600/20 flex items-center justify-center gap-2 transition cursor-pointer"
               >
                 <MessageCircle className="w-4 h-4" />
                 <span>Enviar Solicitud por WhatsApp al Comercio</span>
@@ -379,8 +380,9 @@ ${submittedAppointment.notes ? `Notas: ${submittedAppointment.notes}\n` : ''}
             )}
 
             <button
+              type="button"
               onClick={onClose}
-              className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold transition cursor-pointer"
+              className="w-full py-2.5 rounded-xl bg-stone-100 hover:bg-stone-200 dark:bg-stone-800 dark:hover:bg-stone-700 text-stone-700 dark:text-stone-300 hover:text-stone-900 dark:hover:text-white text-xs font-semibold transition cursor-pointer"
             >
               Cerrar y Volver a la Tienda
             </button>
@@ -391,17 +393,24 @@ ${submittedAppointment.notes ? `Notas: ${submittedAppointment.notes}\n` : ''}
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="w-full max-w-xl rounded-2xl bg-slate-900 border border-slate-800 p-6 shadow-2xl space-y-5 max-h-[92vh] flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs animate-in fade-in duration-200">
+      <div className="w-full max-w-xl rounded-3xl bg-white dark:bg-stone-900 border border-stone-200/90 dark:border-stone-800 p-6 shadow-2xl space-y-5 max-h-[92vh] flex flex-col text-stone-900 dark:text-stone-100">
         {/* Encabezado */}
-        <div className="flex items-center justify-between pb-3 border-b border-slate-800 shrink-0">
-          <div className="flex items-center gap-2 text-white font-bold text-base">
-            <Briefcase className={`w-5 h-5 ${isZenit ? 'text-emerald-400' : 'text-indigo-400'}`} />
+        <div className="flex items-center justify-between pb-3 border-b border-stone-200/80 dark:border-stone-800 shrink-0">
+          <div className="flex items-center gap-2 font-bold text-base">
+            <div
+              className="w-8 h-8 rounded-xl flex items-center justify-center shadow-2xs"
+              style={{ backgroundColor: `${primaryColor}14`, color: primaryColor }}
+            >
+              <Briefcase className="w-4 h-4" />
+            </div>
             <span>Solicitud de Cita — {storeName}</span>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="text-slate-400 hover:text-white text-sm font-semibold p-1 rounded-lg hover:bg-slate-800 transition cursor-pointer"
+            className="text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 p-1.5 rounded-xl hover:bg-stone-100 dark:hover:bg-stone-800 transition cursor-pointer"
+            title="Cerrar modal"
           >
             <X className="w-4 h-4" />
           </button>
@@ -410,10 +419,10 @@ ${submittedAppointment.notes ? `Notas: ${submittedAppointment.notes}\n` : ''}
         {/* Flujo: Tienda → Servicio → Profesional → Fecha → Hora → Solicitud */}
         <div className="flex-1 overflow-y-auto space-y-5 pr-1 text-xs">
           {/* Advertencia de confirmación de cita */}
-          <div className="rounded-xl bg-amber-500/10 border border-amber-500/30 p-3 flex items-start gap-2.5 text-amber-300">
-            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+          <div className="rounded-2xl bg-amber-500/10 border border-amber-500/30 p-3.5 flex items-start gap-2.5 text-amber-800 dark:text-amber-300">
+            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
             <div className="text-[11px] leading-relaxed">
-              <strong className="font-semibold block text-amber-200">
+              <strong className="font-semibold block text-amber-900 dark:text-amber-200">
                 La cita está pendiente de confirmación por el profesional.
               </strong>
               Tu solicitud será evaluada por el especialista, quien confirmará o coordinará la cita contigo.
@@ -421,8 +430,8 @@ ${submittedAppointment.notes ? `Notas: ${submittedAppointment.notes}\n` : ''}
           </div>
 
           {bookingCooldownRemaining > 0 && (
-            <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-2.5">
-              <Clock className="w-4 h-4 shrink-0 text-amber-400 animate-pulse" />
+            <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-300 text-xs flex items-center gap-2.5">
+              <Clock className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400 animate-pulse" />
               <span>
                 Protección contra envíos repetidos: Por favor espera{' '}
                 <strong className="underline">{bookingCooldownRemaining}s</strong> antes de enviar otra solicitud.
@@ -431,7 +440,7 @@ ${submittedAppointment.notes ? `Notas: ${submittedAppointment.notes}\n` : ''}
           )}
 
           {errorMsg && (
-            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs">
+            <div className="p-3 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-700 dark:text-rose-300 text-xs">
               {errorMsg}
             </div>
           )}
@@ -439,7 +448,7 @@ ${submittedAppointment.notes ? `Notas: ${submittedAppointment.notes}\n` : ''}
           <form id="service-booking-form" onSubmit={handleSubmit} className="space-y-4">
             {/* 1. SELECCIONAR SERVICIO */}
             <div className="space-y-1.5">
-              <label className="block text-slate-300 font-semibold">
+              <label className="block text-stone-700 dark:text-stone-300 font-semibold">
                 1. Selecciona el Servicio
               </label>
               <select
@@ -451,18 +460,19 @@ ${submittedAppointment.notes ? `Notas: ${submittedAppointment.notes}\n` : ''}
                     setSelectedProfId(s.attributes.professional_id as string);
                   }
                 }}
-                className={`w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none text-xs ${
-                  isZenit ? 'focus:border-emerald-500' : 'focus:border-indigo-500'
-                }`}
+                className="w-full px-3 py-2 rounded-xl bg-stone-50 dark:bg-stone-950 border border-stone-200 dark:border-stone-800 text-stone-900 dark:text-white focus:outline-none text-xs focus:ring-1 focus:ring-stone-400"
               >
-                {services.map((srv) => (
-                  <option key={srv.id} value={srv.id}>
-                    {srv.name} — Bs {srv.price} ({srv.attributes?.duration_minutes || 60} min)
-                  </option>
-                ))}
+                {services.map((srv) => {
+                  const srvDuration = typeof srv.attributes?.duration_minutes === 'number' && srv.attributes.duration_minutes > 0 ? `${srv.attributes.duration_minutes} min` : null;
+                  return (
+                    <option key={srv.id} value={srv.id}>
+                      {srv.name} — Bs {srv.price} {srvDuration ? `(${srvDuration})` : ''}
+                    </option>
+                  );
+                })}
               </select>
               {selectedService?.description && (
-                <p className="text-[11px] text-slate-400 italic">
+                <p className="text-[11px] text-stone-500 dark:text-stone-400 italic">
                   {selectedService.description}
                 </p>
               )}
@@ -471,10 +481,10 @@ ${submittedAppointment.notes ? `Notas: ${submittedAppointment.notes}\n` : ''}
             {/* 2. SELECCIONAR PROFESIONAL (Filtrado por servicios que realiza) */}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <label className="block text-slate-300 font-semibold">
+                <label className="block text-stone-700 dark:text-stone-300 font-semibold">
                   2. Especialista / Profesional
                 </label>
-                <span className="text-[10px] text-slate-400">
+                <span className="text-[10px] text-stone-500 dark:text-stone-400">
                   {availableProfessionals.length} disponible{availableProfessionals.length !== 1 ? 's' : ''} para este servicio
                 </span>
               </div>
@@ -487,25 +497,31 @@ ${submittedAppointment.notes ? `Notas: ${submittedAppointment.notes}\n` : ''}
                       setSelectedProfId(prof.id);
                       setSelectedTime('');
                     }}
-                    className={`p-3 rounded-xl border text-left transition cursor-pointer flex items-start gap-3 ${
+                    className={`p-3 rounded-2xl border text-left transition cursor-pointer flex items-start gap-3 ${
                       selectedProfId === prof.id
-                        ? isZenit
-                          ? 'bg-emerald-600/15 border-emerald-500 text-white shadow-sm ring-1 ring-emerald-500/50'
-                          : 'bg-indigo-600/15 border-indigo-500 text-white shadow-sm ring-1 ring-indigo-500/50'
-                        : 'bg-slate-950/70 border-slate-800 text-slate-300 hover:border-slate-700'
+                        ? 'bg-stone-100/90 dark:bg-stone-800 border-stone-400 dark:border-stone-600 shadow-xs ring-1 ring-stone-400 dark:ring-stone-500'
+                        : 'bg-stone-50/50 dark:bg-stone-950/70 border-stone-200/80 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300 dark:hover:border-stone-700'
                     }`}
                   >
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
-                      isZenit ? 'bg-emerald-500/20 text-emerald-400' : 'bg-indigo-500/20 text-indigo-400'
-                    }`}>
+                    <div
+                      className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5"
+                      style={{
+                        backgroundColor: selectedProfId === prof.id ? `${primaryColor}22` : undefined,
+                        color: selectedProfId === prof.id ? primaryColor : undefined,
+                      }}
+                    >
                       <User className="w-4 h-4" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="font-semibold text-xs truncate">{prof.name}</p>
-                      <p className="text-[10px] text-slate-400 truncate">{prof.specialty}</p>
-                      <p className={`text-[9px] mt-1 font-mono ${isZenit ? 'text-emerald-300/80' : 'text-indigo-300/80'}`}>
-                        Turno: {prof.shiftHours || 'Horario regular'}
-                      </p>
+                      <p className="font-semibold text-xs text-stone-900 dark:text-white truncate">{prof.name}</p>
+                      {prof.specialty && (
+                        <p className="text-[10px] text-stone-500 dark:text-stone-400 truncate">{prof.specialty}</p>
+                      )}
+                      {prof.shiftHours && (
+                        <p className="text-[9px] mt-1 font-mono text-stone-500 dark:text-stone-400">
+                          Turno: {prof.shiftHours}
+                        </p>
+                      )}
                     </div>
                   </button>
                 ))}
@@ -514,7 +530,7 @@ ${submittedAppointment.notes ? `Notas: ${submittedAppointment.notes}\n` : ''}
 
             {/* 3. FECHA (Mismo día o día siguiente) */}
             <div className="space-y-1.5">
-              <label className="block text-slate-300 font-semibold">
+              <label className="block text-stone-700 dark:text-stone-300 font-semibold">
                 3. Fecha de la Cita
               </label>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -524,13 +540,12 @@ ${submittedAppointment.notes ? `Notas: ${submittedAppointment.notes}\n` : ''}
                     setSelectedDate(todayStr);
                     setSelectedTime('');
                   }}
-                  className={`p-2.5 rounded-xl border text-center font-semibold transition cursor-pointer ${
+                  className={`p-2.5 rounded-2xl border text-center font-semibold transition cursor-pointer ${
                     selectedDate === todayStr
-                      ? isZenit
-                        ? 'bg-emerald-700 text-white border-emerald-600 shadow-md'
-                        : 'bg-indigo-600 text-white border-indigo-500 shadow-md'
-                      : 'bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700'
+                      ? 'shadow-xs text-white'
+                      : 'bg-stone-50/60 dark:bg-stone-950 border-stone-200/90 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
                   }`}
+                  style={selectedDate === todayStr ? { backgroundColor: primaryColor, borderColor: primaryColor } : undefined}
                 >
                   <p className="text-xs">Hoy (Mismo Día)</p>
                   <p className="text-[10px] opacity-80">{todayStr}</p>
@@ -542,13 +557,12 @@ ${submittedAppointment.notes ? `Notas: ${submittedAppointment.notes}\n` : ''}
                     setSelectedDate(tomorrowStr);
                     setSelectedTime('');
                   }}
-                  className={`p-2.5 rounded-xl border text-center font-semibold transition cursor-pointer ${
+                  className={`p-2.5 rounded-2xl border text-center font-semibold transition cursor-pointer ${
                     selectedDate === tomorrowStr
-                      ? isZenit
-                        ? 'bg-emerald-700 text-white border-emerald-600 shadow-md'
-                        : 'bg-indigo-600 text-white border-indigo-500 shadow-md'
-                      : 'bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700'
+                      ? 'shadow-xs text-white'
+                      : 'bg-stone-50/60 dark:bg-stone-950 border-stone-200/90 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
                   }`}
+                  style={selectedDate === tomorrowStr ? { backgroundColor: primaryColor, borderColor: primaryColor } : undefined}
                 >
                   <p className="text-xs">Mañana (Día Siguiente)</p>
                   <p className="text-[10px] opacity-80">{tomorrowStr}</p>
@@ -565,9 +579,7 @@ ${submittedAppointment.notes ? `Notas: ${submittedAppointment.notes}\n` : ''}
                         setSelectedTime('');
                       }
                     }}
-                    className={`w-full h-full p-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs font-mono focus:outline-none ${
-                      isZenit ? 'focus:border-emerald-500' : 'focus:border-indigo-500'
-                    }`}
+                    className="w-full h-full p-2.5 rounded-2xl bg-stone-50/60 dark:bg-stone-950 border border-stone-200/90 dark:border-stone-800 text-stone-900 dark:text-white text-xs font-mono focus:outline-none"
                     title="Otras fechas"
                   />
                 </div>
@@ -577,30 +589,30 @@ ${submittedAppointment.notes ? `Notas: ${submittedAppointment.notes}\n` : ''}
             {/* 4. HORA (Disponibilidad propia del profesional y estados canónicos) */}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <label className="block text-slate-300 font-semibold">
+                <label className="block text-stone-700 dark:text-stone-300 font-semibold">
                   4. Horarios Disponibles de {currentProfessional?.name || 'Profesional'}
                 </label>
                 {professionalSlots.length > 0 && (
-                  <span className="text-[10px] text-emerald-400 font-medium">
+                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
                     {professionalSlots.filter((s) => s.status === 'disponible').length} cupos libres
                   </span>
                 )}
               </div>
 
               {professionalSlots.length === 0 ? (
-                <div className="p-4 rounded-xl bg-slate-950/80 border border-dashed border-slate-800 text-center space-y-1.5">
-                  <p className="text-xs font-semibold text-amber-300">
+                <div className="p-4 rounded-2xl bg-stone-50 dark:bg-stone-950/80 border border-dashed border-stone-300 dark:border-stone-800 text-center space-y-1.5">
+                  <p className="text-xs font-semibold text-amber-700 dark:text-amber-300">
                     Sin atención programada para esta fecha
                   </p>
-                  <p className="text-[11px] text-slate-400">
+                  <p className="text-[11px] text-stone-500 dark:text-stone-400">
                     El profesional <strong>{currentProfessional?.name}</strong> no tiene turnos de atención configurados para este día.
                   </p>
                   {currentProfessional?.workDays && currentProfessional.workDays.length > 0 && (
-                    <p className="text-[10px] text-slate-500">
+                    <p className="text-[10px] text-stone-500">
                       Días de atención habituales: {currentProfessional.workDays.join(', ')}
                     </p>
                   )}
-                  <p className="text-[11px] text-indigo-400 pt-1 font-medium">
+                  <p className="text-[11px] pt-1 font-medium" style={{ color: primaryColor }}>
                     Por favor selecciona otra fecha o elige otro profesional disponible.
                   </p>
                 </div>
@@ -629,15 +641,12 @@ ${submittedAppointment.notes ? `Notas: ${submittedAppointment.notes}\n` : ''}
                         onClick={() => setSelectedTime(slot.time)}
                         className={`py-2 px-1.5 rounded-xl text-center text-xs font-semibold border transition ${
                           !isAvailable
-                            ? 'bg-slate-950/40 border-slate-900 text-slate-600 cursor-not-allowed line-through'
+                            ? 'bg-stone-100/50 dark:bg-stone-950/40 border-stone-200 dark:border-stone-900 text-stone-400 dark:text-stone-600 cursor-not-allowed line-through'
                             : selectedTime === slot.time
-                            ? isZenit
-                              ? 'bg-emerald-700 text-white border-emerald-500 shadow-md cursor-pointer ring-2 ring-emerald-400/50'
-                              : 'bg-indigo-600 text-white border-indigo-500 shadow-md cursor-pointer ring-2 ring-indigo-400/50'
-                            : isZenit
-                            ? 'bg-slate-950 border-slate-800 text-slate-200 hover:border-emerald-500/50 hover:bg-slate-900 cursor-pointer'
-                            : 'bg-slate-950 border-slate-800 text-slate-200 hover:border-indigo-500/50 hover:bg-slate-900 cursor-pointer'
+                            ? 'text-white shadow-xs cursor-pointer ring-2 ring-stone-400/40'
+                            : 'bg-stone-50/60 dark:bg-stone-950 border-stone-200/90 dark:border-stone-800 text-stone-800 dark:text-stone-200 hover:border-stone-300 dark:hover:border-stone-700 cursor-pointer'
                         }`}
+                        style={isAvailable && selectedTime === slot.time ? { backgroundColor: primaryColor, borderColor: primaryColor } : undefined}
                         title={
                           !isAvailable
                             ? `Horario no disponible (${statusLabel}): ${slot.reason || 'Reservado por otro cliente'}`
@@ -646,7 +655,7 @@ ${submittedAppointment.notes ? `Notas: ${submittedAppointment.notes}\n` : ''}
                       >
                         <span className="font-mono">{slot.time}</span>
                         {!isAvailable && (
-                          <span className="block text-[8px] no-underline font-normal text-rose-400 truncate px-0.5">
+                          <span className="block text-[8px] no-underline font-normal text-rose-500 dark:text-rose-400 truncate px-0.5">
                             {statusLabel}
                           </span>
                         )}
@@ -658,14 +667,14 @@ ${submittedAppointment.notes ? `Notas: ${submittedAppointment.notes}\n` : ''}
             </div>
 
             {/* 5. DATOS DEL CLIENTE */}
-            <div className="space-y-3 pt-2 border-t border-slate-800">
-              <h4 className="text-slate-200 font-semibold">5. Tus Datos de Contacto</h4>
+            <div className="space-y-3 pt-2 border-t border-stone-200/80 dark:border-stone-800">
+              <h4 className="text-stone-900 dark:text-stone-200 font-semibold">5. Tus Datos de Contacto</h4>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <div className="flex justify-between items-center">
-                    <label className="text-[11px] text-slate-400">Nombre Completo *</label>
-                    <span className="text-[10px] text-slate-500">{customerName.length}/100</span>
+                    <label className="text-[11px] text-stone-600 dark:text-stone-400">Nombre Completo *</label>
+                    <span className="text-[10px] text-stone-400 dark:text-stone-500">{customerName.length}/100</span>
                   </div>
                   <input
                     type="text"
@@ -674,16 +683,14 @@ ${submittedAppointment.notes ? `Notas: ${submittedAppointment.notes}\n` : ''}
                     value={customerName}
                     onChange={(e) => setCustomerName(e.target.value)}
                     placeholder="Ej. Ana Fernández"
-                    className={`w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs focus:outline-none ${
-                      isZenit ? 'focus:border-emerald-500' : 'focus:border-indigo-500'
-                    }`}
+                    className="w-full px-3 py-2 rounded-xl bg-stone-50 dark:bg-stone-950 border border-stone-200 dark:border-stone-800 text-stone-900 dark:text-white text-xs focus:outline-none focus:ring-1 focus:ring-stone-400"
                   />
                 </div>
 
                 <div className="space-y-1">
                   <div className="flex justify-between items-center">
-                    <label className="text-[11px] text-slate-400">Teléfono / WhatsApp *</label>
-                    <span className="text-[10px] text-slate-500">{customerPhone.length}/25</span>
+                    <label className="text-[11px] text-stone-600 dark:text-stone-400">Teléfono / WhatsApp *</label>
+                    <span className="text-[10px] text-stone-400 dark:text-stone-500">{customerPhone.length}/25</span>
                   </div>
                   <input
                     type="tel"
@@ -692,31 +699,27 @@ ${submittedAppointment.notes ? `Notas: ${submittedAppointment.notes}\n` : ''}
                     value={customerPhone}
                     onChange={(e) => setCustomerPhone(e.target.value)}
                     placeholder="Ej. 71023456"
-                    className={`w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs focus:outline-none ${
-                      isZenit ? 'focus:border-emerald-500' : 'focus:border-indigo-500'
-                    }`}
+                    className="w-full px-3 py-2 rounded-xl bg-stone-50 dark:bg-stone-950 border border-stone-200 dark:border-stone-800 text-stone-900 dark:text-white text-xs focus:outline-none focus:ring-1 focus:ring-stone-400"
                   />
                 </div>
               </div>
 
               <div className="space-y-1">
-                <label className="text-[11px] text-slate-400">Email de Contacto (Opcional)</label>
+                <label className="text-[11px] text-stone-600 dark:text-stone-400">Email de Contacto (Opcional)</label>
                 <input
                   type="email"
                   maxLength={120}
                   value={customerEmail}
                   onChange={(e) => setCustomerEmail(e.target.value)}
                   placeholder="ejemplo@correo.com"
-                  className={`w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs focus:outline-none ${
-                    isZenit ? 'focus:border-emerald-500' : 'focus:border-indigo-500'
-                  }`}
+                  className="w-full px-3 py-2 rounded-xl bg-stone-50 dark:bg-stone-950 border border-stone-200 dark:border-stone-800 text-stone-900 dark:text-white text-xs focus:outline-none focus:ring-1 focus:ring-stone-400"
                 />
               </div>
 
               <div className="space-y-1">
                 <div className="flex justify-between items-center">
-                  <label className="text-[11px] text-slate-400">Notas o Requerimientos Especiales</label>
-                  <span className="text-[10px] text-slate-500">{notes.length}/300</span>
+                  <label className="text-[11px] text-stone-600 dark:text-stone-400">Notas o Requerimientos Especiales</label>
+                  <span className="text-[10px] text-stone-400 dark:text-stone-500">{notes.length}/300</span>
                 </div>
                 <textarea
                   rows={2}
@@ -724,9 +727,7 @@ ${submittedAppointment.notes ? `Notas: ${submittedAppointment.notes}\n` : ''}
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="Ej. Es mi primera sesión, prefiero presión moderada..."
-                  className={`w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs focus:outline-none resize-none ${
-                    isZenit ? 'focus:border-emerald-500' : 'focus:border-indigo-500'
-                  }`}
+                  className="w-full px-3 py-2 rounded-xl bg-stone-50 dark:bg-stone-950 border border-stone-200 dark:border-stone-800 text-stone-900 dark:text-white text-xs focus:outline-none resize-none focus:ring-1 focus:ring-stone-400"
                 />
               </div>
             </div>
@@ -734,16 +735,13 @@ ${submittedAppointment.notes ? `Notas: ${submittedAppointment.notes}\n` : ''}
         </div>
 
         {/* Botón de Enviar */}
-        <div className="pt-3 border-t border-slate-800 shrink-0">
+        <div className="pt-3 border-t border-stone-200/80 dark:border-stone-800 shrink-0">
           <button
             type="submit"
             form="service-booking-form"
             disabled={bookingCooldownRemaining > 0}
-            className={`w-full py-3 rounded-xl text-white text-xs font-bold transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
-              isZenit
-                ? 'bg-emerald-700 hover:bg-emerald-600 shadow-lg shadow-emerald-700/20'
-                : 'bg-indigo-600 hover:bg-indigo-500 shadow-lg shadow-indigo-600/20'
-            }`}
+            className="w-full py-3 rounded-2xl text-white text-xs font-bold transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:brightness-105 active:scale-98"
+            style={{ backgroundColor: primaryColor }}
           >
             {bookingCooldownRemaining > 0 ? (
               <span className="inline-flex items-center justify-center gap-1.5 text-amber-200">

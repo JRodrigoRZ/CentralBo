@@ -296,6 +296,21 @@ export interface StoreProfileSettings {
   socials: StoreSocials;
 }
 
+export interface StoreHighlightItem {
+  id: string;
+  icon?: string;
+  title: string;
+  description?: string;
+  badge?: string;
+}
+
+export type StoreHighlightsLayout =
+  | 'balanced'
+  | 'featured'
+  | 'horizontal'
+  | 'editorial'
+  | 'minimal';
+
 export interface StoreAppearanceSettings {
   theme: 'light' | 'dark';
   // Exclusivo Plan Pro
@@ -305,6 +320,10 @@ export interface StoreAppearanceSettings {
   customDomain: string;
   domainVerified: boolean;
   visualStyle: 'modern' | 'minimal' | 'elegant';
+  // Sistema de Destacados del Comercio
+  showHighlights?: boolean;
+  highlightsLayout?: StoreHighlightsLayout;
+  highlights?: StoreHighlightItem[];
 }
 
 export interface StoreSchedulePeriod {

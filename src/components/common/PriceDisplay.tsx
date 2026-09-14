@@ -9,6 +9,7 @@ export interface PriceDisplayProps {
   showDiscountBadge?: boolean;
   className?: string;
   align?: 'left' | 'center' | 'right';
+  colorVariant?: 'default' | 'white' | 'fashion' | 'inherit';
 }
 
 export const PriceDisplay: React.FC<PriceDisplayProps> = ({
@@ -20,8 +21,35 @@ export const PriceDisplay: React.FC<PriceDisplayProps> = ({
   showDiscountBadge = true,
   className = '',
   align = 'left',
+  colorVariant = 'default',
 }) => {
   const finalPrice = price ?? amount ?? 0;
+
+  // Clases de color para garantizar contraste óptimo en fondos oscuros o de marca (ej. canasta flotante)
+  const isWhite = colorVariant === 'white';
+  const isFashionVariant = colorVariant === 'fashion';
+
+  let containerColorClass = 'text-slate-900 dark:text-slate-100';
+  let currencyColorClass = 'text-slate-500 dark:text-slate-400';
+  let decimalColorClass = 'text-slate-700 dark:text-slate-300';
+  let prevColorClass = 'text-slate-400 dark:text-slate-500';
+
+  if (isWhite) {
+    containerColorClass = 'text-white';
+    currencyColorClass = 'text-white/85';
+    decimalColorClass = 'text-white/95';
+    prevColorClass = 'text-white/70';
+  } else if (isFashionVariant) {
+    containerColorClass = 'text-white dark:text-stone-950';
+    currencyColorClass = 'text-white/85 dark:text-stone-700';
+    decimalColorClass = 'text-white/95 dark:text-stone-900';
+    prevColorClass = 'text-white/70 dark:text-stone-500';
+  } else if (colorVariant === 'inherit') {
+    containerColorClass = 'text-current';
+    currencyColorClass = 'opacity-85';
+    decimalColorClass = 'opacity-95';
+    prevColorClass = 'opacity-70';
+  }
 
   // Si solo se muestra como precio anterior tachado
   if (isPreviousPrice) {
@@ -95,14 +123,14 @@ export const PriceDisplay: React.FC<PriceDisplayProps> = ({
   return (
     <div className={`inline-flex flex-wrap items-center gap-x-2 gap-y-1 ${className}`}>
       {/* Contenedor del precio principal */}
-      <div className={`flex ${alignClass} text-slate-900 dark:text-slate-100`}>
-        <span className={`${sizeClasses.currency} text-slate-500 dark:text-slate-400 mr-1 select-none font-medium`}>
+      <div className={`flex ${alignClass} ${containerColorClass}`}>
+        <span className={`${sizeClasses.currency} ${currencyColorClass} mr-1 select-none font-semibold`}>
           Bs
         </span>
-        <span className={sizeClasses.integer}>
+        <span className={`${sizeClasses.integer} ${isWhite || isFashionVariant ? 'font-black' : ''}`}>
           {integerPart}
         </span>
-        <span className={`${sizeClasses.decimal} text-slate-700 dark:text-slate-300`}>
+        <span className={`${sizeClasses.decimal} ${decimalColorClass}`}>
           .{decimalPart}
         </span>
       </div>
@@ -110,7 +138,7 @@ export const PriceDisplay: React.FC<PriceDisplayProps> = ({
       {/* Precio anterior tachado */}
       {hasOffer && previousPrice != null && (
         <span
-          className={`${sizeClasses.prev} text-slate-400 dark:text-slate-500 line-through select-none font-normal`}
+          className={`${sizeClasses.prev} ${prevColorClass} line-through select-none font-normal`}
           title={`Precio anterior: Bs ${previousPrice.toFixed(2)}`}
         >
           Bs {previousPrice.toFixed(2)}

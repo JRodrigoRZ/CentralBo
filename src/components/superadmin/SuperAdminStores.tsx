@@ -140,6 +140,7 @@ export const SuperAdminStores: React.FC = () => {
   // Estados del flujo de Credenciales Iniciales del Dueño de Comercio
   const [invitations, setInvitations] = useState<StoreOwnerInvitation[]>(() => getStoreOwnerInvitations());
   const [createdCredentials, setCreatedCredentials] = useState<DirectStoreOwnerCredentials | null>(null);
+  const [isSubmittingCreate, setIsSubmittingCreate] = useState<boolean>(false);
   const [copiedEmailFeedback, setCopiedEmailFeedback] = useState<boolean>(false);
   const [copiedPasswordFeedback, setCopiedPasswordFeedback] = useState<boolean>(false);
   const [copiedAllFeedback, setCopiedAllFeedback] = useState<boolean>(false);
@@ -277,7 +278,7 @@ export const SuperAdminStores: React.FC = () => {
     setIsCreateModalOpen(true);
   };
 
-  const handleCreateSubmit = (e: React.FormEvent) => {
+  const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const errors: Record<string, string> = {};
 
@@ -301,28 +302,37 @@ export const SuperAdminStores: React.FC = () => {
       return;
     }
 
-    try {
-      const created = createSuperAdminStore(newStoreForm);
+    setIsSubmittingCreate(true);
 
-      // Flujo de Registro Directo: Crear acceso del dueño con credenciales iniciales automáticas
-      const credentials = registerDirectStoreOwnerAccess({
+    try {
+      const { store: created, credentials } = await createSuperAdminStore(newStoreForm);
+
+      // Flujo de Registro Directo: Sincronizar invitación en caché local para consistencia
+      registerDirectStoreOwnerAccess({
         storeId: created.id,
         storeName: created.name,
         storeSlug: created.slug || '',
         ownerName: created.owner.name,
         ownerEmail: created.owner.email,
         ownerPhone: created.owner.phone,
+        initialPassword: credentials.initialPassword,
       });
 
-      refreshStores();
+      await refreshStores();
       setInvitations(getStoreOwnerInvitations());
       setIsCreateModalOpen(false);
-      showToast(`Comercio "${created.name}" y dueño registrados con éxito`, 'success');
-      // Abrir modal de confirmación con credenciales iniciales generadas
+      showToast(`Comercio "${created.name}" y dueño creados exitosamente en Supabase`, 'success');
+      // Abrir modal de confirmación con credenciales iniciales generadas solo tras éxito confirmado
       setCreatedCredentials(credentials);
-    } catch (err) {
-      console.error('[CentralBo] Error al crear comercio:', err);
-      showToast('Ocurrió un error al registrar el comercio', 'error');
+    } catch (err: unknown) {
+      console.error('[CentralBo] Error al crear comercio y dueño:', err);
+      const message =
+        err instanceof Error
+          ? err.message
+          : 'Ocurrió un error al registrar el comercio y su dueño en Supabase';
+      showToast(message, 'error');
+    } finally {
+      setIsSubmittingCreate(false);
     }
   };
 
@@ -1043,9 +1053,17 @@ export const SuperAdminStores: React.FC = () => {
                 <button
                   id="submit-crear-comercio"
                   type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-md shadow-indigo-600/30 transition cursor-pointer"
+                  disabled={isSubmittingCreate}
+                  className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-md shadow-indigo-600/30 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2"
                 >
-                  Crear comercio
+                  {isSubmittingCreate ? (
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Creando en Supabase...</span>
+                    </>
+                  ) : (
+                    <span>Crear comercio</span>
+                  )}
                 </button>
               </div>
             </form>
