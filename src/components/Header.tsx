@@ -85,7 +85,15 @@ export const Header: React.FC<HeaderProps> = ({ pwaStatus, onInstallClick }) => 
   const handleMerchantAccess = () => {
     setMobileMenuOpen(false);
     if (user) {
-      navigate('/admin');
+      if (profile === 'superadmin') {
+        navigate('/superadmin');
+      } else if (profile === 'store_admin' && user.tenantId) {
+        navigate(`/admin/${user.tenantId}`);
+      } else if (user.tenantId) {
+        navigate(`/admin/${user.tenantId}`);
+      } else {
+        navigate('/admin');
+      }
     } else {
       navigate('/login');
     }

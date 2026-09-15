@@ -133,12 +133,26 @@ export async function resolveUserProfile(
 ): Promise<AuthenticatedUser> {
   try {
     // 1. Consultar tabla store_users de Supabase
-    const { data: storeUserData, error } = await supabase
+    let { data: storeUserData, error } = await supabase
       .from('store_users')
       .select('*, stores(*)')
       .eq('user_id', userId)
       .eq('is_active', true)
       .maybeSingle();
+
+    // Reintento de seguridad si la consulta con join falló por RLS o embedding
+    if (error && !storeUserData) {
+      const retry = await supabase
+        .from('store_users')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('is_active', true)
+        .maybeSingle();
+      if (!retry.error && retry.data) {
+        storeUserData = retry.data;
+        error = null;
+      }
+    }
 
     if (!error && storeUserData) {
       const role = storeUserData.role as StoreUserRole;

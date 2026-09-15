@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://wuerdwkcpurbtcwyqjep.supabase.co';
-const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
 
 function generateSecurePassword(): string {
   const charsUpper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -32,8 +32,21 @@ export default async function handler(req: any, res: any) {
   }
 
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Método no permitido' });
+    return res.status(405).json({ success: false, error: 'Método no permitido' });
   }
+
+  // Verificación estricta de credencial de servicio administrativo
+  if (!supabaseServiceRoleKey) {
+    return res.status(500).json({
+      success: false,
+      error: 'Error de configuración del servidor: SUPABASE_SERVICE_ROLE_KEY no está configurada en las variables de entorno.'
+    });
+  }
+
+  let createdStoreId: string | null = null;
+  const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
+    auth: { autoRefreshToken: false, persistSession: false }
+  });
 
   try {
     let body = req.body;
@@ -57,13 +70,11 @@ export default async function handler(req: any, res: any) {
     const targetStatus = body.status || 'active';
 
     if (!targetEmail) {
-      return res.status(400).json({ error: 'El correo electrónico es obligatorio' });
+      return res.status(400).json({ success: false, error: 'El correo electrónico es obligatorio' });
     }
 
-    const supabase = createClient(supabaseUrl, supabaseServiceRoleKey!, {
-      auth: { autoRefreshToken: false, persistSession: false }
-    });
-
+    const cleanEmail = targetEmail.trim().toLowerCase();
+    const cleanOwnerName = targetOwnerName.trim();
     const tempPassword = generateSecurePassword();
 
     // 1. Crear usuario en Supabase Auth
@@ -71,32 +82,63 @@ export default async function handler(req: any, res: any) {
     let authResponseUser: any = null;
 
     const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
-      email: targetEmail,
+      email: cleanEmail,
       password: tempPassword,
       email_confirm: true,
       user_metadata: {
-        full_name: targetOwnerName,
+        full_name: cleanOwnerName,
         phone: targetPhone,
-        role: 'store_admin'
+        role: 'admin'
       }
     });
 
     if (authError) {
       if (authError.message?.toLowerCase().includes('already') || authError.status === 422) {
-        const { data: listData } = await supabase.auth.admin.listUsers();
-        const existing = listData?.users?.find((u: any) => u.email?.toLowerCase() === targetEmail.toLowerCase());
+        const { data: listData, error: listError } = await supabase.auth.admin.listUsers();
+        if (listError) {
+          return res.status(500).json({
+            success: false,
+            error: `Error al consultar usuarios de Supabase Auth: ${listError.message}`
+          });
+        }
+        const existing = listData?.users?.find((u: any) => u.email?.toLowerCase() === cleanEmail);
         if (existing) {
           userId = existing.id;
           authResponseUser = existing;
+
+          // Sincronizar contraseña del usuario existente con la credencial generada
+          const { error: updateError } = await supabase.auth.admin.updateUserById(existing.id, {
+            password: tempPassword,
+            email_confirm: true,
+            user_metadata: {
+              full_name: cleanOwnerName,
+              phone: targetPhone,
+              role: 'admin'
+            }
+          });
+
+          if (updateError) {
+            return res.status(500).json({
+              success: false,
+              error: `Error al actualizar credenciales del usuario existente: ${updateError.message}`
+            });
+          }
         } else {
-          return res.status(400).json({ error: authError.message });
+          return res.status(400).json({ success: false, error: authError.message });
         }
       } else {
-        return res.status(400).json({ error: authError.message });
+        return res.status(400).json({ success: false, error: authError.message });
       }
     } else {
       userId = authUser?.user?.id;
       authResponseUser = authUser?.user;
+    }
+
+    if (!userId) {
+      return res.status(500).json({
+        success: false,
+        error: 'No se pudo obtener el identificador (user_id) del usuario en Supabase Auth.'
+      });
     }
 
     // 2. Detectar dinámicamente las columnas reales de la tabla 'stores'
@@ -140,39 +182,46 @@ export default async function handler(req: any, res: any) {
       .select()
       .single();
 
-    if (storeError) {
-      return res.status(500).json({ error: `Error guardando en stores: ${storeError.message}` });
+    if (storeError || !insertedStore) {
+      return res.status(500).json({
+        success: false,
+        error: `Error guardando en stores: ${storeError?.message || 'Fallo desconocido'}`
+      });
     }
 
-    const createdStoreId = insertedStore?.id;
+    createdStoreId = insertedStore.id;
 
-    // 3. Vincular dueño en 'store_users' si existe la tabla
-    try {
-      const { data: sampleUsers } = await supabase.from('store_users').select('*').limit(1);
-      if (sampleUsers !== null) {
-        const userCols = sampleUsers.length > 0 ? Object.keys(sampleUsers[0]) : ['store_id', 'user_id', 'role'];
-        const storeUserPayload: Record<string, any> = {};
-        const candidateUserData: Record<string, any> = {
-          store_id: createdStoreId,
-          user_id: userId,
-          role: 'store_admin',
-          created_at: new Date().toISOString()
-        };
-        for (const col of userCols) {
-          if (col === 'id') continue;
-          if (candidateUserData[col] !== undefined) {
-            storeUserPayload[col] = candidateUserData[col];
-          }
-        }
-        if (storeUserPayload.store_id && storeUserPayload.user_id) {
-          await supabase.from('store_users').insert([storeUserPayload]);
+    // 3. Vincular dueño en 'store_users' utilizando el contrato real de CentralBo
+    const { data: storeUserData, error: storeUserError } = await supabase
+      .from('store_users')
+      .insert({
+        tenant_id: createdStoreId,
+        user_id: userId,
+        role: 'admin',
+        full_name: cleanOwnerName,
+        email: cleanEmail,
+        is_active: true
+      })
+      .select()
+      .single();
+
+    if (storeUserError || !storeUserData) {
+      // 4. RESTAURAR ROLLBACK: eliminar tienda para no dejarla huérfana
+      if (createdStoreId) {
+        try {
+          await supabase.from('stores').delete().eq('id', createdStoreId);
+        } catch (rollbackErr) {
+          console.error('[CentralBo API] Error en rollback de stores:', rollbackErr);
         }
       }
-    } catch (linkError) {
-      console.warn('Advertencia en store_users:', linkError);
+
+      return res.status(500).json({
+        success: false,
+        error: `Error al vincular el administrador en store_users: ${storeUserError?.message || 'Fallo al asociar usuario con comercio'}`
+      });
     }
 
-    // Estructuras de respuesta para el modal y frontend
+    // Estructuras de respuesta compatibles para el modal y frontend
     const resultStore = {
       ...(insertedStore || {}),
       id: createdStoreId,
@@ -187,25 +236,25 @@ export default async function handler(req: any, res: any) {
       planId: targetPlanId,
       plan_id: targetPlanId,
       initialPassword: tempPassword,
-      ownerName: targetOwnerName,
-      ownerEmail: targetEmail,
+      ownerName: cleanOwnerName,
+      ownerEmail: cleanEmail,
       ownerPhone: targetPhone
     };
 
     const resultOwner = {
       id: userId,
-      email: targetEmail,
-      ownerEmail: targetEmail,
-      owner_email: targetEmail,
-      name: targetOwnerName,
-      ownerName: targetOwnerName,
-      owner_name: targetOwnerName,
-      fullName: targetOwnerName,
-      full_name: targetOwnerName,
+      email: cleanEmail,
+      ownerEmail: cleanEmail,
+      owner_email: cleanEmail,
+      name: cleanOwnerName,
+      ownerName: cleanOwnerName,
+      owner_name: cleanOwnerName,
+      fullName: cleanOwnerName,
+      full_name: cleanOwnerName,
       phone: targetPhone,
       ownerPhone: targetPhone,
       owner_phone: targetPhone,
-      role: 'store_admin',
+      role: 'admin',
       initialPassword: tempPassword,
       password: tempPassword,
       tempPassword: tempPassword,
@@ -213,7 +262,7 @@ export default async function handler(req: any, res: any) {
     };
 
     const resultCredentials = {
-      email: targetEmail,
+      email: cleanEmail,
       initialPassword: tempPassword,
       password: tempPassword,
       tempPassword: tempPassword
@@ -228,13 +277,13 @@ export default async function handler(req: any, res: any) {
       slug: targetSlug,
       storeSlug: targetSlug,
       store_slug: targetSlug,
-      ownerName: targetOwnerName,
-      owner_name: targetOwnerName,
-      fullName: targetOwnerName,
-      full_name: targetOwnerName,
-      ownerEmail: targetEmail,
-      owner_email: targetEmail,
-      email: targetEmail,
+      ownerName: cleanOwnerName,
+      owner_name: cleanOwnerName,
+      fullName: cleanOwnerName,
+      full_name: cleanOwnerName,
+      ownerEmail: cleanEmail,
+      owner_email: cleanEmail,
+      email: cleanEmail,
       ownerPhone: targetPhone,
       owner_phone: targetPhone,
       phone: targetPhone,
@@ -242,6 +291,7 @@ export default async function handler(req: any, res: any) {
       password: tempPassword,
       tempPassword: tempPassword,
       store: resultStore,
+      storeUser: storeUserData,
       owner: resultOwner,
       admin: resultOwner,
       user: resultOwner,
@@ -258,16 +308,28 @@ export default async function handler(req: any, res: any) {
         name: targetStoreName,
         storeName: targetStoreName,
         slug: targetSlug,
-        ownerName: targetOwnerName,
-        ownerEmail: targetEmail,
+        ownerName: cleanOwnerName,
+        ownerEmail: cleanEmail,
         ownerPhone: targetPhone,
         initialPassword: tempPassword,
         store: resultStore,
+        storeUser: storeUserData,
         owner: resultOwner,
         credentials: resultCredentials
       }
     });
   } catch (error: any) {
-    return res.status(500).json({ error: error.message || 'Error interno del servidor' });
+    // Rollback en caso de excepción general
+    if (createdStoreId) {
+      try {
+        await supabase.from('stores').delete().eq('id', createdStoreId);
+      } catch (rollbackErr) {
+        console.error('[CentralBo API] Error en rollback:', rollbackErr);
+      }
+    }
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'Error interno del servidor'
+    });
   }
 }

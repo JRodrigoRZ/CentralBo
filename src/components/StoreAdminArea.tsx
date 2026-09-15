@@ -58,7 +58,7 @@ export const StoreAdminArea: React.FC<StoreAdminAreaProps> = ({
   initialStore,
   onBack,
 }) => {
-  const { user, profile, signOut } = useAuth();
+  const { user, profile, signOut, isLoading } = useAuth();
   const { navigate } = useRouter();
 
   const [activeTab, setActiveTab] = useState<StoreAdminTab>('inicio_resumen');
@@ -92,11 +92,23 @@ export const StoreAdminArea: React.FC<StoreAdminAreaProps> = ({
     };
   }, [activeTenantId]);
 
+  // Si la sesión aún está cargando o resolviendo el perfil, mostrar estado de carga limpio
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-3">
+        <div className="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin" />
+        <p className="text-xs text-slate-400 font-medium">
+          Verificando credenciales de acceso al comercio...
+        </p>
+      </div>
+    );
+  }
+
   // Guardia de Seguridad Interna Multi-Tenant
   const isAuthorized =
     user &&
     (user.profile === 'superadmin' ||
-      (user.profile === 'store_admin' && (!tenantId || user.tenantId === tenantId)));
+      ((user.profile === 'store_admin' || !!user.tenantId) && (!tenantId || user.tenantId === tenantId)));
 
   if (!isAuthorized) {
     return (

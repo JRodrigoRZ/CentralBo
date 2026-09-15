@@ -152,9 +152,10 @@ export const RouterProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         return { type: 'store_admin', tenantId: targetTenantId || user.tenantId || undefined };
       }
 
-      // Caso Administrador de Comercio
-      if (profile === 'store_admin') {
-        if (!user.tenantId) {
+      // Caso Administrador de Comercio (o usuario con tenantId asignado)
+      if (profile === 'store_admin' || (user && user.tenantId)) {
+        const userTenantId = user.tenantId;
+        if (!userTenantId) {
           return {
             type: 'unauthorized',
             reason: 'Esta cuenta no tiene asignado un comercio activo válido.',
@@ -163,25 +164,28 @@ export const RouterProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           };
         }
 
-        // Si no se especifica tenantId en la URL, se asume su propio comercio
+        // CASO 2: Si no se especifica tenantId en la URL (#/admin), resolver y navegar hacia su propio comercio
         if (!targetTenantId) {
-          return { type: 'store_admin', tenantId: user.tenantId };
+          if (typeof window !== 'undefined' && window.location.hash !== `#/admin/${userTenantId}`) {
+            window.location.replace(`#/admin/${userTenantId}`);
+          }
+          return { type: 'store_admin', tenantId: userTenantId };
         }
 
-        // SEGURIDAD CRÍTICA MULTI-TENANT:
+        // CASO 3: SEGURIDAD CRÍTICA MULTI-TENANT:
         // Verificar que el administrador NO pueda acceder ni administrar otro comercio distinto al suyo
-        if (user.tenantId !== targetTenantId) {
+        if (userTenantId !== targetTenantId) {
           return {
             type: 'unauthorized',
             reason: `Violación de Frontera Multi-Tenant: Su cuenta está asociada exclusivamente a su comercio. No tiene permisos para acceder ni administrar el comercio solicitado.`,
             attemptedPath: path,
             requiredRole: 'admin',
-            userTenantId: user.tenantId,
+            userTenantId: userTenantId,
             targetTenantId: targetTenantId,
           };
         }
 
-        return { type: 'store_admin', tenantId: user.tenantId };
+        return { type: 'store_admin', tenantId: userTenantId };
       }
 
       // Cliente público que intente entrar a admin

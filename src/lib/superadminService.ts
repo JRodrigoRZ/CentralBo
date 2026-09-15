@@ -264,7 +264,22 @@ export async function createSuperAdminStore(input: CreateStoreInput): Promise<{
       }),
     });
 
-    const result = await response.json();
+    const contentType = response.headers.get('content-type') || '';
+    let result: any;
+    if (contentType.includes('application/json')) {
+      result = await response.json();
+    } else {
+      const rawText = await response.text();
+      console.error('[CentralBo SuperAdmin] Respuesta no JSON recibida del servidor:', {
+        status: response.status,
+        statusText: response.statusText,
+        contentType,
+        bodyPreview: rawText.slice(0, 200),
+      });
+      throw new Error(
+        `El endpoint del servidor respondió con formato inesperado (${response.status} ${response.statusText}): ${rawText.slice(0, 100)}`
+      );
+    }
 
     if (!response.ok || !result.success) {
       throw new Error(result.error || 'Error al persistir el comercio en Supabase');
