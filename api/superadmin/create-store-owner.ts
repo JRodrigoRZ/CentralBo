@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://wuerdwkcpurbtcwyqjep.supabase.co';
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
 
+// Generador de contraseña segura
 function generateSecurePassword(): string {
   const charsUpper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
   const charsLower = 'abcdefghijklmnopqrstuvwxyz';
@@ -18,7 +19,7 @@ function generateSecurePassword(): string {
   return pass;
 }
 
-// Extractor para capturar el correo sin importar el nombre del campo en el formulario
+// Extractor para encontrar el correo sin importar el nombre del campo
 function extractEmail(data: any): string | null {
   if (!data) return null;
   if (typeof data === 'string') {
@@ -63,6 +64,7 @@ function extractEmail(data: any): string | null {
 }
 
 export default async function handler(req: any, res: any) {
+  // Configuración de encabezados CORS
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
@@ -141,6 +143,8 @@ export default async function handler(req: any, res: any) {
 
     // 1. Crear o vincular usuario en Supabase Auth
     let userId: string | undefined;
+    let authResponseUser: any = null;
+
     const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
       email: targetEmail,
       password: tempPassword,
@@ -158,6 +162,7 @@ export default async function handler(req: any, res: any) {
         const existing = listData?.users?.find((u: any) => u.email?.toLowerCase() === targetEmail.toLowerCase());
         if (existing) {
           userId = existing.id;
+          authResponseUser = existing;
         } else {
           return res.status(400).json({ error: authError.message });
         }
@@ -166,10 +171,11 @@ export default async function handler(req: any, res: any) {
       }
     } else {
       userId = authUser?.user?.id;
+      authResponseUser = authUser?.user;
     }
 
     // 2. Registrar el comercio en la base de datos
-    const storePayload = {
+    const storePayload: any = {
       name: targetStoreName,
       slug: targetSlug,
       vertical: targetVertical,
@@ -197,12 +203,70 @@ export default async function handler(req: any, res: any) {
       storeResult = store || storePayload;
     }
 
+    // Estructuras de credenciales y usuario
+    const credentialsObject = {
+      email: targetEmail,
+      initialPassword: tempPassword,
+      password: tempPassword,
+      tempPassword: tempPassword
+    };
+
+    const ownerObject = {
+      id: userId,
+      email: targetEmail,
+      full_name: targetOwnerName,
+      fullName: targetOwnerName,
+      name: targetOwnerName,
+      phone: targetPhone,
+      role: 'store_admin',
+      initialPassword: tempPassword,
+      password: tempPassword,
+      tempPassword: tempPassword,
+      credentials: credentialsObject,
+      ...(authResponseUser || {})
+    };
+
+    if (storeResult && typeof storeResult === 'object') {
+      storeResult.initialPassword = tempPassword;
+      storeResult.owner = ownerObject;
+      storeResult.credentials = credentialsObject;
+    }
+
+    // Respuesta multiformato para blindar cualquier lectura del frontend
     return res.status(200).json({
       success: true,
       message: 'Comercio y administrador creados con éxito',
+      initialPassword: tempPassword,
+      tempPassword: tempPassword,
+      password: tempPassword,
       store: storeResult,
-      user: authUser?.user || { id: userId, email: targetEmail },
-      tempPassword
+      owner: ownerObject,
+      admin: ownerObject,
+      user: ownerObject,
+      storeOwner: ownerObject,
+      store_owner: ownerObject,
+      credentials: credentialsObject,
+      auth: {
+        user: ownerObject,
+        initialPassword: tempPassword,
+        credentials: credentialsObject
+      },
+      data: {
+        success: true,
+        initialPassword: tempPassword,
+        password: tempPassword,
+        tempPassword: tempPassword,
+        store: storeResult,
+        owner: ownerObject,
+        admin: ownerObject,
+        user: ownerObject,
+        storeOwner: ownerObject,
+        credentials: credentialsObject,
+        auth: {
+          user: ownerObject,
+          initialPassword: tempPassword
+        }
+      }
     });
   } catch (error: any) {
     return res.status(500).json({ error: error.message || 'Error interno del servidor' });
