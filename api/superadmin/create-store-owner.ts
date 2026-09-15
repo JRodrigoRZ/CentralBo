@@ -18,8 +18,51 @@ function generateSecurePassword(): string {
   return pass;
 }
 
+// Extractor para capturar el correo sin importar el nombre del campo en el formulario
+function extractEmail(data: any): string | null {
+  if (!data) return null;
+  if (typeof data === 'string') {
+    if (data.includes('@') && data.includes('.')) return data.trim();
+    try {
+      return extractEmail(JSON.parse(data));
+    } catch {
+      return null;
+    }
+  }
+  if (typeof data === 'object') {
+    const directCandidates = [
+      data.email,
+      data.ownerEmail,
+      data.owner_email,
+      data.adminEmail,
+      data.admin_email,
+      data.correo,
+      data.correoElectronico,
+      data.userEmail,
+      data.owner?.email,
+      data.admin?.email,
+      data.user?.email
+    ];
+    for (const item of directCandidates) {
+      if (typeof item === 'string' && item.includes('@') && item.includes('.')) {
+        return item.trim();
+      }
+    }
+    for (const key of Object.keys(data)) {
+      const val = data[key];
+      if (typeof val === 'string' && val.includes('@') && val.includes('.')) {
+        return val.trim();
+      }
+      if (typeof val === 'object' && val !== null) {
+        const nested = extractEmail(val);
+        if (nested) return nested;
+      }
+    }
+  }
+  return null;
+}
+
 export default async function handler(req: any, res: any) {
-  // Encabezados CORS
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
@@ -37,29 +80,58 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    const body = req.body || {};
-    const {
-      name,
-      storeName,
-      slug,
-      vertical,
-      plan,
-      subscriptionPlan,
-      status,
-      ownerName,
-      owner_name,
-      email,
-      phone
-    } = body;
+    let body = req.body;
+    if (typeof body === 'string') {
+      try {
+        body = JSON.parse(body);
+      } catch (e) {
+        // mantener como objeto
+      }
+    }
+    body = body || {};
 
-    const targetEmail = email || body.correo;
-    const finalStoreName = name || storeName || body.nombreComercio;
-    const finalSlug = slug || (finalStoreName ? finalStoreName.toLowerCase().replace(/\s+/g, '-') : 'tienda');
-    const finalOwnerName = ownerName || owner_name || body.nombreDueno || 'Administrador';
+    const targetEmail = extractEmail(body);
 
     if (!targetEmail) {
       return res.status(400).json({ error: 'El correo electrónico es obligatorio' });
     }
+
+    const targetOwnerName = 
+      body.ownerName || 
+      body.owner_name || 
+      body.adminName || 
+      body.admin_name || 
+      body.nombreDueno || 
+      body.nombre_dueno || 
+      body.owner?.name || 
+      body.admin?.name || 
+      'Administrador';
+
+    const targetPhone = 
+      body.phone || 
+      body.telefono || 
+      body.ownerPhone || 
+      body.owner_phone || 
+      body.adminPhone || 
+      body.whatsapp || 
+      body.owner?.phone || 
+      '';
+
+    const targetStoreName = 
+      body.name || 
+      body.storeName || 
+      body.store_name || 
+      body.nombreComercio || 
+      body.comercio || 
+      'Comercio';
+
+    const targetSlug = 
+      body.slug || 
+      (targetStoreName ? targetStoreName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') : `tienda-${Date.now()}`);
+
+    const targetVertical = body.vertical || body.tipoComercio || body.tipo_comercio || 'Comercio General';
+    const targetPlan = body.plan || body.subscriptionPlan || body.plan_suscripcion || body.planSuscripcion || 'basic';
+    const targetStatus = body.status || body.estado || 'active';
 
     const supabase = createClient(supabaseUrl, supabaseServiceRoleKey!, {
       auth: { autoRefreshToken: false, persistSession: false }
@@ -67,51 +139,69 @@ export default async function handler(req: any, res: any) {
 
     const tempPassword = generateSecurePassword();
 
-    // 1. Crear usuario en Supabase Auth
+    // 1. Crear o vincular usuario en Supabase Auth
+    let userId: string | undefined;
     const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
       email: targetEmail,
       password: tempPassword,
       email_confirm: true,
       user_metadata: {
-        full_name: finalOwnerName,
-        phone: phone || '',
+        full_name: targetOwnerName,
+        phone: targetPhone,
         role: 'store_admin'
       }
     });
 
     if (authError) {
-      return res.status(400).json({ error: authError.message });
+      if (authError.message?.toLowerCase().includes('already') || authError.status === 422) {
+        const { data: listData } = await supabase.auth.admin.listUsers();
+        const existing = listData?.users?.find((u: any) => u.email?.toLowerCase() === targetEmail.toLowerCase());
+        if (existing) {
+          userId = existing.id;
+        } else {
+          return res.status(400).json({ error: authError.message });
+        }
+      } else {
+        return res.status(400).json({ error: authError.message });
+      }
+    } else {
+      userId = authUser?.user?.id;
     }
-
-    const userId = authUser?.user?.id;
 
     // 2. Registrar el comercio en la base de datos
     const storePayload = {
-      name: finalStoreName,
-      slug: finalSlug,
-      vertical: vertical || 'Comercio General',
-      plan: plan || subscriptionPlan || 'basic',
-      status: status || 'active',
+      name: targetStoreName,
+      slug: targetSlug,
+      vertical: targetVertical,
+      plan: targetPlan,
+      status: targetStatus,
       owner_id: userId,
       created_at: new Date().toISOString()
     };
 
+    let storeResult: any = null;
     const { data: store, error: storeError } = await supabase
       .from('stores')
       .insert([storePayload])
       .select()
-      .single();
+      .maybeSingle();
 
     if (storeError) {
-      // Intento de fallback si la tabla se llama comercios
-      await supabase.from('comercios').insert([storePayload]);
+      const { data: fallbackStore } = await supabase
+        .from('comercios')
+        .insert([storePayload])
+        .select()
+        .maybeSingle();
+      storeResult = fallbackStore || storePayload;
+    } else {
+      storeResult = store || storePayload;
     }
 
     return res.status(200).json({
       success: true,
       message: 'Comercio y administrador creados con éxito',
-      store: store || storePayload,
-      user: authUser?.user,
+      store: storeResult,
+      user: authUser?.user || { id: userId, email: targetEmail },
       tempPassword
     });
   } catch (error: any) {
