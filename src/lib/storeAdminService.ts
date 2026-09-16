@@ -37,6 +37,7 @@ import {
   StoreHighlightsLayout,
 } from '../types';
 import { SUPERADMIN_STORES } from './superadminService';
+import { supabase } from './supabase';
 
 // ----------------------------------------------------------------------------
 // ESTADO Y PLAN DEL COMERCIO
@@ -206,6 +207,9 @@ function sanitizeCategoryItem(item: any, tenantId: string): Category | null {
 }
 
 function loadFromStorage<T>(tenantId: string, section: string, fallback: T): T {
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+    return cloneFallback(fallback);
+  }
   if (!isValidTenantId(tenantId)) {
     console.warn(`[CentralBo StoreAdmin] Intento de acceso a sección "${section}" con tenantId inválido: "${tenantId}"`);
     return cloneFallback(fallback);
@@ -269,6 +273,9 @@ function loadFromStorage<T>(tenantId: string, section: string, fallback: T): T {
 }
 
 function saveToStorage<T>(tenantId: string, section: string, data: T): void {
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+    return;
+  }
   if (!isValidTenantId(tenantId)) {
     console.warn(`[CentralBo StoreAdmin] Intento de persistir sección "${section}" con tenantId inválido: "${tenantId}"`);
     return;
@@ -433,11 +440,180 @@ export function getStoreProfile(tenantId: string): StoreProfileSettings {
   return loadFromStorage<StoreProfileSettings>(tenantId, 'profile', defaultProfile);
 }
 
-export function saveStoreProfile(
+/**
+ * Consulta la información oficial del comercio desde Supabase (tabla 'stores').
+ * Extrae name y logo_url desde sus columnas nativas, y el resto desde stores.profile.
+ * Mantiene sincronizada la caché local del tenant.
+ */
+export async function fetchStoreProfile(tenantId: string): Promise<StoreProfileSettings> {
+  if (!tenantId) {
+    return getStoreProfile(tenantId);
+  }
+
+  const cachedProfile = getStoreProfile(tenantId);
+
+  try {
+    // 1. Intentar consultar stores con columna profile
+    const { data, error } = await supabase
+      .from('stores')
+      .select('id, name, logo_url, profile')
+      .eq('id', tenantId)
+      .maybeSingle();
+
+    if (!error && data) {
+      const rawProfile = (data.profile && typeof data.profile === 'object') ? data.profile : {};
+      const remoteProfile: StoreProfileSettings = {
+        name: data.name !== undefined && data.name !== null ? String(data.name) : cachedProfile.name,
+        logoUrl: data.logo_url !== undefined && data.logo_url !== null ? String(data.logo_url) : cachedProfile.logoUrl,
+        description: rawProfile.description !== undefined ? String(rawProfile.description) : cachedProfile.description,
+        address: rawProfile.address !== undefined ? String(rawProfile.address) : cachedProfile.address,
+        phone: rawProfile.phone !== undefined ? String(rawProfile.phone) : cachedProfile.phone,
+        whatsapp: rawProfile.whatsapp !== undefined ? String(rawProfile.whatsapp) : cachedProfile.whatsapp,
+        email: rawProfile.email !== undefined ? String(rawProfile.email) : cachedProfile.email,
+        attentionInfo: rawProfile.attentionInfo !== undefined ? String(rawProfile.attentionInfo) : cachedProfile.attentionInfo,
+        socials: {
+          instagram: rawProfile.socials?.instagram !== undefined ? String(rawProfile.socials.instagram) : (cachedProfile.socials?.instagram || ''),
+          facebook: rawProfile.socials?.facebook !== undefined ? String(rawProfile.socials.facebook) : (cachedProfile.socials?.facebook || ''),
+          tiktok: rawProfile.socials?.tiktok !== undefined ? String(rawProfile.socials.tiktok) : (cachedProfile.socials?.tiktok || ''),
+          youtube: rawProfile.socials?.youtube !== undefined ? String(rawProfile.socials.youtube) : (cachedProfile.socials?.youtube || ''),
+          whatsapp: rawProfile.socials?.whatsapp !== undefined ? String(rawProfile.socials.whatsapp) : (cachedProfile.socials?.whatsapp || cachedProfile.whatsapp || ''),
+        },
+      };
+
+      saveToStorage(tenantId, 'profile', remoteProfile);
+      return remoteProfile;
+    }
+
+    // 2. Si la columna 'profile' no existe aún en el esquema (PGRST204 o 42703), consultar columnas nativas
+    if (error && (error.code === '42703' || error.code === 'PGRST204' || error.message?.includes('profile'))) {
+      const { data: baseData, error: baseErr } = await supabase
+        .from('stores')
+        .select('id, name, logo_url')
+        .eq('id', tenantId)
+        .maybeSingle();
+
+      if (!baseErr && baseData) {
+        const merged: StoreProfileSettings = {
+          ...cachedProfile,
+          name: baseData.name !== undefined && baseData.name !== null ? String(baseData.name) : cachedProfile.name,
+          logoUrl: baseData.logo_url !== undefined && baseData.logo_url !== null ? String(baseData.logo_url) : cachedProfile.logoUrl,
+        };
+        saveToStorage(tenantId, 'profile', merged);
+        return merged;
+      }
+    }
+
+    if (error) {
+      console.warn('[CentralBo StoreAdmin] Error al consultar perfil en Supabase:', error.message);
+    }
+  } catch (err) {
+    console.warn('[CentralBo StoreAdmin] Excepción al consultar perfil en Supabase:', err);
+  }
+
+  return cachedProfile;
+}
+
+/**
+ * Persiste los datos del perfil de forma centralizada en Supabase:
+ * - name -> stores.name
+ * - logoUrl -> stores.logo_url
+ * - resto de campos -> stores.profile (JSONB)
+ * La actualización queda estrictamente aislada por tenantId (store.id).
+ */
+export async function saveStoreProfile(
   tenantId: string,
   settings: StoreProfileSettings
-): void {
-  saveToStorage(tenantId, 'profile', settings);
+): Promise<{ success: boolean; error?: string }> {
+  if (!tenantId || typeof tenantId !== 'string') {
+    return { success: false, error: 'Identificador de comercio (tenantId) no válido.' };
+  }
+
+  if (!settings.name || !settings.name.trim()) {
+    return { success: false, error: 'El nombre del comercio es obligatorio.' };
+  }
+
+  const cleanName = settings.name.trim();
+  const cleanLogo = settings.logoUrl && settings.logoUrl.trim() ? settings.logoUrl.trim() : null;
+
+  const profilePayload = {
+    description: settings.description || '',
+    address: settings.address || '',
+    phone: settings.phone || '',
+    whatsapp: settings.whatsapp || '',
+    email: settings.email || '',
+    attentionInfo: settings.attentionInfo || '',
+    socials: {
+      instagram: settings.socials?.instagram || '',
+      facebook: settings.socials?.facebook || '',
+      tiktok: settings.socials?.tiktok || '',
+      youtube: settings.socials?.youtube || '',
+      whatsapp: settings.socials?.whatsapp || settings.whatsapp || '',
+    },
+  };
+
+  const now = new Date().toISOString();
+
+  try {
+    // 1. Intentar actualizar stores con profile JSONB + name + logo_url
+    const { error: fullUpdateError } = await supabase
+      .from('stores')
+      .update({
+        name: cleanName,
+        logo_url: cleanLogo,
+        profile: profilePayload,
+        updated_at: now,
+      })
+      .eq('id', tenantId);
+
+    if (!fullUpdateError) {
+      // Guardado exitoso en Supabase: actualizar caché local
+      saveToStorage(tenantId, 'profile', settings);
+      return { success: true };
+    }
+
+    // 2. Si la columna 'profile' no existe en el esquema remoto (PGRST204 o 42703)
+    if (
+      fullUpdateError.code === 'PGRST204' ||
+      fullUpdateError.code === '42703' ||
+      fullUpdateError.message?.includes('profile')
+    ) {
+      // Guardar name y logo_url en las columnas existentes en Supabase
+      const { error: baseUpdateError } = await supabase
+        .from('stores')
+        .update({
+          name: cleanName,
+          logo_url: cleanLogo,
+          updated_at: now,
+        })
+        .eq('id', tenantId);
+
+      if (baseUpdateError) {
+        return {
+          success: false,
+          error: `Error al actualizar stores en Supabase: ${baseUpdateError.message}`,
+        };
+      }
+
+      // Guardar en almacenamiento local
+      saveToStorage(tenantId, 'profile', settings);
+
+      return {
+        success: false,
+        error: "Columna 'profile' no detectada en la base de datos de Supabase. Ejecuta en el SQL Editor: ALTER TABLE stores ADD COLUMN IF NOT EXISTS profile JSONB DEFAULT '{}'::jsonb;",
+      };
+    }
+
+    return {
+      success: false,
+      error: fullUpdateError.message || 'Error desconocido al guardar en Supabase.',
+    };
+  } catch (err: any) {
+    console.error('[CentralBo StoreAdmin] Excepción al guardar perfil en Supabase:', err);
+    return {
+      success: false,
+      error: err?.message || 'Error de conexión con Supabase.',
+    };
+  }
 }
 
 // ----------------------------------------------------------------------------
@@ -534,7 +710,7 @@ export function getDefaultStoreHighlights(tenantId: string): StoreHighlightItem[
   return items;
 }
 
-export function getStoreAppearance(tenantId: string): StoreAppearanceSettings {
+export function getCachedStoreAppearance(tenantId: string): StoreAppearanceSettings {
   const plan = getStorePlan(tenantId);
   const defaultAppearance: StoreAppearanceSettings = {
     theme: 'dark',
@@ -565,34 +741,166 @@ export function getStoreAppearance(tenantId: string): StoreAppearanceSettings {
   return stored;
 }
 
-export function saveStoreAppearance(
-  tenantId: string,
-  settings: StoreAppearanceSettings
-): { success: boolean; error?: string } {
+/**
+ * Consulta la configuración de apariencia oficial desde Supabase (tabla 'stores.appearance').
+ * Supabase actúa como Fuente de Verdad Canónica.
+ * Si existe configuración en Supabase, prevalece sobre localStorage y actualiza la caché local.
+ * Si la columna no existe o falla la red, utiliza la caché local como fallback.
+ */
+export async function getStoreAppearance(tenantId: string): Promise<StoreAppearanceSettings> {
+  if (!tenantId || typeof tenantId !== 'string') {
+    return getCachedStoreAppearance(tenantId);
+  }
+
+  const cached = getCachedStoreAppearance(tenantId);
   const plan = getStorePlan(tenantId);
 
-  // Validación de seguridad de plan: Si es Basic, rechazar modificaciones Pro de colores/dominio
+  try {
+    const { data, error } = await supabase
+      .from('stores')
+      .select('id, appearance')
+      .eq('id', tenantId)
+      .maybeSingle();
+
+    if (!error && data && data.appearance && typeof data.appearance === 'object' && Object.keys(data.appearance).length > 0) {
+      const raw = data.appearance as Record<string, any>;
+      const isPro = plan === 'pro';
+
+      const remoteAppearance: StoreAppearanceSettings = {
+        theme: raw.theme === 'light' ? 'light' : 'dark',
+        brandPrimaryColor: isPro && typeof raw.brandPrimaryColor === 'string' && raw.brandPrimaryColor
+          ? raw.brandPrimaryColor
+          : (isPro ? (cached.brandPrimaryColor || '#4f46e5') : '#4f46e5'),
+        brandSecondaryColor: isPro && typeof raw.brandSecondaryColor === 'string' && raw.brandSecondaryColor
+          ? raw.brandSecondaryColor
+          : (isPro ? (cached.brandSecondaryColor || '#06b6d4') : '#06b6d4'),
+        brandAccentColor: isPro && typeof raw.brandAccentColor === 'string' && raw.brandAccentColor
+          ? raw.brandAccentColor
+          : (isPro ? (cached.brandAccentColor || '#f59e0b') : '#f59e0b'),
+        customDomain: isPro && typeof raw.customDomain === 'string' ? raw.customDomain : '',
+        domainVerified: isPro && Boolean(raw.domainVerified),
+        visualStyle: (raw.visualStyle === 'minimal' || raw.visualStyle === 'elegant') ? raw.visualStyle : 'modern',
+        showHighlights: raw.showHighlights !== undefined ? Boolean(raw.showHighlights) : true,
+        highlightsLayout: ['balanced', 'featured', 'horizontal', 'editorial', 'minimal'].includes(raw.highlightsLayout)
+          ? raw.highlightsLayout
+          : 'balanced',
+        highlights: Array.isArray(raw.highlights) && raw.highlights.length > 0
+          ? raw.highlights
+          : getDefaultStoreHighlights(tenantId),
+      };
+
+      // Actualizar caché local con la fuente canónica de Supabase
+      saveToStorage(tenantId, 'appearance', remoteAppearance);
+      return remoteAppearance;
+    }
+
+    if (error) {
+      console.warn('[CentralBo StoreAdmin] Aviso al consultar appearance en Supabase:', error.message);
+    }
+  } catch (err) {
+    console.warn('[CentralBo StoreAdmin] Excepción al consultar appearance en Supabase:', err);
+  }
+
+  // Fallback a caché local o valores predeterminados
+  return cached;
+}
+
+// Alias para consistencia de API
+export const fetchStoreAppearance = getStoreAppearance;
+
+/**
+ * Persiste la configuración de apariencia de forma centralizada en Supabase (stores.appearance).
+ * Aplica reglas estrictas de planes (Basic vs Pro) y aislamiento multi-tenant por tenantId.
+ * Únicamente retorna success=true tras la confirmación real de Supabase.
+ */
+export async function saveStoreAppearance(
+  tenantId: string,
+  settings: StoreAppearanceSettings
+): Promise<{ success: boolean; error?: string }> {
+  if (!tenantId || typeof tenantId !== 'string' || !isValidTenantId(tenantId)) {
+    return { success: false, error: 'Identificador de comercio (tenantId) no válido.' };
+  }
+
+  const plan = getStorePlan(tenantId);
+
+  // Respetar estrictamente la política Basic vs Pro
+  let appearancePayload: StoreAppearanceSettings;
+
   if (plan === 'basic') {
-    const existing = getStoreAppearance(tenantId);
-    // Permitir cambiar tema y configuración de destacados
-    const sanitized: StoreAppearanceSettings = {
+    const existing = await getStoreAppearance(tenantId);
+    appearancePayload = {
       ...existing,
-      theme: settings.theme,
+      theme: settings.theme === 'light' ? 'light' : 'dark',
       brandPrimaryColor: '#4f46e5',
       brandSecondaryColor: '#06b6d4',
       brandAccentColor: '#f59e0b',
       customDomain: '',
       domainVerified: false,
-      showHighlights: settings.showHighlights ?? existing.showHighlights,
-      highlightsLayout: settings.highlightsLayout ?? existing.highlightsLayout,
-      highlights: settings.highlights ?? existing.highlights,
+      visualStyle: (settings.visualStyle === 'minimal' || settings.visualStyle === 'elegant') ? settings.visualStyle : 'modern',
+      showHighlights: settings.showHighlights !== undefined ? Boolean(settings.showHighlights) : true,
+      highlightsLayout: ['balanced', 'featured', 'horizontal', 'editorial', 'minimal'].includes(settings.highlightsLayout || '')
+        ? settings.highlightsLayout!
+        : 'balanced',
+      highlights: Array.isArray(settings.highlights) && settings.highlights.length > 0
+        ? settings.highlights
+        : (existing.highlights && existing.highlights.length > 0 ? existing.highlights : getDefaultStoreHighlights(tenantId)),
     };
-    saveToStorage(tenantId, 'appearance', sanitized);
-    return { success: true };
+  } else {
+    appearancePayload = {
+      theme: settings.theme === 'light' ? 'light' : 'dark',
+      brandPrimaryColor: settings.brandPrimaryColor || '#4f46e5',
+      brandSecondaryColor: settings.brandSecondaryColor || '#06b6d4',
+      brandAccentColor: settings.brandAccentColor || '#f59e0b',
+      customDomain: settings.customDomain || '',
+      domainVerified: Boolean(settings.domainVerified),
+      visualStyle: (settings.visualStyle === 'minimal' || settings.visualStyle === 'elegant') ? settings.visualStyle : 'modern',
+      showHighlights: settings.showHighlights !== undefined ? Boolean(settings.showHighlights) : true,
+      highlightsLayout: ['balanced', 'featured', 'horizontal', 'editorial', 'minimal'].includes(settings.highlightsLayout || '')
+        ? settings.highlightsLayout!
+        : 'balanced',
+      highlights: Array.isArray(settings.highlights) && settings.highlights.length > 0
+        ? settings.highlights
+        : getDefaultStoreHighlights(tenantId),
+    };
   }
 
-  saveToStorage(tenantId, 'appearance', settings);
-  return { success: true };
+  const now = new Date().toISOString();
+
+  try {
+    const { data: updatedRows, error } = await supabase
+      .from('stores')
+      .update({
+        appearance: appearancePayload,
+        updated_at: now,
+      })
+      .eq('id', tenantId)
+      .select('id');
+
+    if (error) {
+      console.error('[CentralBo StoreAdmin] Error al persistir appearance en Supabase:', error);
+      return {
+        success: false,
+        error: error.message || 'Error al persistir la configuración de apariencia en Supabase.',
+      };
+    }
+
+    if (!updatedRows || updatedRows.length === 0) {
+      return {
+        success: false,
+        error: 'No se pudo actualizar el comercio en Supabase. Verifique permisos de administrador o sesión activa.',
+      };
+    }
+
+    // Persistencia remota confirmada: sincronizar la caché local de este tenant
+    saveToStorage(tenantId, 'appearance', appearancePayload);
+    return { success: true };
+  } catch (err: any) {
+    console.error('[CentralBo StoreAdmin] Excepción al persistir appearance en Supabase:', err);
+    return {
+      success: false,
+      error: err?.message || 'Error de conexión al guardar apariencia en el servidor.',
+    };
+  }
 }
 
 // ----------------------------------------------------------------------------
@@ -1490,73 +1798,61 @@ export function saveStoreProducts(
 }
 
 // ----------------------------------------------------------------------------
-// 10. PEDIDOS (Por Tenant con los 7 estados canónicos)
+// 10. PEDIDOS (Por Tenant con los 7 estados canónicos y sincronización Supabase)
 // ----------------------------------------------------------------------------
-export function getStoreOrders(tenantId: string): Order[] {
-  const defaultOrders: Order[] = [
-    {
-      id: 'ord-1001',
-      tenant_id: tenantId,
-      customer_id: null,
-      customer_name: 'Alejandro Morales',
-      customer_email: 'amorales@gmail.com',
-      customer_phone: '+591 77210982',
-      status: 'en_preparacion' as OrderStatus,
-      total: 145,
-      created_at: '2026-09-07T08:30:00Z',
-      updated_at: '2026-09-07T08:45:00Z',
-    },
-    {
-      id: 'ord-1002',
-      tenant_id: tenantId,
-      customer_id: null,
-      customer_name: 'Paola Miranda',
-      customer_email: 'pmiranda@cotas.bo',
-      customer_phone: '+591 71329845',
-      status: 'recibido' as OrderStatus,
-      total: 80,
-      created_at: '2026-09-07T09:10:00Z',
-      updated_at: '2026-09-07T09:10:00Z',
-    },
-    {
-      id: 'ord-1003',
-      tenant_id: tenantId,
-      customer_id: null,
-      customer_name: 'Gonzalo Claros',
-      customer_email: 'gclaros@yahoo.com',
-      customer_phone: '+591 76540981',
-      status: 'pagado' as OrderStatus,
-      total: 195,
-      created_at: '2026-09-06T19:20:00Z',
-      updated_at: '2026-09-06T19:35:00Z',
-    },
-    {
-      id: 'ord-1004',
-      tenant_id: tenantId,
-      customer_id: null,
-      customer_name: 'Mariana Salinas',
-      customer_email: 'msalinas@hotmail.com',
-      customer_phone: '+591 70123984',
-      status: 'completado' as OrderStatus,
-      total: 320,
-      created_at: '2026-09-05T14:10:00Z',
-      updated_at: '2026-09-05T15:30:00Z',
-    },
-    {
-      id: 'ord-1005',
-      tenant_id: tenantId,
-      customer_id: null,
-      customer_name: 'Daniel Mercado',
-      customer_email: 'dmercado@entel.bo',
-      customer_phone: '+591 72098431',
-      status: 'pendiente' as OrderStatus,
-      total: 65,
-      created_at: '2026-09-07T09:40:00Z',
-      updated_at: '2026-09-07T09:40:00Z',
-    },
-  ];
 
-  return loadFromStorage<Order[]>(tenantId, 'orders', defaultOrders);
+/**
+ * Obtiene los pedidos del tenant desde la caché local o estado inicial limpio.
+ * NO inyecta pedidos demo/ficticios. Comercios nuevos comienzan con [].
+ */
+export function getStoreOrders(tenantId: string): Order[] {
+  const loaded = loadFromStorage<Order[]>(tenantId, 'orders', []);
+  // Filtrar pedidos demo residuales de pruebas previas ('ord-100X')
+  return Array.isArray(loaded) ? loaded.filter((o) => !o.id.startsWith('ord-100')) : [];
+}
+
+/**
+ * Consulta de forma centralizada los pedidos reales en Supabase filtrando exclusivamente por tenant_id.
+ * Sincroniza la caché local y retorna la lista ordenada descendentemente por fecha.
+ */
+export async function fetchStoreOrders(tenantId: string): Promise<Order[]> {
+  if (!tenantId) return [];
+
+  try {
+    const { data, error } = await supabase
+      .from('orders')
+      .select('id, tenant_id, customer_id, customer_name, customer_email, customer_phone, status, total, created_at, updated_at')
+      .eq('tenant_id', tenantId)
+      .order('created_at', { ascending: false });
+
+    if (!error && Array.isArray(data)) {
+      const sanitizedOrders: Order[] = data.map((o: any) => ({
+        id: String(o.id),
+        tenant_id: String(o.tenant_id),
+        customer_id: o.customer_id ? String(o.customer_id) : null,
+        customer_name: o.customer_name ? String(o.customer_name) : null,
+        customer_email: o.customer_email ? String(o.customer_email) : null,
+        customer_phone: o.customer_phone ? String(o.customer_phone) : null,
+        status: (o.status || 'pendiente') as OrderStatus,
+        total: Number(o.total) || 0,
+        created_at: o.created_at || new Date().toISOString(),
+        updated_at: o.updated_at || new Date().toISOString(),
+      }));
+
+      // Mantener sincronizado el almacenamiento local del tenant sin pedidos mock
+      saveStoreOrders(tenantId, sanitizedOrders);
+      return sanitizedOrders;
+    }
+
+    if (error) {
+      console.warn('[CentralBo StoreAdmin] Error al consultar pedidos en Supabase:', error.message);
+    }
+  } catch (err) {
+    console.warn('[CentralBo StoreAdmin] Excepción remota al consultar pedidos en Supabase:', err);
+  }
+
+  // Respaldo de pedidos en caché local
+  return getStoreOrders(tenantId);
 }
 
 export function saveStoreOrders(tenantId: string, orders: Order[]): void {
@@ -1566,15 +1862,15 @@ export function saveStoreOrders(tenantId: string, orders: Order[]): void {
   }
   const sanitized = orders
     .map((o) => sanitizeOrderItem(o, tenantId))
-    .filter((o): o is Order => o !== null);
+    .filter((o): o is Order => o !== null && !o.id.startsWith('ord-100'));
   saveToStorage(tenantId, 'orders', sanitized);
 }
 
-export function updateOrderStatus(
+export async function updateOrderStatus(
   tenantId: string,
   orderId: string,
   newStatus: OrderStatus
-): { success: boolean; order?: Order } {
+): Promise<{ success: boolean; order?: Order; error?: string }> {
   // Validación estricta en runtime: debe pertenecer exclusivamente al conjunto canónico
   if (
     !newStatus ||
@@ -1582,19 +1878,40 @@ export function updateOrderStatus(
     !CANONICAL_ORDER_STATUSES.includes(newStatus)
   ) {
     console.warn(`[CentralBo StoreAdmin] Estado de pedido rechazado por no ser canónico: "${newStatus}"`);
-    return { success: false };
+    return { success: false, error: 'Estado no canónico' };
   }
 
+  const now = new Date().toISOString();
+
+  // 1. Persistencia centralizada en Supabase (tabla 'orders')
+  try {
+    const { error: remoteError } = await supabase
+      .from('orders')
+      .update({
+        status: newStatus,
+        updated_at: now,
+      })
+      .eq('id', orderId)
+      .eq('tenant_id', tenantId);
+
+    if (remoteError) {
+      console.warn('[CentralBo StoreAdmin] Error al actualizar estado en Supabase:', remoteError.message);
+    }
+  } catch (err: any) {
+    console.warn('[CentralBo StoreAdmin] Excepción remota al actualizar estado en Supabase:', err);
+  }
+
+  // 2. Actualizar caché local del tenant
   const orders = getStoreOrders(tenantId);
   const index = orders.findIndex((o) => o.id === orderId);
   if (index === -1) {
-    return { success: false };
+    return { success: false, error: 'Pedido no encontrado en la lista local' };
   }
 
   orders[index] = {
     ...orders[index],
     status: newStatus,
-    updated_at: new Date().toISOString(),
+    updated_at: now,
   };
 
   saveStoreOrders(tenantId, orders);

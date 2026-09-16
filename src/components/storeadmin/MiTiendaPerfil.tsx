@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Store as StoreIcon,
   MapPin,
@@ -13,9 +13,15 @@ import {
   CheckCircle2,
   Save,
   Image as ImageIcon,
+  Loader2,
+  AlertCircle,
 } from 'lucide-react';
 import { Store, StoreProfileSettings } from '../../types';
-import { getStoreProfile, saveStoreProfile } from '../../lib/storeAdminService';
+import {
+  getStoreProfile,
+  fetchStoreProfile,
+  saveStoreProfile,
+} from '../../lib/storeAdminService';
 
 interface MiTiendaPerfilProps {
   store: Store;
@@ -25,13 +31,56 @@ export const MiTiendaPerfil: React.FC<MiTiendaPerfilProps> = ({ store }) => {
   const [profile, setProfile] = useState<StoreProfileSettings>(() =>
     getStoreProfile(store.id)
   );
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
   const [savedSuccess, setSavedSuccess] = useState<boolean>(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const handleSave = (e: React.FormEvent) => {
+  // Cargar datos reales desde Supabase garantizando persistencia centralizada
+  useEffect(() => {
+    let mounted = true;
+    setIsLoading(true);
+    setErrorMessage(null);
+
+    fetchStoreProfile(store.id)
+      .then((remoteProfile) => {
+        if (mounted) {
+          setProfile(remoteProfile);
+        }
+      })
+      .catch((err) => {
+        console.warn('[MiTiendaPerfil] Error cargando perfil remoto:', err);
+      })
+      .finally(() => {
+        if (mounted) {
+          setIsLoading(false);
+        }
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [store.id]);
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    saveStoreProfile(store.id, profile);
-    setSavedSuccess(true);
-    setTimeout(() => setSavedSuccess(false), 3000);
+    setIsSaving(true);
+    setSavedSuccess(false);
+    setErrorMessage(null);
+
+    try {
+      const result = await saveStoreProfile(store.id, profile);
+      if (result.success) {
+        setSavedSuccess(true);
+        setTimeout(() => setSavedSuccess(false), 4000);
+      } else {
+        setErrorMessage(result.error || 'No se pudo guardar la información en Supabase.');
+      }
+    } catch (err: any) {
+      setErrorMessage(err?.message || 'Error inesperado al guardar.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -42,25 +91,55 @@ export const MiTiendaPerfil: React.FC<MiTiendaPerfilProps> = ({ store }) => {
           <h2 className="text-lg font-bold text-white flex items-center gap-2">
             <StoreIcon className="w-5 h-5 text-indigo-400" />
             <span>Perfil del Comercio</span>
+            {isLoading && (
+              <Loader2 className="w-4 h-4 text-indigo-400 animate-spin ml-2" title="Sincronizando con Supabase..." />
+            )}
           </h2>
           <p className="text-xs text-slate-400 mt-0.5">
-            Información de identidad pública, ubicación y canales de contacto directo
+            Información de identidad pública, ubicación y canales de contacto directo (almacenamiento centralizado en Supabase)
           </p>
         </div>
 
         <button
           type="submit"
-          className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-md transition cursor-pointer self-start sm:self-auto"
+          id="btn-guardar-perfil-comercio"
+          disabled={isSaving}
+          className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-800 disabled:cursor-not-allowed text-white text-xs font-semibold shadow-md transition cursor-pointer self-start sm:self-auto"
         >
-          <Save className="w-4 h-4" />
-          <span>Guardar Cambios</span>
+          {isSaving ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>Guardando...</span>
+            </>
+          ) : (
+            <>
+              <Save className="w-4 h-4" />
+              <span>Guardar Cambios</span>
+            </>
+          )}
         </button>
       </div>
 
       {savedSuccess && (
-        <div className="p-3.5 rounded-xl bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 text-xs flex items-center gap-2 animate-fadeIn">
+        <div
+          id="alerta-perfil-guardado-exitoso"
+          className="p-3.5 rounded-xl bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 text-xs flex items-center gap-2 animate-fadeIn"
+        >
           <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-emerald-400" />
-          <span>Información de perfil actualizada exitosamente para {profile.name}.</span>
+          <span>Información de perfil actualizada exitosamente en Supabase para {profile.name}.</span>
+        </div>
+      )}
+
+      {errorMessage && (
+        <div
+          id="alerta-perfil-error-guardado"
+          className="p-3.5 rounded-xl bg-rose-950/60 border border-rose-500/40 text-rose-300 text-xs flex items-start gap-2 animate-fadeIn"
+        >
+          <AlertCircle className="w-4 h-4 flex-shrink-0 text-rose-400 mt-0.5" />
+          <div className="flex-1">
+            <span className="font-semibold block mb-0.5">No se pudo guardar el perfil en Supabase</span>
+            <span className="text-[11px] text-rose-200/90">{errorMessage}</span>
+          </div>
         </div>
       )}
 

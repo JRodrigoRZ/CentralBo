@@ -24,6 +24,8 @@ export interface Store {
   store_type: StoreType;
   status: StoreStatus;
   logo_url: string | null;
+  profile?: StoreProfileSettings | Record<string, any> | null;
+  appearance?: StoreAppearanceSettings | Record<string, any> | null;
   created_at: string;
   updated_at: string;
 }

@@ -14,10 +14,12 @@ import {
   Filter,
   ArrowRight,
   Search,
+  RefreshCw,
 } from 'lucide-react';
 import { Store, Order, OrderStatus } from '../../types';
 import {
   getStoreOrders,
+  fetchStoreOrders,
   updateOrderStatus,
 } from '../../lib/storeAdminService';
 
@@ -85,13 +87,29 @@ const ALL_STATUSES: OrderStatus[] = [
 
 export const StoreAdminPedidos: React.FC<StoreAdminPedidosProps> = ({ store }) => {
   const [orders, setOrders] = useState<Order[]>(() => getStoreOrders(store.id));
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [notification, setNotification] = useState<string | null>(null);
 
+  const loadOrders = async () => {
+    setIsLoading(true);
+    setLoadError(null);
+    try {
+      const remoteOrders = await fetchStoreOrders(store.id);
+      setOrders(remoteOrders);
+    } catch (err: any) {
+      console.error('[StoreAdminPedidos] Error al recuperar pedidos:', err);
+      setLoadError(err?.message || 'Error al conectar con la base de datos de pedidos.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    setOrders(getStoreOrders(store.id));
+    loadOrders();
     setSelectedOrder(null);
     setNotification(null);
   }, [store.id]);
@@ -109,8 +127,8 @@ export const StoreAdminPedidos: React.FC<StoreAdminPedidosProps> = ({ store }) =
     return true;
   });
 
-  const handleStatusChange = (orderId: string, newStatus: OrderStatus) => {
-    const result = updateOrderStatus(store.id, orderId, newStatus);
+  const handleStatusChange = async (orderId: string, newStatus: OrderStatus) => {
+    const result = await updateOrderStatus(store.id, orderId, newStatus);
     if (result.success && result.order) {
       const updatedList = orders.map((o) => (o.id === orderId ? result.order! : o));
       setOrders(updatedList);
@@ -119,6 +137,9 @@ export const StoreAdminPedidos: React.FC<StoreAdminPedidosProps> = ({ store }) =
       }
       setNotification(`Pedido #${orderId.slice(-4).toUpperCase()} actualizado a "${ORDER_STATUS_META[newStatus].label}".`);
       setTimeout(() => setNotification(null), 3000);
+    } else if (result.error) {
+      setNotification(`Error al actualizar estado: ${result.error}`);
+      setTimeout(() => setNotification(null), 4000);
     }
   };
 
@@ -139,6 +160,17 @@ export const StoreAdminPedidos: React.FC<StoreAdminPedidosProps> = ({ store }) =
             <strong className="text-indigo-300">{store.name}</strong>
           </p>
         </div>
+
+        <button
+          type="button"
+          onClick={loadOrders}
+          disabled={isLoading}
+          className="inline-flex items-center gap-1.5 self-start sm:self-center px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 hover:border-slate-600 text-slate-300 hover:text-white text-xs font-semibold transition cursor-pointer disabled:opacity-50"
+          title="Sincronizar pedidos con la base de datos"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-indigo-400' : ''}`} />
+          <span>{isLoading ? 'Sincronizando...' : 'Actualizar'}</span>
+        </button>
       </div>
 
       {notification && (
@@ -199,7 +231,33 @@ export const StoreAdminPedidos: React.FC<StoreAdminPedidosProps> = ({ store }) =
       </div>
 
       {/* Lista de Pedidos */}
-      {filteredOrders.length === 0 ? (
+      {isLoading ? (
+        <div className="p-12 text-center rounded-2xl bg-slate-950/30 border border-dashed border-slate-800 space-y-3">
+          <div className="w-6 h-6 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-xs text-slate-400">Cargando pedidos de la base de datos...</p>
+        </div>
+      ) : loadError ? (
+        <div className="p-8 text-center rounded-2xl bg-rose-950/20 border border-rose-800/40 space-y-3 text-rose-300">
+          <AlertCircle className="w-8 h-8 text-rose-400 mx-auto" />
+          <p className="text-sm font-semibold">Error al cargar pedidos</p>
+          <p className="text-xs text-rose-300/80">{loadError}</p>
+          <button
+            type="button"
+            onClick={loadOrders}
+            className="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs hover:border-slate-500 cursor-pointer"
+          >
+            Reintentar
+          </button>
+        </div>
+      ) : orders.length === 0 ? (
+        <div className="p-12 text-center rounded-2xl bg-slate-950/30 border border-dashed border-slate-800 space-y-2">
+          <ShoppingBag className="w-10 h-10 text-slate-400 mx-auto" />
+          <p className="text-sm font-semibold text-white">No hay pedidos registrados</p>
+          <p className="text-xs text-slate-400 max-w-sm mx-auto">
+            Este comercio aún no cuenta con pedidos. Cuando los clientes completen sus pedidos desde la tienda pública, se sincronizarán aquí automáticamente.
+          </p>
+        </div>
+      ) : filteredOrders.length === 0 ? (
         <div className="p-12 text-center rounded-2xl bg-slate-950/30 border border-dashed border-slate-800 space-y-2">
           <ShoppingBag className="w-10 h-10 text-slate-400 mx-auto" />
           <p className="text-sm font-semibold text-white">No hay pedidos en este estado</p>

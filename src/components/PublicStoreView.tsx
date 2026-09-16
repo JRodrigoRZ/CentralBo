@@ -24,7 +24,9 @@ import {
 import { resolveStoreBySlug } from '../lib/multiTenantService';
 import {
   getStoreProfile,
+  fetchStoreProfile,
   getStoreAppearance,
+  getCachedStoreAppearance,
   getStoreSchedule,
   getStoreShipping,
   getStoreScheduledOrders,
@@ -128,7 +130,7 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
           slug: store.slug,
           logoUrl: profile?.logoUrl || store.logo_url,
           description: profile?.description,
-          primaryColor: appearance?.primaryColor,
+          primaryColor: appearance?.brandPrimaryColor,
         }
       : null
   );
@@ -160,7 +162,7 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
           // Cargar configuración y catálogo aislado por tenant_id
           const tenantId = resolved.id;
           const prof = getStoreProfile(tenantId);
-          const app = getStoreAppearance(tenantId);
+          const app = getCachedStoreAppearance(tenantId);
           const sch = getStoreSchedule(tenantId);
           const shp = getStoreShipping(tenantId);
           const sco = getStoreScheduledOrders(tenantId);
@@ -172,7 +174,22 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
           const gen = getGeneralSettings(tenantId);
 
           setProfile(prof);
+
+          // Sincronizar datos oficiales de perfil desde Supabase
+          fetchStoreProfile(tenantId).then((remoteProf) => {
+            if (mounted && remoteProf) {
+              setProfile(remoteProf);
+            }
+          });
+
           setAppearance(app);
+
+          // Sincronizar configuración oficial de apariencia desde Supabase
+          getStoreAppearance(tenantId).then((remoteApp) => {
+            if (mounted && remoteApp) {
+              setAppearance(remoteApp);
+            }
+          });
           setSchedule(sch);
           setShipping(shp);
           setScheduledOrders(sco);
@@ -351,8 +368,8 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
     : isRetail
     ? '#2563eb'
     : isRestaurant
-    ? (appearance.primaryColor && appearance.primaryColor !== '#2563eb' ? appearance.primaryColor : '#d97706')
-    : (appearance.primaryColor || '#2563eb');
+    ? (appearance.brandPrimaryColor && appearance.brandPrimaryColor !== '#2563eb' ? appearance.brandPrimaryColor : '#d97706')
+    : (appearance.brandPrimaryColor || '#2563eb');
   const totalCartCount = cartItems.reduce((acc, it) => acc + it.quantity, 0);
   const cartSubtotal = cartItems.reduce((acc, it) => acc + it.price * it.quantity, 0);
 

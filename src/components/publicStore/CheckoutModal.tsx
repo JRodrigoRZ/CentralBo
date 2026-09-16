@@ -40,6 +40,7 @@ import {
   saveStoreOrders,
   getStorePaymentSettings,
 } from '../../lib/storeAdminService';
+import { supabase } from '../../lib/supabase';
 import {
   getSavedCustomerProfile,
   saveCustomerProfile,
@@ -337,7 +338,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   };
 
   // Confirmar y registrar pedido
-  const handleConfirmOrder = (e: React.FormEvent) => {
+  const handleConfirmOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
 
@@ -414,9 +415,48 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     setIsProcessing(true);
 
     const orderNumber = `ORD-${Math.floor(100000 + Math.random() * 900000)}`;
-    const orderId = `order-${Date.now()}`;
+    const orderId =
+      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+            const r = (Math.random() * 16) | 0;
+            const v = c === 'x' ? r : (r & 0x3) | 0x8;
+            return v.toString(16);
+          });
 
-    // Crear registro en la persistencia del tenant
+    // 1. Persistencia centralizada en Supabase (tabla 'orders')
+    try {
+      const { error: insertError } = await supabase
+        .from('orders')
+        .insert({
+          id: orderId,
+          tenant_id: store.id,
+          customer_id: null,
+          customer_name: trimmedName.slice(0, 100),
+          customer_email: email.trim().slice(0, 120) || null,
+          customer_phone: trimmedPhone.slice(0, 25),
+          status: 'pendiente',
+          total: Number(finalTotal.toFixed(2)),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
+
+      if (insertError) {
+        console.error('[CentralBo Checkout] Error al registrar pedido en Supabase:', insertError);
+        setIsProcessing(false);
+        setFormError(
+          `No se pudo registrar el pedido en el comercio: ${insertError.message || 'Error de base de datos'}. Por favor intenta nuevamente.`
+        );
+        return;
+      }
+    } catch (err: any) {
+      console.error('[CentralBo Checkout] Excepción al registrar pedido en Supabase:', err);
+      setIsProcessing(false);
+      setFormError('Error de red al registrar el pedido. Por favor verifica tu conexión e intenta nuevamente.');
+      return;
+    }
+
+    // 2. Crear registro en la persistencia del tenant
     const newTenantOrder: Order = {
       id: orderId,
       tenant_id: store.id,
@@ -431,7 +471,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     };
 
     const existingOrders = getStoreOrders(store.id);
-    saveStoreOrders(store.id, [newTenantOrder, ...existingOrders]);
+    saveStoreOrders(store.id, [newTenantOrder, ...existingOrders.filter((o) => o.id !== orderId)]);
 
     // Crear registro completo para el cliente local
     const clientOrderRecord: PlacedOrderRecord = {

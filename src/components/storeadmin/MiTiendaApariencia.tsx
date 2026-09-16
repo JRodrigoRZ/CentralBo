@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Palette,
   Sun,
@@ -19,6 +19,7 @@ import {
 import { Store, StoreAppearanceSettings, StoreHighlightItem, StoreHighlightsLayout } from '../../types';
 import {
   getStoreAppearance,
+  getCachedStoreAppearance,
   saveStoreAppearance,
   getStorePlan,
   getDefaultStoreHighlights,
@@ -35,23 +36,57 @@ export const MiTiendaApariencia: React.FC<MiTiendaAparienciaProps> = ({ store })
   const { setTheme: setAppTheme } = useTheme();
 
   const [appearance, setAppearance] = useState<StoreAppearanceSettings>(() =>
-    getStoreAppearance(store.id)
+    getCachedStoreAppearance(store.id)
   );
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [blockedAlert, setBlockedAlert] = useState<string | null>(null);
+
+  // Sincronizar con la fuente de verdad central en Supabase
+  useEffect(() => {
+    let mounted = true;
+    getStoreAppearance(store.id)
+      .then((remote) => {
+        if (mounted && remote) {
+          setAppearance(remote);
+        }
+      })
+      .catch((err) => {
+        console.warn('[CentralBo] Error al sincronizar apariencia desde Supabase:', err);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [store.id]);
 
   const handleSelectTheme = (thm: 'light' | 'dark') => {
     setAppearance({ ...appearance, theme: thm });
     setAppTheme(thm);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    const result = saveStoreAppearance(store.id, appearance);
-    if (result.success) {
-      setSavedSuccess(true);
-      setAppTheme(appearance.theme);
-      setTimeout(() => setSavedSuccess(false), 3000);
+    if (isSaving) return;
+
+    setIsSaving(true);
+    setSaveError(null);
+    setSavedSuccess(false);
+
+    try {
+      const result = await saveStoreAppearance(store.id, appearance);
+      if (result.success) {
+        setSavedSuccess(true);
+        setAppTheme(appearance.theme);
+        setTimeout(() => setSavedSuccess(false), 3000);
+      } else {
+        setSaveError(result.error || 'No se pudo guardar la configuración en el servidor.');
+      }
+    } catch (err: any) {
+      setSaveError(err?.message || 'Error inesperado al guardar en Supabase.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -91,13 +126,26 @@ export const MiTiendaApariencia: React.FC<MiTiendaAparienciaProps> = ({ store })
 
           <button
             type="submit"
-            className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-md transition cursor-pointer"
+            disabled={isSaving}
+            className={`inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-white text-xs font-semibold shadow-md transition cursor-pointer ${
+              isSaving
+                ? 'bg-indigo-700/60 opacity-60 cursor-not-allowed'
+                : 'bg-indigo-600 hover:bg-indigo-500'
+            }`}
           >
-            <Save className="w-4 h-4" />
-            <span>Guardar Ajustes</span>
+            <Save className={`w-4 h-4 ${isSaving ? 'animate-spin' : ''}`} />
+            <span>{isSaving ? 'Guardando...' : 'Guardar Ajustes'}</span>
           </button>
         </div>
       </div>
+
+      {/* Alerta de error de guardado */}
+      {saveError && (
+        <div className="p-3.5 rounded-xl bg-red-950/60 border border-red-500/40 text-red-300 text-xs flex items-center gap-2 animate-fadeIn">
+          <AlertTriangle className="w-4 h-4 flex-shrink-0 text-red-400" />
+          <span>{saveError}</span>
+        </div>
+      )}
 
       {/* Alerta de bloqueo de plan */}
       {blockedAlert && (
@@ -113,7 +161,7 @@ export const MiTiendaApariencia: React.FC<MiTiendaAparienciaProps> = ({ store })
       {savedSuccess && (
         <div className="p-3.5 rounded-xl bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 text-xs flex items-center gap-2 animate-fadeIn">
           <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-emerald-400" />
-          <span>Configuración visual guardada correctamente.</span>
+          <span>Configuración visual guardada correctamente en Supabase.</span>
         </div>
       )}
 
