@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Clock,
   Plus,
@@ -7,10 +7,12 @@ import {
   Save,
   AlertCircle,
   Calendar,
+  Loader2,
 } from 'lucide-react';
 import { Store, StoreScheduleDay } from '../../types';
 import {
   getStoreSchedule,
+  getCachedStoreSchedule,
   saveStoreSchedule,
   calculateScheduleStatus,
 } from '../../lib/storeAdminService';
@@ -21,9 +23,39 @@ interface MiTiendaHorariosProps {
 
 export const MiTiendaHorarios: React.FC<MiTiendaHorariosProps> = ({ store }) => {
   const [schedule, setSchedule] = useState<StoreScheduleDay[]>(() =>
-    getStoreSchedule(store.id)
+    getCachedStoreSchedule(store.id)
   );
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadingError, setLoadingError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [savedSuccess, setSavedSuccess] = useState(false);
+
+  // Sincronizar horarios oficiales desde Supabase al montar o cambiar de comercio
+  useEffect(() => {
+    let mounted = true;
+    setIsLoading(true);
+    setLoadingError(null);
+
+    getStoreSchedule(store.id)
+      .then((remoteSchedule) => {
+        if (mounted) {
+          setSchedule(remoteSchedule);
+          setIsLoading(false);
+        }
+      })
+      .catch((err) => {
+        if (mounted) {
+          console.warn('[MiTiendaHorarios] Error al sincronizar horarios desde Supabase:', err);
+          setLoadingError('No se pudo sincronizar con el servidor. Mostrando horarios en caché local.');
+          setIsLoading(false);
+        }
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [store.id]);
 
   // Estado en tiempo real del comercio
   const liveStatus = calculateScheduleStatus(schedule);
@@ -93,11 +125,27 @@ export const MiTiendaHorarios: React.FC<MiTiendaHorariosProps> = ({ store }) => 
     );
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    saveStoreSchedule(store.id, schedule);
-    setSavedSuccess(true);
-    setTimeout(() => setSavedSuccess(false), 3000);
+    if (isSaving) return;
+
+    setIsSaving(true);
+    setSavedSuccess(false);
+    setSaveError(null);
+
+    try {
+      const res = await saveStoreSchedule(store.id, schedule);
+      if (res.success) {
+        setSavedSuccess(true);
+        setTimeout(() => setSavedSuccess(false), 3000);
+      } else {
+        setSaveError(res.error || 'Error al persistir los horarios en Supabase.');
+      }
+    } catch (err: any) {
+      setSaveError(err?.message || 'Error de conexión al guardar los horarios.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -116,17 +164,41 @@ export const MiTiendaHorarios: React.FC<MiTiendaHorariosProps> = ({ store }) => 
 
         <button
           type="submit"
-          className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-md transition cursor-pointer self-start sm:self-auto"
+          disabled={isSaving || isLoading}
+          className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-semibold shadow-md transition cursor-pointer self-start sm:self-auto"
         >
-          <Save className="w-4 h-4" />
-          <span>Guardar Horarios</span>
+          {isSaving ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>Guardando...</span>
+            </>
+          ) : (
+            <>
+              <Save className="w-4 h-4" />
+              <span>Guardar Horarios</span>
+            </>
+          )}
         </button>
       </div>
 
       {savedSuccess && (
         <div className="p-3.5 rounded-xl bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 text-xs flex items-center gap-2 animate-fadeIn">
           <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-emerald-400" />
-          <span>Horarios de atención guardados y sincronizados en tiempo real.</span>
+          <span>Horarios de atención guardados y sincronizados en tiempo real con Supabase.</span>
+        </div>
+      )}
+
+      {saveError && (
+        <div className="p-3.5 rounded-xl bg-rose-950/60 border border-rose-500/40 text-rose-300 text-xs flex items-center gap-2 animate-fadeIn">
+          <AlertCircle className="w-4 h-4 flex-shrink-0 text-rose-400" />
+          <span>{saveError}</span>
+        </div>
+      )}
+
+      {loadingError && (
+        <div className="p-3.5 rounded-xl bg-amber-950/60 border border-amber-500/40 text-amber-300 text-xs flex items-center gap-2 animate-fadeIn">
+          <AlertCircle className="w-4 h-4 flex-shrink-0 text-amber-400" />
+          <span>{loadingError}</span>
         </div>
       )}
 

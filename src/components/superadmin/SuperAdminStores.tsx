@@ -280,6 +280,7 @@ export const SuperAdminStores: React.FC = () => {
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmittingCreate) return;
     const errors: Record<string, string> = {};
 
     if (!newStoreForm.name.trim()) {

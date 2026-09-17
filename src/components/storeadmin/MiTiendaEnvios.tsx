@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Truck,
   DollarSign,
@@ -8,9 +8,14 @@ import {
   Save,
   AlertCircle,
   Info,
+  Loader2,
 } from 'lucide-react';
 import { Store, StoreShippingSettings } from '../../types';
-import { getStoreShipping, saveStoreShipping } from '../../lib/storeAdminService';
+import {
+  getCachedStoreShipping,
+  fetchStoreShipping,
+  saveStoreShipping,
+} from '../../lib/storeAdminService';
 
 interface MiTiendaEnviosProps {
   store: Store;
@@ -20,9 +25,39 @@ const ALL_DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado
 
 export const MiTiendaEnvios: React.FC<MiTiendaEnviosProps> = ({ store }) => {
   const [shipping, setShipping] = useState<StoreShippingSettings>(() =>
-    getStoreShipping(store.id)
+    getCachedStoreShipping(store.id)
   );
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadingError, setLoadingError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [savedSuccess, setSavedSuccess] = useState(false);
+
+  // Sincronizar configuración oficial de envíos desde Supabase al montar o cambiar de comercio
+  useEffect(() => {
+    let mounted = true;
+    setIsLoading(true);
+    setLoadingError(null);
+
+    fetchStoreShipping(store.id)
+      .then((remoteShipping) => {
+        if (mounted) {
+          setShipping(remoteShipping);
+          setIsLoading(false);
+        }
+      })
+      .catch((err) => {
+        if (mounted) {
+          console.warn('[MiTiendaEnvios] Error al sincronizar envíos desde Supabase:', err);
+          setLoadingError('No se pudo sincronizar con el servidor. Mostrando configuración en caché local.');
+          setIsLoading(false);
+        }
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [store.id]);
 
   const handleToggleDay = (day: string) => {
     setShipping((prev) => {
@@ -34,11 +69,25 @@ export const MiTiendaEnvios: React.FC<MiTiendaEnviosProps> = ({ store }) => {
     });
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    saveStoreShipping(store.id, shipping);
-    setSavedSuccess(true);
-    setTimeout(() => setSavedSuccess(false), 3000);
+    setIsSaving(true);
+    setSaveError(null);
+    setSavedSuccess(false);
+
+    try {
+      const result = await saveStoreShipping(store.id, shipping);
+      if (result.success) {
+        setSavedSuccess(true);
+        setTimeout(() => setSavedSuccess(false), 3000);
+      } else {
+        setSaveError(result.error || 'Error al persistir la configuración de envíos en el servidor.');
+      }
+    } catch (err: any) {
+      setSaveError(err?.message || 'Error de conexión al guardar configuración de envíos.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -57,10 +106,11 @@ export const MiTiendaEnvios: React.FC<MiTiendaEnviosProps> = ({ store }) => {
 
         <button
           type="submit"
-          className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-md transition cursor-pointer self-start sm:self-auto"
+          disabled={isSaving}
+          className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-semibold shadow-md transition cursor-pointer self-start sm:self-auto"
         >
-          <Save className="w-4 h-4" />
-          <span>Guardar Configuración</span>
+          {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+          <span>{isSaving ? 'Guardando...' : 'Guardar Configuración'}</span>
         </button>
       </div>
 
@@ -73,6 +123,20 @@ export const MiTiendaEnvios: React.FC<MiTiendaEnviosProps> = ({ store }) => {
           aplica una tarifa plana transparente en Bolivianos (Bs).
         </p>
       </div>
+
+      {saveError && (
+        <div className="p-3.5 rounded-xl bg-red-950/60 border border-red-500/40 text-red-300 text-xs flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 flex-shrink-0 text-red-400" />
+          <span>{saveError}</span>
+        </div>
+      )}
+
+      {loadingError && (
+        <div className="p-3.5 rounded-xl bg-amber-950/60 border border-amber-500/40 text-amber-300 text-xs flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 flex-shrink-0 text-amber-400" />
+          <span>{loadingError}</span>
+        </div>
+      )}
 
       {savedSuccess && (
         <div className="p-3.5 rounded-xl bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 text-xs flex items-center gap-2 animate-fadeIn">

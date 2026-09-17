@@ -617,6 +617,147 @@ export async function saveStoreProfile(
 }
 
 // ----------------------------------------------------------------------------
+// 2.1 GESTIÓN DE ALMACENAMIENTO DE LOGO (Supabase Storage: bucket 'store-logos')
+// ----------------------------------------------------------------------------
+
+export const ALLOWED_LOGO_MIME_TYPES = [
+  'image/png',
+  'image/jpeg',
+  'image/webp',
+  'image/svg+xml',
+];
+
+export const MAX_LOGO_SIZE_BYTES = 2 * 1024 * 1024; // 2 MB
+
+export interface UploadLogoResult {
+  success: boolean;
+  publicUrl?: string;
+  error?: string;
+}
+
+/**
+ * Sube el archivo de logo del comercio al bucket público 'store-logos' de Supabase Storage.
+ * 
+ * Reglas y Garantías:
+ * 1. Valida estrictamente el tenantId y el archivo.
+ * 2. Valida formatos permitidos (PNG, JPEG, WEBP, SVG) y tamaño máximo (2 MB).
+ * 3. Aislamiento por tenant: ruta canónica '{tenantId}/logo.{ext}'.
+ * 4. Garantiza UN SOLO LOGO VIGENTE: tras subir con upsert, elimina cualquier archivo
+ *    obsoleto con otra extensión dentro del directorio del tenant.
+ * 5. Obtiene la URL pública mediante supabase.storage.from('store-logos').getPublicUrl().
+ * 6. NO utiliza URLs temporales ni base64 persistente.
+ */
+export async function uploadStoreLogo(
+  tenantId: string,
+  file: File
+): Promise<UploadLogoResult> {
+  if (!tenantId || typeof tenantId !== 'string' || !tenantId.trim()) {
+    return { success: false, error: 'Identificador de comercio (tenantId) no válido.' };
+  }
+
+  if (!file) {
+    return { success: false, error: 'No se ha seleccionado ningún archivo de imagen.' };
+  }
+
+  if (file.size > MAX_LOGO_SIZE_BYTES) {
+    return {
+      success: false,
+      error: 'El archivo supera el tamaño máximo permitido de 2 MB (límite del bucket store-logos).',
+    };
+  }
+
+  const normalizedType = file.type?.toLowerCase() || '';
+  if (!ALLOWED_LOGO_MIME_TYPES.includes(normalizedType)) {
+    return {
+      success: false,
+      error: 'Formato no permitido. Solo se aceptan archivos PNG, JPEG/JPG, WEBP o SVG.',
+    };
+  }
+
+  // Determinar extensión limpia según MIME type
+  let ext = 'png';
+  if (normalizedType === 'image/jpeg') ext = 'jpg';
+  else if (normalizedType === 'image/webp') ext = 'webp';
+  else if (normalizedType === 'image/svg+xml') ext = 'svg';
+  else if (normalizedType === 'image/png') ext = 'png';
+  else {
+    const parts = file.name.split('.');
+    if (parts.length > 1) {
+      const candidateExt = parts.pop()?.toLowerCase();
+      if (candidateExt === 'jpeg' || candidateExt === 'jpg') ext = 'jpg';
+      else if (candidateExt === 'webp') ext = 'webp';
+      else if (candidateExt === 'svg') ext = 'svg';
+      else if (candidateExt === 'png') ext = 'png';
+    }
+  }
+
+  const cleanTenantId = tenantId.trim();
+  const targetFileName = `logo.${ext}`;
+  const targetPath = `${cleanTenantId}/${targetFileName}`;
+
+  try {
+    // 1. Subir archivo al bucket store-logos (upsert reemplaza si es idéntico nombre)
+    const { error: uploadError } = await supabase.storage
+      .from('store-logos')
+      .upload(targetPath, file, {
+        contentType: normalizedType,
+        cacheControl: '3600',
+        upsert: true,
+      });
+
+    if (uploadError) {
+      return {
+        success: false,
+        error: `Error al subir el archivo a Supabase Storage: ${uploadError.message}`,
+      };
+    }
+
+    // 2. Garantizar un solo logo vigente:
+    // Limpiar cualquier archivo previo con extensión diferente en la carpeta del tenant
+    try {
+      const { data: existingFiles } = await supabase.storage
+        .from('store-logos')
+        .list(cleanTenantId);
+
+      if (existingFiles && Array.isArray(existingFiles) && existingFiles.length > 0) {
+        const obsoleteFiles = existingFiles
+          .filter((item) => item.name !== targetFileName)
+          .map((item) => `${cleanTenantId}/${item.name}`);
+
+        if (obsoleteFiles.length > 0) {
+          await supabase.storage.from('store-logos').remove(obsoleteFiles);
+        }
+      }
+    } catch (cleanupErr) {
+      console.warn('[uploadStoreLogo] Advertencia no bloqueante al limpiar logos obsoletos:', cleanupErr);
+    }
+
+    // 3. Obtener URL pública oficial generada por Supabase Storage
+    const { data: urlData } = supabase.storage
+      .from('store-logos')
+      .getPublicUrl(targetPath);
+
+    if (!urlData?.publicUrl) {
+      return {
+        success: false,
+        error: 'No se pudo resolver la URL pública del logo en Supabase Storage.',
+      };
+    }
+
+    return {
+      success: true,
+      publicUrl: urlData.publicUrl,
+    };
+  } catch (err: any) {
+    console.error('[CentralBo StoreAdmin] Excepción en uploadStoreLogo:', err);
+    return {
+      success: false,
+      error: err?.message || 'Error de red inesperado al comunicarse con Supabase Storage.',
+    };
+  }
+}
+
+// ----------------------------------------------------------------------------
 // 3. APARIENCIA Y PLAN (Basic vs Pro)
 // ----------------------------------------------------------------------------
 export function getDefaultStoreHighlights(tenantId: string): StoreHighlightItem[] {
@@ -624,7 +765,7 @@ export function getDefaultStoreHighlights(tenantId: string): StoreHighlightItem[
 
   // 1. Envíos reales configurados
   try {
-    const shipping = getStoreShipping(tenantId);
+    const shipping = getCachedStoreShipping(tenantId);
     if (shipping && shipping.offersShipping) {
       items.push({
         id: 'shipping',
@@ -906,75 +1047,475 @@ export async function saveStoreAppearance(
 // ----------------------------------------------------------------------------
 // 4. HORARIOS
 // ----------------------------------------------------------------------------
-export function getStoreSchedule(tenantId: string): StoreScheduleDay[] {
-  return loadFromStorage<StoreScheduleDay[]>(tenantId, 'schedule', DEFAULT_WEEK_SCHEDULE);
+
+function isValidScheduleArray(data: any): data is StoreScheduleDay[] {
+  if (!Array.isArray(data) || data.length === 0) {
+    return false;
+  }
+  return data.every(
+    (item) =>
+      typeof item === 'object' &&
+      item !== null &&
+      typeof item.dayOfWeek === 'number' &&
+      typeof item.isOpen === 'boolean' &&
+      Array.isArray(item.periods)
+  );
 }
 
-export function saveStoreSchedule(
+/**
+ * Obtiene la configuración de horarios en caché local o el valor por defecto.
+ * Operación sincrónica segura para inicializaciones de interfaz y fallbacks inmediatos.
+ */
+export function getCachedStoreSchedule(tenantId: string): StoreScheduleDay[] {
+  if (!tenantId || typeof tenantId !== 'string' || !isValidTenantId(tenantId)) {
+    return JSON.parse(JSON.stringify(DEFAULT_WEEK_SCHEDULE));
+  }
+  const cached = loadFromStorage<StoreScheduleDay[]>(tenantId, 'schedule', DEFAULT_WEEK_SCHEDULE);
+  if (isValidScheduleArray(cached)) {
+    return cached;
+  }
+  return JSON.parse(JSON.stringify(DEFAULT_WEEK_SCHEDULE));
+}
+
+/**
+ * Consulta los horarios del comercio con Supabase como fuente canónica de verdad.
+ * Flujo:
+ * 1. Valida tenantId.
+ * 2. Consulta stores.schedule filtrando estrictamente por stores.id = tenantId.
+ * 3. Si Supabase devuelve un schedule válido: lo utiliza, actualiza la caché local del tenant y lo retorna.
+ * 4. Si la consulta falla o aún no tiene datos configurados: recurre al valor existente de localStorage.
+ * 5. Si tampoco existe localStorage válido, utiliza DEFAULT_WEEK_SCHEDULE.
+ * 6. Actualiza la caché local con el valor en uso sin sobrescribir Supabase automáticamente.
+ */
+export async function getStoreSchedule(tenantId: string): Promise<StoreScheduleDay[]> {
+  if (!tenantId || typeof tenantId !== 'string' || !isValidTenantId(tenantId)) {
+    return JSON.parse(JSON.stringify(DEFAULT_WEEK_SCHEDULE));
+  }
+
+  const cached = getCachedStoreSchedule(tenantId);
+
+  try {
+    const { data, error } = await supabase
+      .from('stores')
+      .select('id, schedule')
+      .eq('id', tenantId)
+      .maybeSingle();
+
+    if (!error && data && isValidScheduleArray(data.schedule)) {
+      const remoteSchedule = data.schedule as StoreScheduleDay[];
+      // Sincronizar la caché local del tenant con el valor canónico
+      saveToStorage(tenantId, 'schedule', remoteSchedule);
+      return remoteSchedule;
+    }
+
+    if (error) {
+      console.warn('[CentralBo StoreAdmin] Aviso al consultar schedule en Supabase:', error.message);
+    }
+  } catch (err) {
+    console.warn('[CentralBo StoreAdmin] Excepción al consultar schedule en Supabase:', err);
+  }
+
+  // Fallback seguro: caché local existente o DEFAULT_WEEK_SCHEDULE
+  return cached;
+}
+
+// Alias para consistencia de API con fetchStoreProfile y fetchStoreAppearance
+export const fetchStoreSchedule = getStoreSchedule;
+
+/**
+ * Persiste los horarios de atención comercial de forma centralizada en Supabase (stores.schedule).
+ * Aislamiento estricto por tenantId (stores.id = tenantId).
+ * Solo actualiza la caché local tras la confirmación exitosa de Supabase.
+ */
+export async function saveStoreSchedule(
   tenantId: string,
   schedule: StoreScheduleDay[]
-): void {
-  saveToStorage(tenantId, 'schedule', schedule);
+): Promise<{ success: boolean; error?: string }> {
+  if (!tenantId || typeof tenantId !== 'string' || !isValidTenantId(tenantId)) {
+    return { success: false, error: 'Identificador de comercio (tenantId) no válido.' };
+  }
+
+  if (!isValidScheduleArray(schedule)) {
+    return { success: false, error: 'Formato de horarios inválido o incompleto.' };
+  }
+
+  const now = new Date().toISOString();
+
+  try {
+    const { data: updatedRows, error } = await supabase
+      .from('stores')
+      .update({
+        schedule: schedule,
+        updated_at: now,
+      })
+      .eq('id', tenantId)
+      .select('id');
+
+    if (error) {
+      console.error('[CentralBo StoreAdmin] Error al persistir schedule en Supabase:', error);
+      return {
+        success: false,
+        error: error.message || 'Error al persistir la configuración de horarios en Supabase.',
+      };
+    }
+
+    if (!updatedRows || updatedRows.length === 0) {
+      return {
+        success: false,
+        error: 'No se pudo actualizar el comercio en Supabase. Verifique permisos de administrador o sesión activa.',
+      };
+    }
+
+    // Persistencia remota confirmada: actualizar la caché local de este tenant
+    saveToStorage(tenantId, 'schedule', schedule);
+    return { success: true };
+  } catch (err: any) {
+    console.error('[CentralBo StoreAdmin] Excepción al persistir schedule en Supabase:', err);
+    return {
+      success: false,
+      error: err?.message || 'Error de conexión al guardar horarios en el servidor.',
+    };
+  }
 }
 
 // ----------------------------------------------------------------------------
 // 5. ENVÍOS (La plataforma NO calcula automáticamente el costo)
 // ----------------------------------------------------------------------------
-export function getStoreShipping(tenantId: string): StoreShippingSettings {
-  const defaultShipping: StoreShippingSettings = {
-    offersShipping: true,
-    shippingType: 'fixed',
-    fixedCost: 15, // Bs 15 tarifa fija
-    minOrderAmount: 50, // Bs 50 mínimo
-    maxOrderAmount: 0, // Sin límite
-    availableDays: ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'],
-    availableHours: '11:00 a 20:30',
-  };
+export const DEFAULT_STORE_SHIPPING: StoreShippingSettings = {
+  offersShipping: true,
+  shippingType: 'fixed',
+  fixedCost: 15, // Bs 15 tarifa fija
+  minOrderAmount: 50, // Bs 50 mínimo
+  maxOrderAmount: 0, // Sin límite
+  availableDays: ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'],
+  availableHours: '11:00 a 20:30',
+};
 
-  return loadFromStorage<StoreShippingSettings>(tenantId, 'shipping', defaultShipping);
+function isValidShippingSettings(data: any): data is StoreShippingSettings {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    return false;
+  }
+  if (typeof data.offersShipping !== 'boolean') {
+    return false;
+  }
+  if (data.shippingType !== 'free' && data.shippingType !== 'fixed') {
+    return false;
+  }
+  if (typeof data.fixedCost !== 'number' || isNaN(data.fixedCost)) {
+    return false;
+  }
+  if (typeof data.minOrderAmount !== 'number' || isNaN(data.minOrderAmount)) {
+    return false;
+  }
+  if (typeof data.maxOrderAmount !== 'number' || isNaN(data.maxOrderAmount)) {
+    return false;
+  }
+  if (!Array.isArray(data.availableDays)) {
+    return false;
+  }
+  if (typeof data.availableHours !== 'string') {
+    return false;
+  }
+  return true;
 }
 
-export function saveStoreShipping(
+/**
+ * Retorna la configuración de envíos desde caché local (síncrono).
+ * Aislamiento estricto por tenantId.
+ * Fallback a DEFAULT_STORE_SHIPPING si no hay caché válida.
+ */
+export function getCachedStoreShipping(tenantId: string): StoreShippingSettings {
+  if (!tenantId || typeof tenantId !== 'string' || !isValidTenantId(tenantId)) {
+    return JSON.parse(JSON.stringify(DEFAULT_STORE_SHIPPING));
+  }
+  const cached = loadFromStorage<StoreShippingSettings>(tenantId, 'shipping', DEFAULT_STORE_SHIPPING);
+  if (isValidShippingSettings(cached)) {
+    return cached;
+  }
+  return JSON.parse(JSON.stringify(DEFAULT_STORE_SHIPPING));
+}
+
+/**
+ * Consulta la configuración de envíos del comercio con Supabase como fuente canónica.
+ * Flujo:
+ * 1. Valida tenantId.
+ * 2. Consulta stores.shipping filtrando por stores.id = tenantId.
+ * 3. Si Supabase devuelve un StoreShippingSettings válido: lo utiliza, actualiza la caché local del tenant y lo retorna.
+ * 4. Si la consulta falla o aún no tiene datos configurados: recurre al valor existente de localStorage (fallback).
+ * 5. Si tampoco existe localStorage válido, utiliza DEFAULT_STORE_SHIPPING.
+ * 6. NO sobrescribe Supabase automáticamente durante la lectura (migración conservadora).
+ */
+export async function fetchStoreShipping(tenantId: string): Promise<StoreShippingSettings> {
+  if (!tenantId || typeof tenantId !== 'string' || !isValidTenantId(tenantId)) {
+    return JSON.parse(JSON.stringify(DEFAULT_STORE_SHIPPING));
+  }
+
+  const cached = getCachedStoreShipping(tenantId);
+
+  try {
+    const { data, error } = await supabase
+      .from('stores')
+      .select('id, shipping')
+      .eq('id', tenantId)
+      .maybeSingle();
+
+    if (!error && data && isValidShippingSettings(data.shipping)) {
+      const remoteShipping = data.shipping as StoreShippingSettings;
+      // Actualizar la caché local del tenant con el valor canónico
+      saveToStorage(tenantId, 'shipping', remoteShipping);
+      return remoteShipping;
+    }
+
+    if (error) {
+      console.warn('[CentralBo StoreAdmin] Aviso al consultar shipping en Supabase:', error.message);
+    }
+  } catch (err) {
+    console.warn('[CentralBo StoreAdmin] Excepción al consultar shipping en Supabase:', err);
+  }
+
+  // Fallback seguro: caché local existente o DEFAULT_STORE_SHIPPING
+  return cached;
+}
+
+// Alias para compatibilidad de API con getStoreSchedule / fetchStoreSchedule
+export const getStoreShipping = fetchStoreShipping;
+
+/**
+ * Persiste la configuración de envíos de forma centralizada en Supabase (stores.shipping).
+ * Aislamiento estricto por tenantId (stores.id = tenantId).
+ * Solo actualiza la caché local tras la confirmación exitosa de Supabase.
+ */
+export async function saveStoreShipping(
   tenantId: string,
   settings: StoreShippingSettings
-): void {
-  saveToStorage(tenantId, 'shipping', settings);
+): Promise<{ success: boolean; error?: string }> {
+  if (!tenantId || typeof tenantId !== 'string' || !isValidTenantId(tenantId)) {
+    return { success: false, error: 'Identificador de comercio (tenantId) no válido.' };
+  }
+
+  if (!isValidShippingSettings(settings)) {
+    return { success: false, error: 'Formato de configuración de envíos inválido o incompleto.' };
+  }
+
+  const now = new Date().toISOString();
+
+  try {
+    const { data: updatedRows, error } = await supabase
+      .from('stores')
+      .update({
+        shipping: settings,
+        updated_at: now,
+      })
+      .eq('id', tenantId)
+      .select('id');
+
+    if (error) {
+      console.error('[CentralBo StoreAdmin] Error al persistir shipping en Supabase:', error);
+      return {
+        success: false,
+        error: error.message || 'Error al persistir la configuración de envíos en Supabase.',
+      };
+    }
+
+    if (!updatedRows || updatedRows.length === 0) {
+      return {
+        success: false,
+        error: 'No se pudo actualizar el comercio en Supabase. Verifique permisos de administrador o sesión activa.',
+      };
+    }
+
+    // Persistencia remota confirmada: actualizar la caché local de este tenant
+    saveToStorage(tenantId, 'shipping', settings);
+    return { success: true };
+  } catch (err: any) {
+    console.error('[CentralBo StoreAdmin] Excepción al persistir shipping en Supabase:', err);
+    return {
+      success: false,
+      error: err?.message || 'Error de conexión al guardar configuración de envíos en el servidor.',
+    };
+  }
 }
 
 // ----------------------------------------------------------------------------
 // 6. PEDIDOS PROGRAMADOS
 // ----------------------------------------------------------------------------
-export function getStoreScheduledOrders(
-  tenantId: string
-): StoreScheduledOrdersSettings {
-  const defaultScheduled: StoreScheduledOrdersSettings = {
-    enabled: true,
-    minAdvanceHours: 2, // Mínimo 2 horas de anticipación
-    maxAdvanceDays: 7, // Hasta 7 días a futuro
-    availableSlots: [
-      '11:30 - 12:30',
-      '12:30 - 13:30',
-      '13:30 - 14:30',
-      '18:30 - 19:30',
-      '19:30 - 20:30',
-      '20:30 - 21:30',
-    ],
-    specialConditions:
-      'Para pedidos con entrega programada, solicitamos confirmar su dirección con pin de WhatsApp al momento de coordinar el despacho.',
-  };
+export const DEFAULT_STORE_SCHEDULED_ORDERS: StoreScheduledOrdersSettings = {
+  enabled: true,
+  minAdvanceHours: 2, // Mínimo 2 horas de anticipación
+  maxAdvanceDays: 7, // Hasta 7 días a futuro
+  availableSlots: [
+    '11:30 - 12:30',
+    '12:30 - 13:30',
+    '13:30 - 14:30',
+    '18:30 - 19:30',
+    '19:30 - 20:30',
+    '20:30 - 21:30',
+  ],
+  specialConditions:
+    'Para pedidos con entrega programada, solicitamos confirmar su dirección con pin de WhatsApp al momento de coordinar el despacho.',
+};
 
-  return loadFromStorage<StoreScheduledOrdersSettings>(
-    tenantId,
-    'scheduled_orders',
-    defaultScheduled
-  );
+function isValidScheduledOrdersSettings(data: any): data is StoreScheduledOrdersSettings {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    return false;
+  }
+  if (typeof data.enabled !== 'boolean') {
+    return false;
+  }
+  if (typeof data.minAdvanceHours !== 'number' || isNaN(data.minAdvanceHours)) {
+    return false;
+  }
+  if (typeof data.maxAdvanceDays !== 'number' || isNaN(data.maxAdvanceDays)) {
+    return false;
+  }
+  if (!Array.isArray(data.availableSlots)) {
+    return false;
+  }
+  if (typeof data.specialConditions !== 'string') {
+    return false;
+  }
+  return true;
 }
 
-export function saveStoreScheduledOrders(
+/**
+ * Retorna la configuración de pedidos programados desde caché local (síncrono).
+ * Aislamiento estricto por tenantId.
+ * Fallback a DEFAULT_STORE_SCHEDULED_ORDERS si no hay caché válida.
+ */
+export function getCachedStoreScheduledOrders(tenantId: string): StoreScheduledOrdersSettings {
+  if (!tenantId || typeof tenantId !== 'string' || !isValidTenantId(tenantId)) {
+    return JSON.parse(JSON.stringify(DEFAULT_STORE_SCHEDULED_ORDERS));
+  }
+  const cached = loadFromStorage<StoreScheduledOrdersSettings>(
+    tenantId,
+    'scheduled_orders',
+    DEFAULT_STORE_SCHEDULED_ORDERS
+  );
+  if (isValidScheduledOrdersSettings(cached)) {
+    return cached;
+  }
+  return JSON.parse(JSON.stringify(DEFAULT_STORE_SCHEDULED_ORDERS));
+}
+
+// Alias para compatibilidad con código existente
+export const getStoreScheduledOrders = getCachedStoreScheduledOrders;
+
+/**
+ * Consulta la configuración de pedidos programados del comercio con Supabase como fuente canónica.
+ * Flujo:
+ * 1. Valida tenantId.
+ * 2. Consulta stores.scheduled_orders filtrando por stores.id = tenantId.
+ * 3. Si Supabase devuelve un StoreScheduledOrdersSettings válido: lo utiliza, actualiza la caché local del tenant y lo retorna.
+ * 4. Si la consulta falla o aún no tiene datos configurados: recurre al valor existente de localStorage (fallback).
+ * 5. Si tampoco existe localStorage válido, utiliza DEFAULT_STORE_SCHEDULED_ORDERS.
+ * 6. NO sobrescribe Supabase automáticamente durante la lectura (migración conservadora).
+ */
+export async function fetchStoreScheduledOrders(
+  tenantId: string
+): Promise<StoreScheduledOrdersSettings> {
+  if (!tenantId || typeof tenantId !== 'string' || !isValidTenantId(tenantId)) {
+    return JSON.parse(JSON.stringify(DEFAULT_STORE_SCHEDULED_ORDERS));
+  }
+
+  const cached = getCachedStoreScheduledOrders(tenantId);
+
+  try {
+    const { data, error } = await supabase
+      .from('stores')
+      .select('id, scheduled_orders')
+      .eq('id', tenantId)
+      .maybeSingle();
+
+    if (!error && data && isValidScheduledOrdersSettings(data.scheduled_orders)) {
+      const remoteScheduled = data.scheduled_orders as StoreScheduledOrdersSettings;
+      // Actualizar la caché local del tenant con el valor canónico
+      saveToStorage(tenantId, 'scheduled_orders', remoteScheduled);
+      return remoteScheduled;
+    }
+
+    if (error) {
+      console.warn(
+        '[CentralBo StoreAdmin] Aviso al consultar scheduled_orders en Supabase:',
+        error.message
+      );
+    }
+  } catch (err) {
+    console.warn(
+      '[CentralBo StoreAdmin] Excepción al consultar scheduled_orders en Supabase:',
+      err
+    );
+  }
+
+  // Fallback seguro: caché local existente o DEFAULT_STORE_SCHEDULED_ORDERS
+  return cached;
+}
+
+/**
+ * Persiste la configuración de pedidos programados de forma centralizada en Supabase (stores.scheduled_orders).
+ * Aislamiento estricto por tenantId (stores.id = tenantId).
+ * Solo actualiza la caché local tras la confirmación exitosa de Supabase.
+ */
+export async function saveStoreScheduledOrders(
   tenantId: string,
   settings: StoreScheduledOrdersSettings
-): void {
-  saveToStorage(tenantId, 'scheduled_orders', settings);
+): Promise<{ success: boolean; error?: string }> {
+  if (!tenantId || typeof tenantId !== 'string' || !isValidTenantId(tenantId)) {
+    return { success: false, error: 'Identificador de comercio (tenantId) no válido.' };
+  }
+
+  if (!isValidScheduledOrdersSettings(settings)) {
+    return {
+      success: false,
+      error: 'Formato de configuración de pedidos programados inválido o incompleto.',
+    };
+  }
+
+  const now = new Date().toISOString();
+
+  try {
+    const { data: updatedRows, error } = await supabase
+      .from('stores')
+      .update({
+        scheduled_orders: settings,
+        updated_at: now,
+      })
+      .eq('id', tenantId)
+      .select('id');
+
+    if (error) {
+      console.error(
+        '[CentralBo StoreAdmin] Error al persistir scheduled_orders en Supabase:',
+        error
+      );
+      return {
+        success: false,
+        error: error.message || 'Error al persistir la configuración de pedidos programados en Supabase.',
+      };
+    }
+
+    if (!updatedRows || updatedRows.length === 0) {
+      return {
+        success: false,
+        error:
+          'No se pudo actualizar el comercio en Supabase. Verifique permisos de administrador o sesión activa.',
+      };
+    }
+
+    // Persistencia remota confirmada: actualizar la caché local de este tenant
+    saveToStorage(tenantId, 'scheduled_orders', settings);
+    return { success: true };
+  } catch (err: any) {
+    console.error(
+      '[CentralBo StoreAdmin] Excepción al persistir scheduled_orders en Supabase:',
+      err
+    );
+    return {
+      success: false,
+      error:
+        err?.message ||
+        'Error de conexión al guardar configuración de pedidos programados en el servidor.',
+    };
+  }
 }
 
 // ----------------------------------------------------------------------------
@@ -994,21 +1535,170 @@ export const DEFAULT_PAYMENT_SETTINGS: StorePaymentSettings = {
   },
 };
 
-export function getStorePaymentSettings(tenantId: string): StorePaymentSettings {
-  const loaded = loadFromStorage<Partial<StorePaymentSettings>>(tenantId, 'payment_settings', {});
-  return {
-    cashOnDelivery: typeof loaded.cashOnDelivery === 'boolean' ? loaded.cashOnDelivery : DEFAULT_PAYMENT_SETTINGS.cashOnDelivery,
-    bankTransfer: typeof loaded.bankTransfer === 'boolean' ? loaded.bankTransfer : DEFAULT_PAYMENT_SETTINGS.bankTransfer,
-    qrSimple: typeof loaded.qrSimple === 'boolean' ? loaded.qrSimple : DEFAULT_PAYMENT_SETTINGS.qrSimple,
-    bankDetails: loaded.bankDetails || DEFAULT_PAYMENT_SETTINGS.bankDetails,
-  };
+/**
+ * Valida la integridad estructural de un objeto StorePaymentSettings.
+ * Rechaza null, arrays, tipos incompatibles y objetos sin los booleanos obligatorios.
+ */
+export function isValidPaymentSettings(data: unknown): data is StorePaymentSettings {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    return false;
+  }
+  const obj = data as Record<string, unknown>;
+  if (
+    typeof obj.cashOnDelivery !== 'boolean' ||
+    typeof obj.bankTransfer !== 'boolean' ||
+    typeof obj.qrSimple !== 'boolean'
+  ) {
+    return false;
+  }
+  if (obj.bankDetails !== undefined && obj.bankDetails !== null) {
+    if (typeof obj.bankDetails !== 'object' || Array.isArray(obj.bankDetails)) {
+      return false;
+    }
+    const bd = obj.bankDetails as Record<string, unknown>;
+    if (bd.bankName !== undefined && typeof bd.bankName !== 'string') return false;
+    if (bd.accountNumber !== undefined && typeof bd.accountNumber !== 'string') return false;
+    if (bd.accountHolder !== undefined && typeof bd.accountHolder !== 'string') return false;
+  }
+  return true;
 }
 
-export function saveStorePaymentSettings(
+/**
+ * Retorna la configuración de métodos de pago desde caché local (síncrono).
+ * Aislamiento estricto por tenantId.
+ * Fallback a DEFAULT_PAYMENT_SETTINGS si no hay caché válida.
+ * NO escribe en localStorage durante la lectura.
+ */
+export function getCachedStorePaymentSettings(tenantId: string): StorePaymentSettings {
+  if (!tenantId || typeof tenantId !== 'string' || !isValidTenantId(tenantId)) {
+    return JSON.parse(JSON.stringify(DEFAULT_PAYMENT_SETTINGS));
+  }
+  const cached = loadFromStorage<Partial<StorePaymentSettings>>(tenantId, 'payment_settings', {});
+  if (isValidPaymentSettings(cached)) {
+    return cached;
+  }
+  return JSON.parse(JSON.stringify(DEFAULT_PAYMENT_SETTINGS));
+}
+
+// Alias para compatibilidad con código existente
+export const getStorePaymentSettings = getCachedStorePaymentSettings;
+
+/**
+ * Consulta la configuración de métodos de pago del comercio con Supabase como fuente canónica.
+ * Flujo:
+ * 1. Valida tenantId.
+ * 2. Consulta stores.payment_settings filtrando por stores.id = tenantId.
+ * 3. Si Supabase devuelve un StorePaymentSettings válido: lo utiliza, actualiza la caché local del tenant y lo retorna.
+ * 4. Si la consulta falla o aún no tiene datos configurados (o {}): recurre al valor existente de localStorage (fallback).
+ * 5. Si tampoco existe localStorage válido, utiliza DEFAULT_PAYMENT_SETTINGS.
+ * 6. NO sobrescribe Supabase automáticamente durante la lectura (migración conservadora).
+ */
+export async function fetchStorePaymentSettings(
+  tenantId: string
+): Promise<StorePaymentSettings> {
+  if (!tenantId || typeof tenantId !== 'string' || !isValidTenantId(tenantId)) {
+    return JSON.parse(JSON.stringify(DEFAULT_PAYMENT_SETTINGS));
+  }
+
+  const cached = getCachedStorePaymentSettings(tenantId);
+
+  try {
+    const { data, error } = await supabase
+      .from('stores')
+      .select('id, payment_settings')
+      .eq('id', tenantId)
+      .maybeSingle();
+
+    if (!error && data && isValidPaymentSettings(data.payment_settings)) {
+      const remoteSettings = data.payment_settings as StorePaymentSettings;
+      // Actualizar la caché local del tenant con el valor canónico
+      saveToStorage(tenantId, 'payment_settings', remoteSettings);
+      return remoteSettings;
+    }
+
+    if (error) {
+      console.warn(
+        '[CentralBo StoreAdmin] Aviso al consultar payment_settings en Supabase:',
+        error.message
+      );
+    }
+  } catch (err) {
+    console.warn(
+      '[CentralBo StoreAdmin] Excepción al consultar payment_settings en Supabase:',
+      err
+    );
+  }
+
+  // Fallback seguro: caché local existente o DEFAULT_PAYMENT_SETTINGS
+  return cached;
+}
+
+/**
+ * Persiste la configuración de métodos de pago de forma centralizada en Supabase (stores.payment_settings).
+ * Aislamiento estricto por tenantId (stores.id = tenantId).
+ * Solo actualiza la caché local tras la confirmación exitosa de Supabase.
+ */
+export async function saveStorePaymentSettings(
   tenantId: string,
   settings: StorePaymentSettings
-): void {
-  saveToStorage(tenantId, 'payment_settings', settings);
+): Promise<{ success: boolean; error?: string }> {
+  if (!tenantId || typeof tenantId !== 'string' || !isValidTenantId(tenantId)) {
+    return { success: false, error: 'Identificador de comercio (tenantId) no válido.' };
+  }
+
+  if (!isValidPaymentSettings(settings)) {
+    return {
+      success: false,
+      error: 'Formato de configuración de métodos de pago inválido o incompleto.',
+    };
+  }
+
+  const now = new Date().toISOString();
+
+  try {
+    const { data: updatedRows, error } = await supabase
+      .from('stores')
+      .update({
+        payment_settings: settings,
+        updated_at: now,
+      })
+      .eq('id', tenantId)
+      .select('id');
+
+    if (error) {
+      console.error(
+        '[CentralBo StoreAdmin] Error al persistir payment_settings en Supabase:',
+        error
+      );
+      return {
+        success: false,
+        error: error.message || 'Error al persistir la configuración de métodos de pago en Supabase.',
+      };
+    }
+
+    if (!updatedRows || updatedRows.length === 0) {
+      return {
+        success: false,
+        error:
+          'No se pudo actualizar el comercio en Supabase. Verifique permisos de administrador o sesión activa.',
+      };
+    }
+
+    // Persistencia remota confirmada: actualizar la caché local de este tenant
+    saveToStorage(tenantId, 'payment_settings', settings);
+    return { success: true };
+  } catch (err: any) {
+    console.error(
+      '[CentralBo StoreAdmin] Excepción al persistir payment_settings en Supabase:',
+      err
+    );
+    return {
+      success: false,
+      error:
+        err?.message ||
+        'Error de conexión al guardar configuración de métodos de pago en el servidor.',
+    };
+  }
 }
 
 // ----------------------------------------------------------------------------

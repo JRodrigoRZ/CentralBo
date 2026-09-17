@@ -9,9 +9,18 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-const metaEnv = typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env : ({} as Record<string, string>);
-const supabaseUrl = metaEnv.VITE_SUPABASE_URL || 'https://wuerdwkcpurbtcwyqjep.supabase.co';
-const supabaseAnonKey = metaEnv.VITE_SUPABASE_ANON_KEY || 'sb_publishable_CaupILScNyFk_Kwk-oda_Q_gWniqb4g';
+const metaEnv =
+  typeof import.meta !== 'undefined' && import.meta.env
+    ? import.meta.env
+    : (typeof process !== 'undefined' && process.env ? (process.env as Record<string, string>) : ({} as Record<string, string>));
+const supabaseUrl =
+  metaEnv.VITE_SUPABASE_URL ||
+  (typeof process !== 'undefined' ? process.env.VITE_SUPABASE_URL : '') ||
+  'https://wuerdwkcpurbtcwyqjep.supabase.co';
+const supabaseAnonKey =
+  metaEnv.VITE_SUPABASE_ANON_KEY ||
+  (typeof process !== 'undefined' ? process.env.VITE_SUPABASE_ANON_KEY : '') ||
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1ZXJkd2tjcHVyYnRjd3lxamVwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg3NDk3NjksImV4cCI6MjEwNDMyNTc2OX0.H-lIv4hMO8ER3JhosGy6FSlNceWEvSEdja9FWBVfN8c';
 
 if (!supabaseUrl || !supabaseAnonKey) {
   console.warn(

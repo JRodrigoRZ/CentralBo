@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Share2,
   MessageCircle,
@@ -9,28 +9,118 @@ import {
   ExternalLink,
   CheckCircle2,
   Save,
-  Phone,
-  Mail,
-  HelpCircle,
+  Loader2,
+  AlertCircle,
 } from 'lucide-react';
 import { Store, StoreProfileSettings } from '../../types';
-import { getStoreProfile, saveStoreProfile } from '../../lib/storeAdminService';
+import {
+  getStoreProfile,
+  fetchStoreProfile,
+  saveStoreProfile,
+} from '../../lib/storeAdminService';
 
 interface MiTiendaContactoProps {
   store: Store;
 }
 
 export const MiTiendaContacto: React.FC<MiTiendaContactoProps> = ({ store }) => {
+  // 1. Carga inicial rápida desde caché local existente
   const [profile, setProfile] = useState<StoreProfileSettings>(() =>
     getStoreProfile(store.id)
   );
-  const [savedSuccess, setSavedSuccess] = useState(false);
 
-  const handleSave = (e: React.FormEvent) => {
+  // Referencia para resguardar la base canónica completa de Supabase
+  const remoteProfileRef = useRef<StoreProfileSettings | null>(null);
+
+  // Estados de interfaz
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [savedSuccess, setSavedSuccess] = useState<boolean>(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [loadingError, setLoadingError] = useState<string | null>(null);
+
+  // 2. Consulta asíncrona a Supabase para sincronizar con la fuente canónica
+  useEffect(() => {
+    let mounted = true;
+    setIsLoading(true);
+    setLoadingError(null);
+
+    fetchStoreProfile(store.id)
+      .then((remoteProfile) => {
+        if (mounted && remoteProfile) {
+          remoteProfileRef.current = remoteProfile;
+          setProfile(remoteProfile);
+        }
+      })
+      .catch((err) => {
+        console.warn('[MiTiendaContacto] Error al sincronizar con Supabase:', err);
+        if (mounted) {
+          setLoadingError('No se pudo sincronizar con Supabase. Se muestra la configuración local.');
+        }
+      })
+      .finally(() => {
+        if (mounted) {
+          setIsLoading(false);
+        }
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [store.id]);
+
+  // 3. Guardado seguro asíncrono con protección contra sobrescritura
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    saveStoreProfile(store.id, profile);
-    setSavedSuccess(true);
-    setTimeout(() => setSavedSuccess(false), 3000);
+    if (isSaving) return;
+
+    setIsSaving(true);
+    setSavedSuccess(false);
+    setSaveError(null);
+
+    try {
+      // Obtener la base canónica más reciente para proteger name, logoUrl, description, address, etc.
+      let baseProfile: StoreProfileSettings = remoteProfileRef.current || profile;
+      try {
+        const freshProfile = await fetchStoreProfile(store.id);
+        if (freshProfile) {
+          baseProfile = freshProfile;
+          remoteProfileRef.current = freshProfile;
+        }
+      } catch (err) {
+        // Continuar con la última base remota conocida en memoria si hay problema transitorio de red
+      }
+
+      // Preservar estrictamente los campos que Contacto y Redes no administra
+      const updatedProfile: StoreProfileSettings = {
+        ...baseProfile,
+        phone: profile.phone || '',
+        whatsapp: profile.whatsapp || '',
+        socials: {
+          ...(baseProfile.socials || {}),
+          instagram: profile.socials?.instagram || '',
+          facebook: profile.socials?.facebook || '',
+          tiktok: profile.socials?.tiktok || '',
+          youtube: profile.socials?.youtube || '',
+        },
+      };
+
+      // Guardar en Supabase y esperar confirmación real
+      const result = await saveStoreProfile(store.id, updatedProfile);
+
+      if (result.success) {
+        setProfile(updatedProfile);
+        remoteProfileRef.current = updatedProfile;
+        setSavedSuccess(true);
+        setTimeout(() => setSavedSuccess(false), 4000);
+      } else {
+        setSaveError(result.error || 'No se pudieron guardar los canales de contacto en Supabase.');
+      }
+    } catch (err: any) {
+      setSaveError(err?.message || 'Error inesperado al guardar canales de contacto.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const openTestLink = (url: string | undefined, type: 'whatsapp' | 'instagram' | 'facebook' | 'tiktok' | 'youtube') => {
@@ -59,6 +149,12 @@ export const MiTiendaContacto: React.FC<MiTiendaContactoProps> = ({ store }) => 
           <h2 className="text-lg font-bold text-white flex items-center gap-2">
             <Share2 className="w-5 h-5 text-indigo-400" />
             <span>Canales de Contacto y Redes Sociales</span>
+            {isLoading && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-800 text-[10px] text-slate-400 font-normal">
+                <Loader2 className="w-3 h-3 animate-spin text-indigo-400" />
+                <span>Sincronizando...</span>
+              </span>
+            )}
           </h2>
           <p className="text-xs text-slate-400 mt-0.5">
             Administra y prueba los botones directos que verán los clientes en tu tienda
@@ -67,17 +163,36 @@ export const MiTiendaContacto: React.FC<MiTiendaContactoProps> = ({ store }) => 
 
         <button
           type="submit"
-          className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-md transition cursor-pointer self-start sm:self-auto"
+          disabled={isSaving}
+          className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-semibold shadow-md transition cursor-pointer self-start sm:self-auto"
         >
-          <Save className="w-4 h-4" />
-          <span>Guardar Canales</span>
+          {isSaving ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <Save className="w-4 h-4" />
+          )}
+          <span>{isSaving ? 'Guardando...' : 'Guardar Canales'}</span>
         </button>
       </div>
 
       {savedSuccess && (
         <div className="p-3.5 rounded-xl bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 text-xs flex items-center gap-2 animate-fadeIn">
           <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-emerald-400" />
-          <span>Canales de contacto actualizados correctamente.</span>
+          <span>Canales de contacto actualizados correctamente en Supabase.</span>
+        </div>
+      )}
+
+      {saveError && (
+        <div className="p-3.5 rounded-xl bg-rose-950/60 border border-rose-500/40 text-rose-300 text-xs flex items-center gap-2 animate-fadeIn">
+          <AlertCircle className="w-4 h-4 flex-shrink-0 text-rose-400" />
+          <span>{saveError}</span>
+        </div>
+      )}
+
+      {loadingError && (
+        <div className="p-3.5 rounded-xl bg-amber-950/40 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 flex-shrink-0 text-amber-400" />
+          <span>{loadingError}</span>
         </div>
       )}
 
@@ -113,7 +228,7 @@ export const MiTiendaContacto: React.FC<MiTiendaContactoProps> = ({ store }) => 
             </label>
             <input
               type="text"
-              value={profile.whatsapp}
+              value={profile.whatsapp || ''}
               onChange={(e) => setProfile({ ...profile, whatsapp: e.target.value })}
               className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs font-mono focus:outline-none focus:border-emerald-500 transition"
               placeholder="+591 71023456"
@@ -126,7 +241,7 @@ export const MiTiendaContacto: React.FC<MiTiendaContactoProps> = ({ store }) => 
             </label>
             <input
               type="text"
-              value={profile.phone}
+              value={profile.phone || ''}
               onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
               className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs font-mono focus:outline-none focus:border-indigo-500 transition"
               placeholder="+591 2 2789012"
@@ -149,7 +264,7 @@ export const MiTiendaContacto: React.FC<MiTiendaContactoProps> = ({ store }) => 
                 <Instagram className="w-4 h-4 text-pink-400" />
                 <span className="text-xs font-bold text-white">Instagram</span>
               </div>
-              {profile.socials.instagram && (
+              {profile.socials?.instagram && (
                 <button
                   type="button"
                   onClick={() => openTestLink(profile.socials.instagram, 'instagram')}
@@ -162,11 +277,11 @@ export const MiTiendaContacto: React.FC<MiTiendaContactoProps> = ({ store }) => 
             </div>
             <input
               type="text"
-              value={profile.socials.instagram || ''}
+              value={profile.socials?.instagram || ''}
               onChange={(e) =>
                 setProfile({
                   ...profile,
-                  socials: { ...profile.socials, instagram: e.target.value },
+                  socials: { ...(profile.socials || {}), instagram: e.target.value },
                 })
               }
               className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:border-pink-500"
@@ -181,7 +296,7 @@ export const MiTiendaContacto: React.FC<MiTiendaContactoProps> = ({ store }) => 
                 <Facebook className="w-4 h-4 text-blue-400" />
                 <span className="text-xs font-bold text-white">Facebook</span>
               </div>
-              {profile.socials.facebook && (
+              {profile.socials?.facebook && (
                 <button
                   type="button"
                   onClick={() => openTestLink(profile.socials.facebook, 'facebook')}
@@ -194,11 +309,11 @@ export const MiTiendaContacto: React.FC<MiTiendaContactoProps> = ({ store }) => 
             </div>
             <input
               type="text"
-              value={profile.socials.facebook || ''}
+              value={profile.socials?.facebook || ''}
               onChange={(e) =>
                 setProfile({
                   ...profile,
-                  socials: { ...profile.socials, facebook: e.target.value },
+                  socials: { ...(profile.socials || {}), facebook: e.target.value },
                 })
               }
               className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:border-blue-500"
@@ -213,7 +328,7 @@ export const MiTiendaContacto: React.FC<MiTiendaContactoProps> = ({ store }) => 
                 <Video className="w-4 h-4 text-cyan-400" />
                 <span className="text-xs font-bold text-white">TikTok</span>
               </div>
-              {profile.socials.tiktok && (
+              {profile.socials?.tiktok && (
                 <button
                   type="button"
                   onClick={() => openTestLink(profile.socials.tiktok, 'tiktok')}
@@ -226,11 +341,11 @@ export const MiTiendaContacto: React.FC<MiTiendaContactoProps> = ({ store }) => 
             </div>
             <input
               type="text"
-              value={profile.socials.tiktok || ''}
+              value={profile.socials?.tiktok || ''}
               onChange={(e) =>
                 setProfile({
                   ...profile,
-                  socials: { ...profile.socials, tiktok: e.target.value },
+                  socials: { ...(profile.socials || {}), tiktok: e.target.value },
                 })
               }
               className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:border-cyan-500"
@@ -245,7 +360,7 @@ export const MiTiendaContacto: React.FC<MiTiendaContactoProps> = ({ store }) => 
                 <Youtube className="w-4 h-4 text-rose-500" />
                 <span className="text-xs font-bold text-white">Canal de YouTube</span>
               </div>
-              {profile.socials.youtube && (
+              {profile.socials?.youtube && (
                 <button
                   type="button"
                   onClick={() => openTestLink(profile.socials.youtube, 'youtube')}
@@ -258,11 +373,11 @@ export const MiTiendaContacto: React.FC<MiTiendaContactoProps> = ({ store }) => 
             </div>
             <input
               type="text"
-              value={profile.socials.youtube || ''}
+              value={profile.socials?.youtube || ''}
               onChange={(e) =>
                 setProfile({
                   ...profile,
-                  socials: { ...profile.socials, youtube: e.target.value },
+                  socials: { ...(profile.socials || {}), youtube: e.target.value },
                 })
               }
               className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:border-rose-500"

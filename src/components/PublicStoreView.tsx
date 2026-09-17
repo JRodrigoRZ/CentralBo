@@ -28,8 +28,16 @@ import {
   getStoreAppearance,
   getCachedStoreAppearance,
   getStoreSchedule,
+  getCachedStoreSchedule,
+  fetchStoreSchedule,
+  getCachedStoreShipping,
+  fetchStoreShipping,
   getStoreShipping,
+  getCachedStoreScheduledOrders,
+  fetchStoreScheduledOrders,
   getStoreScheduledOrders,
+  getCachedStorePaymentSettings,
+  fetchStorePaymentSettings,
   getStorePaymentSettings,
   getStoreProducts,
   getStoreCategories,
@@ -163,10 +171,10 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
           const tenantId = resolved.id;
           const prof = getStoreProfile(tenantId);
           const app = getCachedStoreAppearance(tenantId);
-          const sch = getStoreSchedule(tenantId);
-          const shp = getStoreShipping(tenantId);
-          const sco = getStoreScheduledOrders(tenantId);
-          const paySet = getStorePaymentSettings(tenantId);
+          const sch = getCachedStoreSchedule(tenantId);
+          const shp = getCachedStoreShipping(tenantId);
+          const sco = getCachedStoreScheduledOrders(tenantId);
+          const paySet = getCachedStorePaymentSettings(tenantId);
           const prods = getStoreProducts(tenantId, resolved.store_type);
           const cats = getStoreCategories(tenantId, resolved.store_type);
           const profs = getStoreProfessionals(tenantId);
@@ -190,10 +198,41 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
               setAppearance(remoteApp);
             }
           });
+
           setSchedule(sch);
+
+          // Sincronizar horarios oficiales desde Supabase
+          fetchStoreSchedule(tenantId).then((remoteSch) => {
+            if (mounted && remoteSch) {
+              setSchedule(remoteSch);
+            }
+          });
+
           setShipping(shp);
+
+          // Sincronizar configuración oficial de envíos desde Supabase
+          fetchStoreShipping(tenantId).then((remoteShp) => {
+            if (mounted && remoteShp) {
+              setShipping(remoteShp);
+            }
+          });
+
           setScheduledOrders(sco);
+
+          // Sincronizar configuración oficial de pedidos programados desde Supabase
+          fetchStoreScheduledOrders(tenantId).then((remoteSco) => {
+            if (mounted && remoteSco) {
+              setScheduledOrders(remoteSco);
+            }
+          });
           setPaymentSettings(paySet);
+
+          // Sincronizar configuración oficial de métodos de pago desde Supabase
+          fetchStorePaymentSettings(tenantId).then((remotePaySet) => {
+            if (mounted && remotePaySet) {
+              setPaymentSettings(remotePaySet);
+            }
+          });
           setProducts(prods);
           setCategories(cats);
           setProfessionals(profs);

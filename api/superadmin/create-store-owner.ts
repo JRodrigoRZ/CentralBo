@@ -18,6 +18,65 @@ function generateSecurePassword(): string {
   return pass;
 }
 
+function normalizeSlug(raw: string): string {
+  return raw
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'comercio';
+}
+
+function getNextSlugCandidate(rawSlug: string, existingSlugs: Set<string>): string {
+  const normalized = normalizeSlug(rawSlug);
+  if (!existingSlugs.has(normalized)) {
+    return normalized;
+  }
+
+  // Extraer raíz si ya terminaba en -N (ej: argentina-2 -> raíz argentina)
+  const match = normalized.match(/^(.*?)-(\d+)$/);
+  const root = match ? match[1] : normalized;
+  let counter = match ? parseInt(match[2], 10) + 1 : 2;
+
+  while (existingSlugs.has(`${root}-${counter}`)) {
+    counter++;
+  }
+  return `${root}-${counter}`;
+}
+
+function isSlugUniqueViolation(error: any): boolean {
+  if (!error) return false;
+  const msg = (error.message || '').toLowerCase();
+  const details = (error.details || '').toLowerCase();
+  return (
+    (error.code === '23505' &&
+      (msg.includes('slug') || details.includes('slug') || msg.includes('stores_slug_key'))) ||
+    msg.includes('stores_slug_key')
+  );
+}
+
+async function performRollback(
+  supabase: any,
+  createdStoreId: string | null,
+  userId: string | undefined,
+  isNewAuthUser: boolean
+) {
+  if (createdStoreId) {
+    try {
+      await supabase.from('stores').delete().eq('id', createdStoreId);
+    } catch (err) {
+      console.error('[CentralBo API] Error en rollback de stores:', err);
+    }
+  }
+  if (isNewAuthUser && userId) {
+    try {
+      await supabase.auth.admin.deleteUser(userId);
+    } catch (err) {
+      console.error('[CentralBo API] Error en rollback de Auth user:', err);
+    }
+  }
+}
+
 export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -44,6 +103,9 @@ export default async function handler(req: any, res: any) {
   }
 
   let createdStoreId: string | null = null;
+  let userId: string | undefined;
+  let isNewAuthUser = false;
+
   const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
     auth: { autoRefreshToken: false, persistSession: false }
   });
@@ -62,12 +124,14 @@ export default async function handler(req: any, res: any) {
     // Extracción de datos según el Payload real
     const targetEmail = body.ownerEmail || body.email || body.adminEmail || body.correo;
     const targetStoreName = body.name || body.storeName || 'Comercio';
-    const targetSlug = body.slug || targetStoreName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+    const rawSlugInput = (body.slug && typeof body.slug === 'string' && body.slug.trim())
+      ? body.slug.trim()
+      : targetStoreName;
     const targetOwnerName = body.ownerName || body.adminName || body.fullName || 'Administrador';
     const targetPhone = body.ownerPhone || body.phone || body.telefono || '';
     const targetStoreType = body.store_type || body.vertical || 'general';
     const targetPlanId = body.planId || body.plan || 'basic';
-    const targetStatus = body.status || 'active';
+    const targetStatus = body.status || 'activo';
 
     if (!targetEmail) {
       return res.status(400).json({ success: false, error: 'El correo electrónico es obligatorio' });
@@ -78,7 +142,6 @@ export default async function handler(req: any, res: any) {
     const tempPassword = generateSecurePassword();
 
     // 1. Crear usuario en Supabase Auth
-    let userId: string | undefined;
     let authResponseUser: any = null;
 
     const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
@@ -105,6 +168,7 @@ export default async function handler(req: any, res: any) {
         if (existing) {
           userId = existing.id;
           authResponseUser = existing;
+          isNewAuthUser = false; // Usuario preexistente: NUNCA eliminar en rollback
 
           // Sincronizar contraseña del usuario existente con la credencial generada
           const { error: updateError } = await supabase.auth.admin.updateUserById(existing.id, {
@@ -132,6 +196,7 @@ export default async function handler(req: any, res: any) {
     } else {
       userId = authUser?.user?.id;
       authResponseUser = authUser?.user;
+      isNewAuthUser = true; // Usuario creado en esta solicitud: DEBE eliminarse en rollback si falla stores o store_users
     }
 
     if (!userId) {
@@ -145,9 +210,15 @@ export default async function handler(req: any, res: any) {
     const { data: sampleList } = await supabase.from('stores').select('*').limit(1);
     const existingColumns = sampleList && sampleList.length > 0 ? Object.keys(sampleList[0]) : [];
 
+    // Consultar los slugs actuales para resolución inicial de colisiones
+    const { data: allStoresList } = await supabase.from('stores').select('slug');
+    const existingSlugs = new Set<string>((allStoresList || []).map((s: any) => s.slug).filter(Boolean));
+
+    let candidateSlug = getNextSlugCandidate(rawSlugInput, existingSlugs);
+
     const candidateStoreData: Record<string, any> = {
       name: targetStoreName,
-      slug: targetSlug,
+      slug: candidateSlug,
       status: targetStatus,
       store_type: targetStoreType,
       type: targetStoreType,
@@ -161,28 +232,58 @@ export default async function handler(req: any, res: any) {
       updated_at: new Date().toISOString()
     };
 
-    const storeInsertPayload: Record<string, any> = {};
-    if (existingColumns.length > 0) {
-      for (const col of existingColumns) {
-        if (col === 'id') continue; // El UUID lo genera Supabase
-        if (candidateStoreData[col] !== undefined) {
-          storeInsertPayload[col] = candidateStoreData[col];
+    let insertedStore: any = null;
+    let storeError: any = null;
+    const MAX_SLUG_ATTEMPTS = 15;
+
+    for (let attempt = 1; attempt <= MAX_SLUG_ATTEMPTS; attempt++) {
+      candidateStoreData.slug = candidateSlug;
+
+      const storeInsertPayload: Record<string, any> = {};
+      if (existingColumns.length > 0) {
+        for (const col of existingColumns) {
+          if (col === 'id') continue; // El UUID lo genera Supabase
+          if (candidateStoreData[col] !== undefined) {
+            storeInsertPayload[col] = candidateStoreData[col];
+          }
         }
+      } else {
+        storeInsertPayload.name = targetStoreName;
+        storeInsertPayload.slug = candidateSlug;
+        storeInsertPayload.status = targetStatus;
       }
-    } else {
-      storeInsertPayload.name = targetStoreName;
-      storeInsertPayload.slug = targetSlug;
-      storeInsertPayload.status = targetStatus;
+
+      const { data: storeData, error: err } = await supabase
+        .from('stores')
+        .insert([storeInsertPayload])
+        .select()
+        .single();
+
+      if (!err && storeData) {
+        insertedStore = storeData;
+        storeError = null;
+        break; // Inserción exitosa
+      }
+
+      storeError = err;
+
+      // Si ocurrió una colisión de slug (por concurrencia o simultaneidad), reintentar con el siguiente sufijo
+      if (isSlugUniqueViolation(err)) {
+        console.warn(
+          `[CentralBo API] Colisión de slug detectada para "${candidateSlug}" en intento ${attempt}. Calculando siguiente candidato...`
+        );
+        existingSlugs.add(candidateSlug);
+        candidateSlug = getNextSlugCandidate(candidateSlug, existingSlugs);
+      } else {
+        // Otro tipo de error: salir inmediatamente del bucle
+        break;
+      }
     }
 
-    // Insertar en 'stores'
-    const { data: insertedStore, error: storeError } = await supabase
-      .from('stores')
-      .insert([storeInsertPayload])
-      .select()
-      .single();
-
     if (storeError || !insertedStore) {
+      console.error('[CentralBo API] Error guardando en stores tras reintentos, ejecutando rollback:', storeError);
+      await performRollback(supabase, createdStoreId, userId, isNewAuthUser);
+
       return res.status(500).json({
         success: false,
         error: `Error guardando en stores: ${storeError?.message || 'Fallo desconocido'}`
@@ -190,6 +291,7 @@ export default async function handler(req: any, res: any) {
     }
 
     createdStoreId = insertedStore.id;
+    const finalAssignedSlug = insertedStore.slug;
 
     // 3. Vincular dueño en 'store_users' utilizando el contrato real de CentralBo
     const { data: storeUserData, error: storeUserError } = await supabase
@@ -206,14 +308,8 @@ export default async function handler(req: any, res: any) {
       .single();
 
     if (storeUserError || !storeUserData) {
-      // 4. RESTAURAR ROLLBACK: eliminar tienda para no dejarla huérfana
-      if (createdStoreId) {
-        try {
-          await supabase.from('stores').delete().eq('id', createdStoreId);
-        } catch (rollbackErr) {
-          console.error('[CentralBo API] Error en rollback de stores:', rollbackErr);
-        }
-      }
+      console.error('[CentralBo API] Error al vincular en store_users, ejecutando rollback integral...');
+      await performRollback(supabase, createdStoreId, userId, isNewAuthUser);
 
       return res.status(500).json({
         success: false,
@@ -228,9 +324,9 @@ export default async function handler(req: any, res: any) {
       name: targetStoreName,
       storeName: targetStoreName,
       store_name: targetStoreName,
-      slug: targetSlug,
-      storeSlug: targetSlug,
-      store_slug: targetSlug,
+      slug: finalAssignedSlug,
+      storeSlug: finalAssignedSlug,
+      store_slug: finalAssignedSlug,
       status: targetStatus,
       store_type: targetStoreType,
       planId: targetPlanId,
@@ -274,9 +370,9 @@ export default async function handler(req: any, res: any) {
       name: targetStoreName,
       storeName: targetStoreName,
       store_name: targetStoreName,
-      slug: targetSlug,
-      storeSlug: targetSlug,
-      store_slug: targetSlug,
+      slug: finalAssignedSlug,
+      storeSlug: finalAssignedSlug,
+      store_slug: finalAssignedSlug,
       ownerName: cleanOwnerName,
       owner_name: cleanOwnerName,
       fullName: cleanOwnerName,
@@ -307,7 +403,7 @@ export default async function handler(req: any, res: any) {
         success: true,
         name: targetStoreName,
         storeName: targetStoreName,
-        slug: targetSlug,
+        slug: finalAssignedSlug,
         ownerName: cleanOwnerName,
         ownerEmail: cleanEmail,
         ownerPhone: targetPhone,
@@ -319,14 +415,8 @@ export default async function handler(req: any, res: any) {
       }
     });
   } catch (error: any) {
-    // Rollback en caso de excepción general
-    if (createdStoreId) {
-      try {
-        await supabase.from('stores').delete().eq('id', createdStoreId);
-      } catch (rollbackErr) {
-        console.error('[CentralBo API] Error en rollback:', rollbackErr);
-      }
-    }
+    console.error('[CentralBo API] Excepción no controlada en creación de comercio:', error);
+    await performRollback(supabase, createdStoreId, userId, isNewAuthUser);
     return res.status(500).json({
       success: false,
       error: error.message || 'Error interno del servidor'

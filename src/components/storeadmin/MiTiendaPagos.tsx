@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   CreditCard,
   QrCode,
@@ -10,10 +10,12 @@ import {
   Building2,
   AlertCircle,
   ShieldCheck,
+  Loader2,
 } from 'lucide-react';
 import { Store, StorePaymentSettings } from '../../types';
 import {
-  getStorePaymentSettings,
+  getCachedStorePaymentSettings,
+  fetchStorePaymentSettings,
   saveStorePaymentSettings,
   getStoreProfile,
 } from '../../lib/storeAdminService';
@@ -24,16 +26,62 @@ interface MiTiendaPagosProps {
 
 export const MiTiendaPagos: React.FC<MiTiendaPagosProps> = ({ store }) => {
   const [settings, setSettings] = useState<StorePaymentSettings>(() =>
-    getStorePaymentSettings(store.id)
+    getCachedStorePaymentSettings(store.id)
   );
   const profile = getStoreProfile(store.id);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadingError, setLoadingError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [savedSuccess, setSavedSuccess] = useState(false);
 
-  const handleSave = (e: React.FormEvent) => {
+  // Sincronizar configuración oficial de métodos de pago desde Supabase al montar o cambiar de comercio
+  useEffect(() => {
+    let mounted = true;
+    setIsLoading(true);
+    setLoadingError(null);
+
+    fetchStorePaymentSettings(store.id)
+      .then((remoteSettings) => {
+        if (mounted) {
+          setSettings(remoteSettings);
+          setIsLoading(false);
+        }
+      })
+      .catch((err) => {
+        if (mounted) {
+          console.warn('[MiTiendaPagos] Error al sincronizar desde Supabase:', err);
+          setLoadingError('No se pudo sincronizar con el servidor. Mostrando configuración en caché local.');
+          setIsLoading(false);
+        }
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [store.id]);
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    saveStorePaymentSettings(store.id, settings);
-    setSavedSuccess(true);
-    setTimeout(() => setSavedSuccess(false), 3000);
+    if (isSaving) return;
+
+    setIsSaving(true);
+    setSaveError(null);
+    setSavedSuccess(false);
+
+    try {
+      const result = await saveStorePaymentSettings(store.id, settings);
+      if (result.success) {
+        setSavedSuccess(true);
+        setTimeout(() => setSavedSuccess(false), 3000);
+      } else {
+        setSaveError(result.error || 'Error al persistir la configuración de métodos de pago en Supabase.');
+      }
+    } catch (err: any) {
+      setSaveError(err?.message || 'Error de conexión al guardar configuración.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -44,6 +92,12 @@ export const MiTiendaPagos: React.FC<MiTiendaPagosProps> = ({ store }) => {
           <h2 className="text-lg font-bold text-white flex items-center gap-2">
             <CreditCard className="w-5 h-5 text-indigo-400" />
             <span>Métodos de Pago Aceptados</span>
+            {isLoading && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-800 text-slate-400 border border-slate-700">
+                <Loader2 className="w-2.5 h-2.5 animate-spin text-indigo-400" />
+                <span>Sincronizando...</span>
+              </span>
+            )}
           </h2>
           <p className="text-xs text-slate-400 mt-0.5">
             Configura los métodos de pago que acepta tu comercio. Activa o desactiva individualmente cada opción.
@@ -52,10 +106,20 @@ export const MiTiendaPagos: React.FC<MiTiendaPagosProps> = ({ store }) => {
 
         <button
           type="submit"
-          className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-md transition cursor-pointer self-start sm:self-auto"
+          disabled={isSaving}
+          className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-semibold shadow-md transition cursor-pointer self-start sm:self-auto"
         >
-          <Save className="w-4 h-4" />
-          <span>Guardar Configuración</span>
+          {isSaving ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>Guardando...</span>
+            </>
+          ) : (
+            <>
+              <Save className="w-4 h-4" />
+              <span>Guardar Configuración</span>
+            </>
+          )}
         </button>
       </div>
 
@@ -63,6 +127,20 @@ export const MiTiendaPagos: React.FC<MiTiendaPagosProps> = ({ store }) => {
         <div className="p-3.5 rounded-xl bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 text-xs flex items-center gap-2 animate-fadeIn">
           <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-emerald-400" />
           <span>Configuración de métodos de pago guardada exitosamente para {store.name}.</span>
+        </div>
+      )}
+
+      {saveError && (
+        <div className="p-3.5 rounded-xl bg-rose-950/60 border border-rose-500/40 text-rose-300 text-xs flex items-center gap-2 animate-fadeIn">
+          <AlertCircle className="w-4 h-4 flex-shrink-0 text-rose-400" />
+          <span>{saveError}</span>
+        </div>
+      )}
+
+      {loadingError && (
+        <div className="p-3 rounded-xl bg-amber-950/40 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 flex-shrink-0 text-amber-400" />
+          <span>{loadingError}</span>
         </div>
       )}
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   CalendarClock,
   Clock,
@@ -8,10 +8,13 @@ import {
   CheckCircle2,
   Save,
   Info,
+  Loader2,
+  AlertCircle,
 } from 'lucide-react';
 import { Store, StoreScheduledOrdersSettings } from '../../types';
 import {
-  getStoreScheduledOrders,
+  getCachedStoreScheduledOrders,
+  fetchStoreScheduledOrders,
   saveStoreScheduledOrders,
 } from '../../lib/storeAdminService';
 
@@ -21,10 +24,40 @@ interface MiTiendaProgramadosProps {
 
 export const MiTiendaProgramados: React.FC<MiTiendaProgramadosProps> = ({ store }) => {
   const [scheduled, setScheduled] = useState<StoreScheduledOrdersSettings>(() =>
-    getStoreScheduledOrders(store.id)
+    getCachedStoreScheduledOrders(store.id)
   );
   const [newSlotInput, setNewSlotInput] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadingError, setLoadingError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [savedSuccess, setSavedSuccess] = useState(false);
+
+  // Sincronizar configuración oficial de pedidos programados desde Supabase al montar o cambiar de comercio
+  useEffect(() => {
+    let mounted = true;
+    setIsLoading(true);
+    setLoadingError(null);
+
+    fetchStoreScheduledOrders(store.id)
+      .then((remoteScheduled) => {
+        if (mounted) {
+          setScheduled(remoteScheduled);
+          setIsLoading(false);
+        }
+      })
+      .catch((err) => {
+        if (mounted) {
+          console.warn('[MiTiendaProgramados] Error al sincronizar desde Supabase:', err);
+          setLoadingError('No se pudo sincronizar con el servidor. Mostrando configuración en caché local.');
+          setIsLoading(false);
+        }
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [store.id]);
 
   const handleAddSlot = () => {
     const trimmed = newSlotInput.trim();
@@ -43,11 +76,25 @@ export const MiTiendaProgramados: React.FC<MiTiendaProgramadosProps> = ({ store 
     }));
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    saveStoreScheduledOrders(store.id, scheduled);
-    setSavedSuccess(true);
-    setTimeout(() => setSavedSuccess(false), 3000);
+    setIsSaving(true);
+    setSaveError(null);
+    setSavedSuccess(false);
+
+    try {
+      const result = await saveStoreScheduledOrders(store.id, scheduled);
+      if (result.success) {
+        setSavedSuccess(true);
+        setTimeout(() => setSavedSuccess(false), 3000);
+      } else {
+        setSaveError(result.error || 'Error al persistir la configuración en el servidor.');
+      }
+    } catch (err: any) {
+      setSaveError(err?.message || 'Error de conexión al guardar configuración.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -66,17 +113,41 @@ export const MiTiendaProgramados: React.FC<MiTiendaProgramadosProps> = ({ store 
 
         <button
           type="submit"
-          className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-md transition cursor-pointer self-start sm:self-auto"
+          disabled={isSaving}
+          className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-semibold shadow-md transition cursor-pointer self-start sm:self-auto"
         >
-          <Save className="w-4 h-4" />
-          <span>Guardar Configuración</span>
+          {isSaving ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>Guardando...</span>
+            </>
+          ) : (
+            <>
+              <Save className="w-4 h-4" />
+              <span>Guardar Configuración</span>
+            </>
+          )}
         </button>
       </div>
+
+      {loadingError && (
+        <div className="p-3.5 rounded-xl bg-amber-950/40 border border-amber-500/40 text-amber-300 text-xs flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 flex-shrink-0 text-amber-400" />
+          <span>{loadingError}</span>
+        </div>
+      )}
+
+      {saveError && (
+        <div className="p-3.5 rounded-xl bg-rose-950/40 border border-rose-500/40 text-rose-300 text-xs flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 flex-shrink-0 text-rose-400" />
+          <span>{saveError}</span>
+        </div>
+      )}
 
       {savedSuccess && (
         <div className="p-3.5 rounded-xl bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 text-xs flex items-center gap-2 animate-fadeIn">
           <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-emerald-400" />
-          <span>Parámetros de pedidos programados actualizados correctamente.</span>
+          <span>Parámetros de pedidos programados actualizados correctamente en el servidor.</span>
         </div>
       )}
 

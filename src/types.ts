@@ -26,6 +26,10 @@ export interface Store {
   logo_url: string | null;
   profile?: StoreProfileSettings | Record<string, any> | null;
   appearance?: StoreAppearanceSettings | Record<string, any> | null;
+  schedule?: StoreScheduleDay[] | null;
+  shipping?: StoreShippingSettings | null;
+  scheduled_orders?: StoreScheduledOrdersSettings | null;
+  payment_settings?: StorePaymentSettings | Record<string, any> | null;
   created_at: string;
   updated_at: string;
 }
