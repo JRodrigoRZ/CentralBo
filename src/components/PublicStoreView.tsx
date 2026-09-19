@@ -39,8 +39,12 @@ import {
   getCachedStorePaymentSettings,
   fetchStorePaymentSettings,
   getStorePaymentSettings,
+  getCachedStoreProducts,
+  fetchStoreProducts,
   getStoreProducts,
   getStoreCategories,
+  getCachedStoreCategories,
+  fetchStoreCategories,
   getStoreProfessionals,
   getFashionSettings,
   getGeneralSettings,
@@ -175,8 +179,8 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
           const shp = getCachedStoreShipping(tenantId);
           const sco = getCachedStoreScheduledOrders(tenantId);
           const paySet = getCachedStorePaymentSettings(tenantId);
-          const prods = getStoreProducts(tenantId, resolved.store_type);
-          const cats = getStoreCategories(tenantId, resolved.store_type);
+          const prods = getCachedStoreProducts(tenantId);
+          const cats = getCachedStoreCategories(tenantId);
           const profs = getStoreProfessionals(tenantId);
           const fsh = getFashionSettings(tenantId);
           const gen = getGeneralSettings(tenantId);
@@ -235,6 +239,20 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
           });
           setProducts(prods);
           setCategories(cats);
+
+          // Sincronizar productos oficiales desde Supabase (Fuente Canónica)
+          fetchStoreProducts(tenantId).then((remoteProds) => {
+            if (mounted && Array.isArray(remoteProds)) {
+              setProducts(remoteProds);
+            }
+          });
+
+          // Sincronizar categorías oficiales desde Supabase
+          fetchStoreCategories(tenantId).then((remoteCats) => {
+            if (mounted && Array.isArray(remoteCats)) {
+              setCategories(remoteCats);
+            }
+          });
           setProfessionals(profs);
           setFashionSettings(fsh);
           setGeneralSettings(gen);

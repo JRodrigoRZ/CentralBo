@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Package,
   Plus,
@@ -18,13 +18,23 @@ import {
   Sparkles,
   Copy,
   ExternalLink,
+  Loader2,
+  Scissors,
+  Utensils,
+  X,
 } from 'lucide-react';
 import { Store, Product, Category, ProductStatus } from '../../types';
 import {
-  getStoreProducts,
-  saveStoreProducts,
-  getStoreCategories,
+  getCachedStoreProducts,
+  fetchStoreProducts,
+  createStoreProduct,
+  updateStoreProduct,
+  deleteStoreProduct,
+  toggleStoreProductAvailability,
+  getCachedStoreCategories,
+  fetchStoreCategories,
   getStoreProfessionals,
+  isValidUUID,
 } from '../../lib/storeAdminService';
 
 interface CatalogoProductosProps {
@@ -33,10 +43,43 @@ interface CatalogoProductosProps {
 
 export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) => {
   const [products, setProducts] = useState<Product[]>(() =>
-    getStoreProducts(store.id, store.store_type)
+    getCachedStoreProducts(store.id)
   );
-  const categories = getStoreCategories(store.id, store.store_type);
+  const [categories, setCategories] = useState<Category[]>(() =>
+    getCachedStoreCategories(store.id)
+  );
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
   const professionals = getStoreProfessionals(store.id);
+
+  // Sincronizar catálogo y categorías oficiales desde Supabase (Fuente Canónica)
+  useEffect(() => {
+    let mounted = true;
+    setIsLoading(true);
+
+    Promise.all([
+      fetchStoreProducts(store.id),
+      fetchStoreCategories(store.id),
+    ])
+      .then(([remoteProds, remoteCats]) => {
+        if (!mounted) return;
+        if (Array.isArray(remoteProds)) {
+          setProducts(remoteProds);
+        }
+        if (Array.isArray(remoteCats)) {
+          setCategories(remoteCats);
+        }
+        setIsLoading(false);
+      })
+      .catch((err) => {
+        console.warn('[CatalogoProductos] Error al consultar catálogo en Supabase:', err);
+        if (mounted) setIsLoading(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [store.id]);
 
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -46,6 +89,14 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
   const [currentProduct, setCurrentProduct] = useState<Partial<Product> | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [notification, setNotification] = useState<string | null>(null);
+
+  // Inputs temporales para adición de atributos verticales
+  const [newSizeInput, setNewSizeInput] = useState<string>('');
+  const [newColorName, setNewColorName] = useState<string>('');
+  const [newColorHex, setNewColorHex] = useState<string>('#000000');
+  const [newModifierName, setNewModifierName] = useState<string>('');
+  const [newModifierPrice, setNewModifierPrice] = useState<string>('');
+  const [newComboItemInput, setNewComboItemInput] = useState<string>('');
 
   // Filtrado de productos
   const filteredProducts = products.filter((p) => {
@@ -59,11 +110,16 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
   });
 
   const handleOpenCreate = () => {
-    const defaultCat = categories[0]?.id || '';
+    setNewSizeInput('');
+    setNewColorName('');
+    setNewColorHex('#000000');
+    setNewModifierName('');
+    setNewModifierPrice('');
+    setNewComboItemInput('');
+    const defaultCat = categories[0]?.id && isValidUUID(categories[0]?.id) ? categories[0].id : '';
     const newProd: Partial<Product> = {
-      id: `prod-${Date.now()}`,
       tenant_id: store.id,
-      category_id: defaultCat,
+      category_id: defaultCat || null,
       name: '',
       description: '',
       price: 0,
@@ -78,9 +134,13 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
         modifiers: store.store_type === 'restaurante' ? [] : undefined,
         kitchen_notes_allowed: store.store_type === 'restaurante',
         is_combo: false,
+        combo_items: store.store_type === 'restaurante' ? [] : undefined,
         sizes: store.store_type === 'moda' ? ['S', 'M', 'L'] : undefined,
         colors: store.store_type === 'moda' ? [{ name: 'Negro', hex: '#000000' }] : undefined,
+        is_service: store.store_type === 'servicios' ? true : undefined,
         duration_minutes: store.store_type === 'servicios' ? 45 : undefined,
+        specialty: store.store_type === 'servicios' ? '' : undefined,
+        professional_name: store.store_type === 'servicios' ? '' : undefined,
         professional_id: store.store_type === 'servicios' ? professionals[0]?.id || '' : undefined,
       },
     };
@@ -89,33 +149,43 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
   };
 
   const handleOpenEdit = (p: Product) => {
+    setNewSizeInput('');
+    setNewColorName('');
+    setNewColorHex('#000000');
+    setNewModifierName('');
+    setNewModifierPrice('');
+    setNewComboItemInput('');
     setCurrentProduct({ ...p, attributes: { ...p.attributes } });
     setIsEditing(true);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (window.confirm('¿Estás seguro de eliminar este producto del catálogo?')) {
-      const updated = products.filter((p) => p.id !== id);
-      setProducts(updated);
-      saveStoreProducts(store.id, updated);
-      showNotification('Producto eliminado correctamente.');
+      const res = await deleteStoreProduct(store.id, id);
+      if (res.success) {
+        setProducts((prev) => prev.filter((p) => p.id !== id));
+        showNotification('Producto eliminado correctamente.');
+      } else {
+        showNotification(res.error || 'Error al eliminar el producto.');
+      }
     }
   };
 
-  const handleToggleAvailability = (p: Product) => {
-    const updated = products.map((item) =>
-      item.id === p.id ? { ...item, is_available: !item.is_available } : item
-    );
-    setProducts(updated);
-    saveStoreProducts(store.id, updated);
-    showNotification(
-      `Disponibilidad de "${p.name}" cambiada a ${!p.is_available ? 'Disponible' : 'Agotado'}.`
-    );
+  const handleToggleAvailability = async (p: Product) => {
+    const res = await toggleStoreProductAvailability(store.id, p.id, p.is_available);
+    if (res.success && res.product) {
+      setProducts((prev) => prev.map((item) => (item.id === p.id ? res.product! : item)));
+      showNotification(
+        `Disponibilidad de "${p.name}" cambiada a ${res.product.is_available ? 'Disponible' : 'Agotado'}.`
+      );
+    } else {
+      showNotification(res.error || 'Error al cambiar la disponibilidad.');
+    }
   };
 
-  const handleSaveProduct = (e: React.FormEvent) => {
+  const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!currentProduct) return;
+    if (!currentProduct || isSaving) return;
 
     // 1. Validación runtime estricta de Nombre
     if (
@@ -164,50 +234,134 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
     }
 
     // 5. Límite estricto de descripción (máx 1000 caracteres)
-    const cleanDescription = typeof currentProduct.description === 'string'
-      ? currentProduct.description.slice(0, 1000)
-      : null;
+    const cleanDescription =
+      typeof currentProduct.description === 'string' && currentProduct.description.trim()
+        ? currentProduct.description.trim().slice(0, 1000)
+        : null;
 
     const cleanName = currentProduct.name.trim().slice(0, 150);
 
-    const exists = products.some((p) => p.id === currentProduct.id);
-    let updated: Product[];
+    const baseAttributes = (currentProduct.attributes && typeof currentProduct.attributes === 'object')
+      ? currentProduct.attributes
+      : {};
 
-    // Normalizar objeto descartando propiedades arbitrarias
     const cleanAttributes: Record<string, unknown> = {
-      ...(currentProduct.attributes || {}),
+      ...baseAttributes,
       previous_price: cleanPrevPrice,
       offer_price: cleanOfferPrice,
     };
 
-    const targetId = currentProduct.id || `prod-${Date.now()}`;
-    const normalizedProduct: Product = {
-      id: targetId,
-      tenant_id: store.id,
-      category_id: typeof currentProduct.category_id === 'string' ? currentProduct.category_id : null,
-      name: cleanName,
-      description: cleanDescription,
-      price: numPrice,
-      is_available: currentProduct.is_available ?? true,
-      image_url: typeof currentProduct.image_url === 'string' ? currentProduct.image_url : null,
-      status: currentProduct.status === 'inactivo' || currentProduct.status === 'agotado' ? currentProduct.status : 'activo',
-      attributes: cleanAttributes,
-      created_at: currentProduct.created_at || new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-
-    if (exists) {
-      updated = products.map((p) => (p.id === targetId ? normalizedProduct : p));
-      showNotification('Producto actualizado exitosamente.');
-    } else {
-      updated = [normalizedProduct, ...products];
-      showNotification('Nuevo producto añadido al catálogo.');
+    // Procesar atributos según el vertical manteniendo los existentes
+    if (store.store_type === 'moda') {
+      if (Array.isArray(baseAttributes.sizes)) {
+        cleanAttributes.sizes = baseAttributes.sizes
+          .filter((s: unknown) => typeof s === 'string' && s.trim())
+          .map((s: string) => s.trim())
+          .slice(0, 20);
+      }
+      if (Array.isArray(baseAttributes.colors)) {
+        cleanAttributes.colors = baseAttributes.colors
+          .filter((c: any) => c && typeof c === 'object' && typeof c.name === 'string' && c.name.trim())
+          .map((c: any) => ({
+            name: String(c.name).trim().slice(0, 50),
+            hex: typeof c.hex === 'string' && c.hex.trim() ? c.hex.trim() : '#000000',
+          }))
+          .slice(0, 20);
+      }
+    } else if (store.store_type === 'restaurante') {
+      if (Array.isArray(baseAttributes.modifiers)) {
+        cleanAttributes.modifiers = baseAttributes.modifiers
+          .filter((m: any) => m && typeof m === 'object' && typeof m.name === 'string' && m.name.trim())
+          .map((m: any) => ({
+            name: String(m.name).trim().slice(0, 100),
+            price: typeof m.price === 'number' && Number.isFinite(m.price) ? Math.max(0, m.price) : 0,
+          }))
+          .slice(0, 30);
+      }
+      cleanAttributes.is_combo = Boolean(baseAttributes.is_combo);
+      if (Array.isArray(baseAttributes.combo_items)) {
+        cleanAttributes.combo_items = baseAttributes.combo_items
+          .filter((ci: unknown) => typeof ci === 'string' && ci.trim())
+          .map((ci: string) => ci.trim().slice(0, 150))
+          .slice(0, 30);
+      }
+    } else if (store.store_type === 'servicios') {
+      cleanAttributes.is_service = baseAttributes.is_service !== false;
+      const rawDur = Number(baseAttributes.duration_minutes);
+      cleanAttributes.duration_minutes = Number.isFinite(rawDur) && rawDur > 0 ? rawDur : 45;
+      cleanAttributes.specialty = typeof baseAttributes.specialty === 'string' ? baseAttributes.specialty.trim().slice(0, 100) : '';
+      cleanAttributes.professional_name = typeof baseAttributes.professional_name === 'string' ? baseAttributes.professional_name.trim().slice(0, 100) : '';
+      if (typeof baseAttributes.professional_id === 'string' && baseAttributes.professional_id.trim()) {
+        cleanAttributes.professional_id = baseAttributes.professional_id.trim();
+      }
     }
 
-    setProducts(updated);
-    saveStoreProducts(store.id, updated);
-    setIsEditing(false);
-    setCurrentProduct(null);
+    const validCategoryId =
+      typeof currentProduct.category_id === 'string' && isValidUUID(currentProduct.category_id)
+        ? currentProduct.category_id.trim()
+        : null;
+
+    const isEditMode = Boolean(currentProduct.id && isValidUUID(currentProduct.id));
+
+    setIsSaving(true);
+
+    if (isEditMode && currentProduct.id) {
+      const res = await updateStoreProduct(store.id, currentProduct.id, {
+        name: cleanName,
+        price: numPrice,
+        description: cleanDescription,
+        category_id: validCategoryId,
+        is_available: currentProduct.is_available ?? true,
+        image_url:
+          typeof currentProduct.image_url === 'string' && currentProduct.image_url.trim()
+            ? currentProduct.image_url.trim()
+            : null,
+        status:
+          currentProduct.status === 'inactivo' || currentProduct.status === 'borrador'
+            ? currentProduct.status
+            : 'activo',
+        attributes: cleanAttributes,
+      });
+
+      setIsSaving(false);
+
+      if (res.success && res.product) {
+        setProducts((prev) => prev.map((p) => (p.id === res.product!.id ? res.product! : p)));
+        showNotification('Producto actualizado exitosamente en Supabase.');
+        setIsEditing(false);
+        setCurrentProduct(null);
+      } else {
+        showNotification(res.error || 'Error al actualizar el producto en el servidor.');
+      }
+    } else {
+      const res = await createStoreProduct(store.id, {
+        name: cleanName,
+        price: numPrice,
+        description: cleanDescription,
+        category_id: validCategoryId,
+        is_available: currentProduct.is_available ?? true,
+        image_url:
+          typeof currentProduct.image_url === 'string' && currentProduct.image_url.trim()
+            ? currentProduct.image_url.trim()
+            : null,
+        status:
+          currentProduct.status === 'inactivo' || currentProduct.status === 'borrador'
+            ? currentProduct.status
+            : 'activo',
+        attributes: cleanAttributes,
+      });
+
+      setIsSaving(false);
+
+      if (res.success && res.product) {
+        setProducts((prev) => [res.product!, ...prev.filter((p) => p.id !== res.product!.id)]);
+        showNotification('Nuevo producto añadido al catálogo en Supabase.');
+        setIsEditing(false);
+        setCurrentProduct(null);
+      } else {
+        showNotification(res.error || 'Error al crear el producto en el servidor.');
+      }
+    }
   };
 
   const copyShareLink = (productId: string) => {
@@ -539,16 +693,16 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
 
                 <div>
                   <label className="block text-xs font-medium text-slate-300 mb-1">
-                    Categoría *
+                    Categoría
                   </label>
                   <select
-                    required
                     value={currentProduct.category_id || ''}
                     onChange={(e) =>
-                      setCurrentProduct({ ...currentProduct, category_id: e.target.value })
+                      setCurrentProduct({ ...currentProduct, category_id: e.target.value || null })
                     }
                     className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-indigo-500"
                   >
+                    <option value="">Sin categoría (General)</option>
                     {categories.map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.name}
@@ -645,6 +799,461 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
                 </div>
               </div>
 
+              {/* Atributos Específicos según Vertical */}
+              {store.store_type === 'moda' && (
+                <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-700/80 space-y-4">
+                  <div className="flex items-center gap-2 text-xs font-bold text-indigo-400 uppercase tracking-wider">
+                    <Shirt className="w-4 h-4" />
+                    <span>Configuración de Moda</span>
+                  </div>
+
+                  {/* Tallas */}
+                  <div>
+                    <label className="block text-xs font-medium text-slate-300 mb-1.5">
+                      Tallas Disponibles
+                    </label>
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                      {((currentProduct.attributes?.sizes as string[]) || []).map((size, idx) => (
+                        <span
+                          key={idx}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 text-white text-xs"
+                        >
+                          <span className="font-semibold">{size}</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const curSizes = (currentProduct.attributes?.sizes as string[]) || [];
+                              const updated = curSizes.filter((_, i) => i !== idx);
+                              setCurrentProduct({
+                                ...currentProduct,
+                                attributes: { ...currentProduct.attributes, sizes: updated },
+                              });
+                            }}
+                            className="text-slate-400 hover:text-rose-400 p-0.5 cursor-pointer"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
+                      ))}
+                      {(!currentProduct.attributes?.sizes || (currentProduct.attributes.sizes as string[]).length === 0) && (
+                        <span className="text-xs text-slate-500 italic">No hay tallas agregadas</span>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newSizeInput}
+                        onChange={(e) => setNewSizeInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            if (newSizeInput.trim()) {
+                              const curSizes = (currentProduct.attributes?.sizes as string[]) || [];
+                              if (!curSizes.includes(newSizeInput.trim()) && curSizes.length < 20) {
+                                setCurrentProduct({
+                                  ...currentProduct,
+                                  attributes: { ...currentProduct.attributes, sizes: [...curSizes, newSizeInput.trim()] },
+                                });
+                                setNewSizeInput('');
+                              }
+                            }
+                          }
+                        }}
+                        placeholder="Ej: S, M, L, XL, 38, 40..."
+                        className="flex-1 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-indigo-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (newSizeInput.trim()) {
+                            const curSizes = (currentProduct.attributes?.sizes as string[]) || [];
+                            if (!curSizes.includes(newSizeInput.trim()) && curSizes.length < 20) {
+                              setCurrentProduct({
+                                ...currentProduct,
+                                attributes: { ...currentProduct.attributes, sizes: [...curSizes, newSizeInput.trim()] },
+                              });
+                              setNewSizeInput('');
+                            }
+                          }
+                        }}
+                        className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold cursor-pointer flex items-center gap-1"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Añadir</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Colores */}
+                  <div className="pt-2 border-t border-slate-800">
+                    <label className="block text-xs font-medium text-slate-300 mb-1.5">
+                      Colores / Variantes
+                    </label>
+                    <div className="flex flex-wrap gap-2 mb-2.5">
+                      {((currentProduct.attributes?.colors as Array<{ name: string; hex: string }>) || []).map((col, idx) => (
+                        <span
+                          key={idx}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 text-white text-xs"
+                        >
+                          <span
+                            className="w-3 h-3 rounded-full border border-slate-600 inline-block shadow-sm"
+                            style={{ backgroundColor: col.hex }}
+                          />
+                          <span>{col.name}</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const curColors = (currentProduct.attributes?.colors as Array<{ name: string; hex: string }>) || [];
+                              const updated = curColors.filter((_, i) => i !== idx);
+                              setCurrentProduct({
+                                ...currentProduct,
+                                attributes: { ...currentProduct.attributes, colors: updated },
+                              });
+                            }}
+                            className="text-slate-400 hover:text-rose-400 p-0.5 cursor-pointer ml-0.5"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
+                      ))}
+                      {(!currentProduct.attributes?.colors || (currentProduct.attributes.colors as any[]).length === 0) && (
+                        <span className="text-xs text-slate-500 italic">No hay colores agregados</span>
+                      )}
+                    </div>
+                    <div className="flex gap-2 items-center">
+                      <input
+                        type="text"
+                        value={newColorName}
+                        onChange={(e) => setNewColorName(e.target.value)}
+                        placeholder="Nombre color (Ej: Azul Marino)"
+                        className="flex-1 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-indigo-500"
+                      />
+                      <input
+                        type="color"
+                        value={newColorHex}
+                        onChange={(e) => setNewColorHex(e.target.value)}
+                        className="w-9 h-8 rounded-lg bg-slate-800 border border-slate-700 cursor-pointer p-0.5"
+                        title="Seleccionar color"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (newColorName.trim()) {
+                            const curColors = (currentProduct.attributes?.colors as Array<{ name: string; hex: string }>) || [];
+                            if (curColors.length < 20) {
+                              setCurrentProduct({
+                                ...currentProduct,
+                                attributes: {
+                                  ...currentProduct.attributes,
+                                  colors: [...curColors, { name: newColorName.trim(), hex: newColorHex || '#000000' }],
+                                },
+                              });
+                              setNewColorName('');
+                              setNewColorHex('#000000');
+                            }
+                          }
+                        }}
+                        className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold cursor-pointer flex items-center gap-1"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Añadir</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {store.store_type === 'restaurante' && (
+                <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-700/80 space-y-4">
+                  <div className="flex items-center gap-2 text-xs font-bold text-amber-400 uppercase tracking-wider">
+                    <ChefHat className="w-4 h-4" />
+                    <span>Configuración de Gastronomía</span>
+                  </div>
+
+                  {/* Modificadores / Extras */}
+                  <div>
+                    <label className="block text-xs font-medium text-slate-300 mb-1.5">
+                      Modificadores y Extras (Opcionales con costo adicional)
+                    </label>
+                    <div className="space-y-1.5 mb-2.5">
+                      {((currentProduct.attributes?.modifiers as Array<{ name: string; price: number }>) || []).map((mod, idx) => (
+                        <div
+                          key={idx}
+                          className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-xs"
+                        >
+                          <span className="text-white font-medium">{mod.name}</span>
+                          <div className="flex items-center gap-3">
+                            <span className="text-emerald-400 font-semibold">
+                              {mod.price > 0 ? `+Bs ${mod.price.toFixed(2)}` : 'Gratis / Sin costo'}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const curMods = (currentProduct.attributes?.modifiers as Array<{ name: string; price: number }>) || [];
+                                const updated = curMods.filter((_, i) => i !== idx);
+                                setCurrentProduct({
+                                  ...currentProduct,
+                                  attributes: { ...currentProduct.attributes, modifiers: updated },
+                                });
+                              }}
+                              className="text-slate-400 hover:text-rose-400 p-0.5 cursor-pointer"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                      {(!currentProduct.attributes?.modifiers || (currentProduct.attributes.modifiers as any[]).length === 0) && (
+                        <span className="text-xs text-slate-500 italic">No hay modificadores agregados</span>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newModifierName}
+                        onChange={(e) => setNewModifierName(e.target.value)}
+                        placeholder="Nombre extra (Ej: Doble Queso, Salsa BBQ)"
+                        className="flex-1 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-indigo-500"
+                      />
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.5"
+                        value={newModifierPrice}
+                        onChange={(e) => setNewModifierPrice(e.target.value)}
+                        placeholder="Precio (Bs)"
+                        className="w-28 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-indigo-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (newModifierName.trim()) {
+                            const curMods = (currentProduct.attributes?.modifiers as Array<{ name: string; price: number }>) || [];
+                            if (curMods.length < 30) {
+                              const parsedPrice = Number(newModifierPrice);
+                              const cleanPrice = !isNaN(parsedPrice) && parsedPrice >= 0 ? parsedPrice : 0;
+                              setCurrentProduct({
+                                ...currentProduct,
+                                attributes: {
+                                  ...currentProduct.attributes,
+                                  modifiers: [...curMods, { name: newModifierName.trim(), price: cleanPrice }],
+                                },
+                              });
+                              setNewModifierName('');
+                              setNewModifierPrice('');
+                            }
+                          }
+                        }}
+                        className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold cursor-pointer flex items-center gap-1 whitespace-nowrap"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Añadir</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Configuración de Combo */}
+                  <div className="pt-3 border-t border-slate-800 space-y-2.5">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="is_combo_checkbox"
+                        checked={Boolean(currentProduct.attributes?.is_combo)}
+                        onChange={(e) =>
+                          setCurrentProduct({
+                            ...currentProduct,
+                            attributes: {
+                              ...currentProduct.attributes,
+                              is_combo: e.target.checked,
+                            },
+                          })
+                        }
+                        className="w-4 h-4 rounded text-amber-600 bg-slate-800 border-slate-700"
+                      />
+                      <label htmlFor="is_combo_checkbox" className="text-xs font-bold text-white cursor-pointer flex items-center gap-1.5">
+                        <Utensils className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Es un Combo / Paquete gastronómico</span>
+                      </label>
+                    </div>
+
+                    {Boolean(currentProduct.attributes?.is_combo) && (
+                      <div className="pl-6 space-y-2">
+                        <label className="block text-xs font-medium text-slate-300">
+                          Elementos incluidos en el combo
+                        </label>
+                        <div className="flex flex-wrap gap-1.5 mb-2">
+                          {((currentProduct.attributes?.combo_items as string[]) || []).map((item, idx) => (
+                            <span
+                              key={idx}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 text-amber-200 text-xs"
+                            >
+                              <span>{item}</span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const curItems = (currentProduct.attributes?.combo_items as string[]) || [];
+                                  const updated = curItems.filter((_, i) => i !== idx);
+                                  setCurrentProduct({
+                                    ...currentProduct,
+                                    attributes: { ...currentProduct.attributes, combo_items: updated },
+                                  });
+                                }}
+                                className="text-slate-400 hover:text-rose-400 p-0.5 cursor-pointer"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </span>
+                          ))}
+                          {(!currentProduct.attributes?.combo_items || (currentProduct.attributes.combo_items as string[]).length === 0) && (
+                            <span className="text-xs text-slate-500 italic">No hay ítems detallados para el combo</span>
+                          )}
+                        </div>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={newComboItemInput}
+                            onChange={(e) => setNewComboItemInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                if (newComboItemInput.trim()) {
+                                  const curItems = (currentProduct.attributes?.combo_items as string[]) || [];
+                                  if (curItems.length < 30) {
+                                    setCurrentProduct({
+                                      ...currentProduct,
+                                      attributes: { ...currentProduct.attributes, combo_items: [...curItems, newComboItemInput.trim()] },
+                                    });
+                                    setNewComboItemInput('');
+                                  }
+                                }
+                              }
+                            }}
+                            placeholder="Ej: Hamburguesa doble, Papas fritas medianas, Soda 500ml"
+                            className="flex-1 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-amber-500"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (newComboItemInput.trim()) {
+                                const curItems = (currentProduct.attributes?.combo_items as string[]) || [];
+                                if (curItems.length < 30) {
+                                  setCurrentProduct({
+                                    ...currentProduct,
+                                    attributes: { ...currentProduct.attributes, combo_items: [...curItems, newComboItemInput.trim()] },
+                                  });
+                                  setNewComboItemInput('');
+                                }
+                              }
+                            }}
+                            className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold cursor-pointer flex items-center gap-1"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>Añadir</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {store.store_type === 'servicios' && (
+                <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-700/80 space-y-4">
+                  <div className="flex items-center gap-2 text-xs font-bold text-teal-400 uppercase tracking-wider">
+                    <Scissors className="w-4 h-4" />
+                    <span>Configuración de Servicios y Citas</span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="is_service_checkbox"
+                      checked={currentProduct.attributes?.is_service !== false}
+                      onChange={(e) =>
+                        setCurrentProduct({
+                          ...currentProduct,
+                          attributes: {
+                            ...currentProduct.attributes,
+                            is_service: e.target.checked,
+                          },
+                        })
+                      }
+                      className="w-4 h-4 rounded text-teal-600 bg-slate-800 border-slate-700"
+                    />
+                    <label htmlFor="is_service_checkbox" className="text-xs font-bold text-white cursor-pointer">
+                      Tratar como Servicio agendable
+                    </label>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-300 mb-1">
+                        Duración estimada (minutos)
+                      </label>
+                      <input
+                        type="number"
+                        min="5"
+                        step="5"
+                        value={currentProduct.attributes?.duration_minutes ?? 45}
+                        onChange={(e) =>
+                          setCurrentProduct({
+                            ...currentProduct,
+                            attributes: {
+                              ...currentProduct.attributes,
+                              duration_minutes: e.target.value ? Number(e.target.value) : 45,
+                            },
+                          })
+                        }
+                        placeholder="Ej: 45"
+                        className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-teal-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-slate-300 mb-1">
+                        Especialidad / Área
+                      </label>
+                      <input
+                        type="text"
+                        value={(currentProduct.attributes?.specialty as string) || ''}
+                        onChange={(e) =>
+                          setCurrentProduct({
+                            ...currentProduct,
+                            attributes: {
+                              ...currentProduct.attributes,
+                              specialty: e.target.value,
+                            },
+                          })
+                        }
+                        placeholder="Ej: Colorimetría, Masajes, Consulta"
+                        className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-teal-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-slate-300 mb-1">
+                      Profesional / Especialista Asignado
+                    </label>
+                    <input
+                      type="text"
+                      value={(currentProduct.attributes?.professional_name as string) || ''}
+                      onChange={(e) =>
+                        setCurrentProduct({
+                          ...currentProduct,
+                          attributes: {
+                            ...currentProduct.attributes,
+                            professional_name: e.target.value,
+                          },
+                        })
+                      }
+                      placeholder="Ej: Dra. García, Carlos Estilista..."
+                      className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-teal-500"
+                    />
+                  </div>
+                </div>
+              )}
+
               {/* URL de Imagen */}
               <div>
                 <label className="block text-xs font-medium text-slate-300 mb-1">
@@ -737,9 +1346,11 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold cursor-pointer"
+                  disabled={isSaving}
+                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-semibold cursor-pointer flex items-center gap-1.5"
                 >
-                  Guardar Producto
+                  {isSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  <span>{isSaving ? 'Guardando...' : 'Guardar Producto'}</span>
                 </button>
               </div>
             </form>

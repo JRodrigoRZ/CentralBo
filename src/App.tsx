@@ -18,17 +18,20 @@ function AppContent() {
   const { currentRoute } = useRouter();
   const pwaStatus = usePWA();
   const isPublicStore = currentRoute.type === 'public_store';
+  const isStoreAdmin = currentRoute.type === 'store_admin';
 
   return (
     <div
       className={`min-h-screen ${
         isPublicStore
           ? 'bg-stone-50 dark:bg-stone-950 text-stone-900 dark:text-stone-100 selection:bg-amber-500 selection:text-white'
+          : isStoreAdmin
+          ? 'bg-slate-50 dark:bg-[#080d1a] text-slate-900 dark:text-slate-100 selection:bg-blue-600 selection:text-white'
           : 'bg-slate-50 dark:bg-[#080d1a] text-slate-900 dark:text-slate-100 selection:bg-amber-500 selection:text-white'
       } flex flex-col transition-colors`}
     >
-      {/* Barra de navegación superior responsive - Excluida en tienda pública */}
-      {!isPublicStore && (
+      {/* Barra de navegación superior responsive - Excluida en tienda pública y en panel administrativo */}
+      {!isPublicStore && !isStoreAdmin && (
         <Header pwaStatus={pwaStatus} onInstallClick={pwaStatus.install} />
       )}
 
@@ -36,7 +39,7 @@ function AppContent() {
       <OfflineIndicator />
 
       {/* Contenido Dinámico de la Ruta Multi-Tenant */}
-      <main className={isPublicStore ? "flex-1 w-full" : "flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-10"}>
+      <main className={isPublicStore || isStoreAdmin ? "flex-1 w-full" : "flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-10"}>
         {currentRoute.type === 'home' && <PortalHome />}
 
         {currentRoute.type === 'login' && (
@@ -68,8 +71,8 @@ function AppContent() {
         )}
       </main>
 
-      {/* Pie de página institucional - Excluido en tienda pública */}
-      {!isPublicStore && <Footer />}
+      {/* Pie de página institucional - Excluido en tienda pública y en panel administrativo */}
+      {!isPublicStore && !isStoreAdmin && <Footer />}
     </div>
   );
 }

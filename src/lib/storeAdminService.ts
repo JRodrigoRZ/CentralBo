@@ -11,7 +11,9 @@
 
 import {
   Category,
+  CategoryStatus,
   Product,
+  ProductStatus,
   Order,
   StoreProfileSettings,
   StoreAppearanceSettings,
@@ -66,6 +68,13 @@ function isValidTenantId(tenantId: string | undefined | null): boolean {
   );
 }
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export function isValidUUID(value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+  return UUID_REGEX.test(value.trim());
+}
+
 function getStorageKey(tenantId: string, section: string): string {
   return `${TENANT_STORAGE_PREFIX}${tenantId.trim()}_${section.trim()}`;
 }
@@ -91,62 +100,138 @@ function cloneFallback<T>(fallback: T): T {
   return fallback;
 }
 
-function sanitizeProductItem(item: any, tenantId: string): Product | null {
+export function sanitizeProductItem(item: any, tenantId: string): Product | null {
   if (
     !item ||
     typeof item !== 'object' ||
-    typeof item.id !== 'string' ||
-    !item.id.trim() ||
     typeof item.name !== 'string' ||
-    !item.name.trim() ||
-    typeof item.price !== 'number' ||
-    !Number.isFinite(item.price) ||
-    item.price < 0
+    !item.name.trim()
   ) {
     return null;
   }
 
-  // Sanear atributos descartando propiedades arbitrarias
+  const numPrice = Number(item.price);
+  if (isNaN(numPrice) || !Number.isFinite(numPrice) || numPrice < 0) {
+    return null;
+  }
+
+  // Si el item tiene ID existente, debe ser un UUID canónico válido (elimina IDs demo legacy como prod-rest-1)
+  const rawId = item.id ? String(item.id).trim() : '';
+  if (rawId && !isValidUUID(rawId)) {
+    return null;
+  }
+
+  // Sanear atributos preservando todas las propiedades de las verticales soportadas
   const rawAttrs = (item.attributes && typeof item.attributes === 'object' && !Array.isArray(item.attributes))
     ? item.attributes
     : {};
   
-  const cleanAttrs: Record<string, unknown> = {};
-  if (typeof rawAttrs.is_featured === 'boolean') cleanAttrs.is_featured = rawAttrs.is_featured;
-  if (typeof rawAttrs.previous_price === 'number' && Number.isFinite(rawAttrs.previous_price) && rawAttrs.previous_price >= 0) {
-    cleanAttrs.previous_price = rawAttrs.previous_price;
+  const cleanAttrs: Record<string, unknown> = { ...rawAttrs };
+
+  // 1. Destacado y precios promocionales
+  if (typeof rawAttrs.is_featured === 'boolean') {
+    cleanAttrs.is_featured = rawAttrs.is_featured;
   } else {
+    cleanAttrs.is_featured = false;
+  }
+
+  if (
+    typeof rawAttrs.previous_price === 'number' &&
+    Number.isFinite(rawAttrs.previous_price) &&
+    rawAttrs.previous_price >= 0
+  ) {
+    cleanAttrs.previous_price = rawAttrs.previous_price;
+  } else if (rawAttrs.previous_price !== undefined) {
     cleanAttrs.previous_price = null;
   }
-  if (typeof rawAttrs.offer_price === 'number' && Number.isFinite(rawAttrs.offer_price) && rawAttrs.offer_price >= 0) {
+
+  if (
+    typeof rawAttrs.offer_price === 'number' &&
+    Number.isFinite(rawAttrs.offer_price) &&
+    rawAttrs.offer_price >= 0
+  ) {
     cleanAttrs.offer_price = rawAttrs.offer_price;
-  } else {
+  } else if (rawAttrs.offer_price !== undefined) {
     cleanAttrs.offer_price = null;
   }
+
+  // 2. Inventario y SKU
+  if (typeof rawAttrs.sku === 'string') {
+    cleanAttrs.sku = rawAttrs.sku.slice(0, 100);
+  }
+  if (typeof rawAttrs.stock_units === 'number' && Number.isFinite(rawAttrs.stock_units) && rawAttrs.stock_units >= 0) {
+    cleanAttrs.stock_units = rawAttrs.stock_units;
+  }
+
+  // 3. Gastronomía (Restaurante)
+  if (Array.isArray(rawAttrs.modifiers)) {
+    cleanAttrs.modifiers = rawAttrs.modifiers
+      .filter((m: any) => m && typeof m === 'object' && typeof m.name === 'string')
+      .map((m: any) => ({
+        name: String(m.name).slice(0, 100),
+        price: typeof m.price === 'number' && Number.isFinite(m.price) ? Math.max(0, m.price) : 0,
+      }))
+      .slice(0, 30);
+  }
+  if (typeof rawAttrs.is_combo === 'boolean') cleanAttrs.is_combo = rawAttrs.is_combo;
+  if (Array.isArray(rawAttrs.combo_items)) {
+    cleanAttrs.combo_items = rawAttrs.combo_items
+      .filter((ci: unknown) => typeof ci === 'string')
+      .map((ci: string) => ci.slice(0, 150))
+      .slice(0, 30);
+  }
+  if (typeof rawAttrs.kitchen_notes_allowed === 'boolean') {
+    cleanAttrs.kitchen_notes_allowed = rawAttrs.kitchen_notes_allowed;
+  }
+  if (typeof rawAttrs.allow_pickup === 'boolean') cleanAttrs.allow_pickup = rawAttrs.allow_pickup;
+  if (typeof rawAttrs.allow_delivery === 'boolean') cleanAttrs.allow_delivery = rawAttrs.allow_delivery;
+
+  // 4. Moda
   if (Array.isArray(rawAttrs.sizes)) {
     cleanAttrs.sizes = rawAttrs.sizes.filter((s: unknown) => typeof s === 'string').slice(0, 20);
   }
   if (Array.isArray(rawAttrs.colors)) {
-    cleanAttrs.colors = rawAttrs.colors.filter((c: any) => c && typeof c === 'object' && typeof c.name === 'string').slice(0, 20);
+    cleanAttrs.colors = rawAttrs.colors
+      .filter((c: any) => c && typeof c === 'object' && typeof c.name === 'string')
+      .slice(0, 20);
   }
-  if (typeof rawAttrs.kitchen_notes_allowed === 'boolean') cleanAttrs.kitchen_notes_allowed = rawAttrs.kitchen_notes_allowed;
-  if (Array.isArray(rawAttrs.modifiers)) cleanAttrs.modifiers = rawAttrs.modifiers.slice(0, 30);
-  if (typeof rawAttrs.is_combo === 'boolean') cleanAttrs.is_combo = rawAttrs.is_combo;
-  if (typeof rawAttrs.duration_minutes === 'number' && Number.isFinite(rawAttrs.duration_minutes) && rawAttrs.duration_minutes > 0) {
+  if (Array.isArray(rawAttrs.gallery_images)) {
+    cleanAttrs.gallery_images = rawAttrs.gallery_images
+      .filter((img: unknown) => typeof img === 'string')
+      .slice(0, 20);
+  }
+  if (typeof rawAttrs.size_guide === 'string') cleanAttrs.size_guide = rawAttrs.size_guide.slice(0, 500);
+  if (typeof rawAttrs.exchange_policy === 'string') cleanAttrs.exchange_policy = rawAttrs.exchange_policy.slice(0, 500);
+
+  // 5. Servicios y Citas
+  if (typeof rawAttrs.is_service === 'boolean') cleanAttrs.is_service = rawAttrs.is_service;
+  if (
+    typeof rawAttrs.duration_minutes === 'number' &&
+    Number.isFinite(rawAttrs.duration_minutes) &&
+    rawAttrs.duration_minutes > 0
+  ) {
     cleanAttrs.duration_minutes = rawAttrs.duration_minutes;
   }
+  if (typeof rawAttrs.specialty === 'string') cleanAttrs.specialty = rawAttrs.specialty.slice(0, 100);
+  if (typeof rawAttrs.professional_name === 'string') cleanAttrs.professional_name = rawAttrs.professional_name.slice(0, 100);
   if (typeof rawAttrs.professional_id === 'string') cleanAttrs.professional_id = rawAttrs.professional_id;
 
+  // Validar categoría: únicamente UUID canónico válido o null
+  const validCategoryId =
+    typeof item.category_id === 'string' && isValidUUID(item.category_id)
+      ? item.category_id.trim()
+      : null;
+
   return {
-    id: String(item.id).trim(),
+    id: rawId,
     tenant_id: typeof item.tenant_id === 'string' && item.tenant_id.trim() ? item.tenant_id.trim() : tenantId,
-    category_id: typeof item.category_id === 'string' ? item.category_id : null,
+    category_id: validCategoryId,
     name: String(item.name).trim().slice(0, 150),
     description: typeof item.description === 'string' ? item.description.slice(0, 1000) : null,
-    price: Number(item.price),
-    is_available: Boolean(item.is_available),
-    image_url: typeof item.image_url === 'string' ? item.image_url : null,
-    status: (item.status === 'inactivo' || item.status === 'agotado') ? item.status : 'activo',
+    price: numPrice,
+    is_available: item.is_available !== undefined ? Boolean(item.is_available) : true,
+    image_url: typeof item.image_url === 'string' && item.image_url.trim() ? item.image_url.trim() : null,
+    status: (item.status === 'inactivo' || item.status === 'borrador') ? item.status : 'activo',
     attributes: cleanAttrs,
     created_at: typeof item.created_at === 'string' ? item.created_at : new Date().toISOString(),
     updated_at: typeof item.updated_at === 'string' ? item.updated_at : new Date().toISOString(),
@@ -230,7 +315,7 @@ function loadFromStorage<T>(tenantId: string, section: string, fallback: T): T {
           const sanitizedProducts = parsed
             .map((item) => sanitizeProductItem(item, tenantId))
             .filter((p): p is Product => p !== null);
-          return (sanitizedProducts.length > 0 ? sanitizedProducts : cloneFallback(fallback)) as unknown as T;
+          return sanitizedProducts as unknown as T;
         }
 
         if (section === 'orders') {
@@ -244,7 +329,7 @@ function loadFromStorage<T>(tenantId: string, section: string, fallback: T): T {
           const sanitizedCategories = parsed
             .map((item) => sanitizeCategoryItem(item, tenantId))
             .filter((c): c is Category => c !== null);
-          return (sanitizedCategories.length > 0 ? sanitizedCategories : cloneFallback(fallback)) as unknown as T;
+          return sanitizedCategories as unknown as T;
         }
 
         // Para otras colecciones (schedule, promotions, professionals, appointments):
@@ -2024,129 +2109,439 @@ export function saveStoreAppointments(
 }
 
 // ----------------------------------------------------------------------------
-// 8. CATEGORÍAS (Por Tenant)
+// 8. CATEGORÍAS (Por Tenant - Supabase Canónico con Caché Local)
 // ----------------------------------------------------------------------------
-export function getStoreCategories(tenantId: string, storeType: StoreType): Category[] {
-  const defaultCategories: Category[] =
-    storeType === 'restaurante'
-      ? [
-          {
-            id: 'cat-rest-1',
-            tenant_id: tenantId,
-            name: 'Pizzas Artesanales',
-            status: 'activo',
-            created_at: '2026-09-01T12:00:00Z',
-            updated_at: '2026-09-01T12:00:00Z',
-          },
-          {
-            id: 'cat-rest-2',
-            tenant_id: tenantId,
-            name: 'Pastas Frescas',
-            status: 'activo',
-            created_at: '2026-09-01T12:00:00Z',
-            updated_at: '2026-09-01T12:00:00Z',
-          },
-          {
-            id: 'cat-rest-3',
-            tenant_id: tenantId,
-            name: 'Bebidas y Vinos',
-            status: 'activo',
-            created_at: '2026-09-01T12:00:00Z',
-            updated_at: '2026-09-01T12:00:00Z',
-          },
-          {
-            id: 'cat-rest-4',
-            tenant_id: tenantId,
-            name: 'Postres Clásicos',
-            status: 'activo',
-            created_at: '2026-09-01T12:00:00Z',
-            updated_at: '2026-09-01T12:00:00Z',
-          },
-        ]
-      : storeType === 'moda'
-      ? [
-          {
-            id: 'cat-moda-1',
-            tenant_id: tenantId,
-            name: 'Vestidos & Enterizos',
-            status: 'activo',
-            created_at: '2026-09-02T12:00:00Z',
-            updated_at: '2026-09-02T12:00:00Z',
-          },
-          {
-            id: 'cat-moda-2',
-            tenant_id: tenantId,
-            name: 'Abrigos & Chaquetas',
-            status: 'activo',
-            created_at: '2026-09-02T12:00:00Z',
-            updated_at: '2026-09-02T12:00:00Z',
-          },
-          {
-            id: 'cat-moda-3',
-            tenant_id: tenantId,
-            name: 'Calzado & Botines',
-            status: 'activo',
-            created_at: '2026-09-02T12:00:00Z',
-            updated_at: '2026-09-02T12:00:00Z',
-          },
-        ]
-      : storeType === 'servicios'
-      ? [
-          {
-            id: 'cat-serv-1',
-            tenant_id: tenantId,
-            name: 'Masoterapia & Relajación',
-            status: 'activo',
-            created_at: '2026-09-03T12:00:00Z',
-            updated_at: '2026-09-03T12:00:00Z',
-          },
-          {
-            id: 'cat-serv-2',
-            tenant_id: tenantId,
-            name: 'Cuidado Facial',
-            status: 'activo',
-            created_at: '2026-09-03T12:00:00Z',
-            updated_at: '2026-09-03T12:00:00Z',
-          },
-          {
-            id: 'cat-serv-3',
-            tenant_id: tenantId,
-            name: 'Paquetes de Spa',
-            status: 'activo',
-            created_at: '2026-09-03T12:00:00Z',
-            updated_at: '2026-09-03T12:00:00Z',
-          },
-        ]
-      : [
-          {
-            id: 'cat-gen-1',
-            tenant_id: tenantId,
-            name: 'Despensa & Abarrotes',
-            status: 'activo',
-            created_at: '2026-09-04T12:00:00Z',
-            updated_at: '2026-09-04T12:00:00Z',
-          },
-          {
-            id: 'cat-gen-2',
-            tenant_id: tenantId,
-            name: 'Lácteos & Refrigerados',
-            status: 'activo',
-            created_at: '2026-09-04T12:00:00Z',
-            updated_at: '2026-09-04T12:00:00Z',
-          },
-          {
-            id: 'cat-gen-3',
-            tenant_id: tenantId,
-            name: 'Limpieza del Hogar',
-            status: 'activo',
-            created_at: '2026-09-04T12:00:00Z',
-            updated_at: '2026-09-04T12:00:00Z',
-          },
-        ];
 
-  return loadFromStorage<Category[]>(tenantId, 'categories', defaultCategories);
+/**
+ * Referencia histórica de categorías demo por vertical.
+ * Se preserva para fallback estático de diseño o referencia de catálogo,
+ * pero NUNCA se inyecta automáticamente si Supabase devuelve una lista vacía [].
+ */
+export function getDefaultStoreCategories(tenantId: string, storeType: StoreType): Category[] {
+  return storeType === 'restaurante'
+    ? [
+        {
+          id: 'cat-rest-1',
+          tenant_id: tenantId,
+          name: 'Pizzas Artesanales',
+          status: 'activo',
+          created_at: '2026-09-01T12:00:00Z',
+          updated_at: '2026-09-01T12:00:00Z',
+        },
+        {
+          id: 'cat-rest-2',
+          tenant_id: tenantId,
+          name: 'Pastas Frescas',
+          status: 'activo',
+          created_at: '2026-09-01T12:00:00Z',
+          updated_at: '2026-09-01T12:00:00Z',
+        },
+        {
+          id: 'cat-rest-3',
+          tenant_id: tenantId,
+          name: 'Bebidas y Vinos',
+          status: 'activo',
+          created_at: '2026-09-01T12:00:00Z',
+          updated_at: '2026-09-01T12:00:00Z',
+        },
+        {
+          id: 'cat-rest-4',
+          tenant_id: tenantId,
+          name: 'Postres Clásicos',
+          status: 'activo',
+          created_at: '2026-09-01T12:00:00Z',
+          updated_at: '2026-09-01T12:00:00Z',
+        },
+      ]
+    : storeType === 'moda'
+    ? [
+        {
+          id: 'cat-moda-1',
+          tenant_id: tenantId,
+          name: 'Vestidos & Enterizos',
+          status: 'activo',
+          created_at: '2026-09-02T12:00:00Z',
+          updated_at: '2026-09-02T12:00:00Z',
+        },
+        {
+          id: 'cat-moda-2',
+          tenant_id: tenantId,
+          name: 'Abrigos & Chaquetas',
+          status: 'activo',
+          created_at: '2026-09-02T12:00:00Z',
+          updated_at: '2026-09-02T12:00:00Z',
+        },
+        {
+          id: 'cat-moda-3',
+          tenant_id: tenantId,
+          name: 'Calzado & Botines',
+          status: 'activo',
+          created_at: '2026-09-02T12:00:00Z',
+          updated_at: '2026-09-02T12:00:00Z',
+        },
+      ]
+    : storeType === 'servicios'
+    ? [
+        {
+          id: 'cat-serv-1',
+          tenant_id: tenantId,
+          name: 'Masoterapia & Relajación',
+          status: 'activo',
+          created_at: '2026-09-03T12:00:00Z',
+          updated_at: '2026-09-03T12:00:00Z',
+        },
+        {
+          id: 'cat-serv-2',
+          tenant_id: tenantId,
+          name: 'Cuidado Facial',
+          status: 'activo',
+          created_at: '2026-09-03T12:00:00Z',
+          updated_at: '2026-09-03T12:00:00Z',
+        },
+        {
+          id: 'cat-serv-3',
+          tenant_id: tenantId,
+          name: 'Paquetes de Spa',
+          status: 'activo',
+          created_at: '2026-09-03T12:00:00Z',
+          updated_at: '2026-09-03T12:00:00Z',
+        },
+      ]
+    : [
+        {
+          id: 'cat-gen-1',
+          tenant_id: tenantId,
+          name: 'Despensa & Abarrotes',
+          status: 'activo',
+          created_at: '2026-09-04T12:00:00Z',
+          updated_at: '2026-09-04T12:00:00Z',
+        },
+        {
+          id: 'cat-gen-2',
+          tenant_id: tenantId,
+          name: 'Lácteos & Refrigerados',
+          status: 'activo',
+          created_at: '2026-09-04T12:00:00Z',
+          updated_at: '2026-09-04T12:00:00Z',
+        },
+        {
+          id: 'cat-gen-3',
+          tenant_id: tenantId,
+          name: 'Limpieza del Hogar',
+          status: 'activo',
+          created_at: '2026-09-04T12:00:00Z',
+          updated_at: '2026-09-04T12:00:00Z',
+        },
+      ];
 }
 
+/**
+ * Obtiene las categorías cacheadas en localStorage para el tenantId de forma síncrona.
+ * Si el comercio tiene guardado [], retorna [].
+ * Si no tiene ningún registro en localStorage, retorna [].
+ */
+export function getCachedStoreCategories(tenantId: string): Category[] {
+  if (!tenantId || typeof tenantId !== 'string' || !isValidTenantId(tenantId)) {
+    return [];
+  }
+  return loadFromStorage<Category[]>(tenantId, 'categories', []);
+}
+
+/**
+ * Retorna las categorías del comercio (síncrono para compatibilidad de interfaz inicial).
+ * Respeta rigurosamente si el comercio tiene caché (incluso si es un array vacío []).
+ */
+export function getStoreCategories(tenantId: string, storeType?: StoreType): Category[] {
+  if (!tenantId || typeof tenantId !== 'string' || !isValidTenantId(tenantId)) {
+    return [];
+  }
+
+  // Si existe registro en localStorage para este tenant, devolverlo fielmente
+  if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+    const raw = localStorage.getItem(getStorageKey(tenantId, 'categories'));
+    if (raw !== null) {
+      return loadFromStorage<Category[]>(tenantId, 'categories', []);
+    }
+  }
+
+  // Si no hay caché y se especificó storeType como referencia histórica previa
+  if (storeType) {
+    const defaults = getDefaultStoreCategories(tenantId, storeType);
+    return loadFromStorage<Category[]>(tenantId, 'categories', defaults);
+  }
+
+  return [];
+}
+
+/**
+ * Consulta las categorías del comercio con Supabase como fuente canónica de datos.
+ * Reglas:
+ * 1. Aislamiento estricto: filtra por tenant_id = tenantId.
+ * 2. Si Supabase devuelve categorías válidas (incluso [] vacías): actualiza caché local y retorna.
+ * 3. Si Supabase devuelve [] (cero categorías): SE CONSERVA [] y NO se reinyectan datos demo.
+ * 4. Si la conexión falla: recurre a la caché local existente como fallback de resiliencia.
+ * 5. NO escribe datos demo en Supabase.
+ */
+export async function fetchStoreCategories(tenantId: string): Promise<Category[]> {
+  if (!tenantId || typeof tenantId !== 'string' || !isValidTenantId(tenantId)) {
+    return [];
+  }
+
+  const cached = getCachedStoreCategories(tenantId);
+
+  try {
+    const { data, error } = await supabase
+      .from('categories')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .order('created_at', { ascending: true });
+
+    if (!error && Array.isArray(data)) {
+      const sanitized = data
+        .map((item) => sanitizeCategoryItem(item, tenantId))
+        .filter((c): c is Category => c !== null);
+
+      // Persistencia remota confirmada: sincronizar la caché local del tenant
+      saveToStorage(tenantId, 'categories', sanitized);
+      return sanitized;
+    }
+
+    if (error) {
+      console.warn('[CentralBo StoreAdmin] Aviso al consultar categories en Supabase:', error.message);
+    }
+  } catch (err) {
+    console.warn('[CentralBo StoreAdmin] Excepción al consultar categories en Supabase:', err);
+  }
+
+  // Fallback seguro ante fallo de red: caché local existente
+  return cached;
+}
+
+/**
+ * Crea una nueva categoría de catálogo en Supabase como fuente canónica.
+ * - Genera un UUID estándar en Supabase (o por defecto gen_random_uuid()).
+ * - Asocia estrictamente tenant_id = tenantId.
+ * - Sincroniza la caché local únicamente tras la confirmación exitosa de Supabase.
+ */
+export async function createStoreCategory(
+  tenantId: string,
+  name: string
+): Promise<{ success: boolean; category?: Category; error?: string }> {
+  if (!tenantId || typeof tenantId !== 'string' || !isValidTenantId(tenantId)) {
+    return { success: false, error: 'Identificador de comercio (tenantId) no válido.' };
+  }
+
+  const trimmedName = name ? name.trim().slice(0, 100) : '';
+  if (!trimmedName) {
+    return { success: false, error: 'El nombre de la categoría es obligatorio.' };
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('categories')
+      .insert({
+        tenant_id: tenantId,
+        name: trimmedName,
+        status: 'activo',
+      })
+      .select('*')
+      .single();
+
+    if (error) {
+      console.error('[CentralBo StoreAdmin] Error al crear categoría en Supabase:', error);
+      return {
+        success: false,
+        error: error.message || 'Error al guardar la categoría en el servidor.',
+      };
+    }
+
+    if (!data) {
+      return {
+        success: false,
+        error: 'No se recibió respuesta al crear la categoría en el servidor.',
+      };
+    }
+
+    const newCategory = sanitizeCategoryItem(data, tenantId);
+    if (!newCategory) {
+      return {
+        success: false,
+        error: 'Los datos devueltos por el servidor no tienen un formato válido.',
+      };
+    }
+
+    // Actualizar caché local tras confirmación remota exitosa
+    const currentCached = getCachedStoreCategories(tenantId);
+    const updated = [...currentCached.filter((c) => c.id !== newCategory.id), newCategory];
+    saveToStorage(tenantId, 'categories', updated);
+
+    return { success: true, category: newCategory };
+  } catch (err: any) {
+    console.error('[CentralBo StoreAdmin] Excepción al crear categoría en Supabase:', err);
+    return {
+      success: false,
+      error: err?.message || 'Error de conexión al crear la categoría.',
+    };
+  }
+}
+
+/**
+ * Actualiza los campos permitidos ('name' y 'status') de una categoría en Supabase.
+ * Soporta firmas:
+ * - updateStoreCategory(tenantId, categoryId, updates)
+ * - updateStoreCategory(categoryId, updates, tenantId?)
+ */
+export async function updateStoreCategory(
+  tenantIdOrCategoryId: string,
+  categoryIdOrUpdates: string | { name?: string; status?: CategoryStatus },
+  updatesOrTenantId?: { name?: string; status?: CategoryStatus } | string
+): Promise<{ success: boolean; category?: Category; error?: string }> {
+  let tenantId = '';
+  let categoryId = '';
+  let updates: { name?: string; status?: CategoryStatus } = {};
+
+  if (typeof categoryIdOrUpdates === 'string') {
+    tenantId = tenantIdOrCategoryId;
+    categoryId = categoryIdOrUpdates;
+    updates =
+      typeof updatesOrTenantId === 'object' && updatesOrTenantId !== null
+        ? updatesOrTenantId
+        : {};
+  } else {
+    categoryId = tenantIdOrCategoryId;
+    updates =
+      typeof categoryIdOrUpdates === 'object' && categoryIdOrUpdates !== null
+        ? categoryIdOrUpdates
+        : {};
+    tenantId = typeof updatesOrTenantId === 'string' ? updatesOrTenantId : '';
+  }
+
+  if (!categoryId || typeof categoryId !== 'string') {
+    return { success: false, error: 'Identificador de categoría no válido.' };
+  }
+
+  const payload: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+  };
+
+  if (typeof updates.name === 'string') {
+    const trimmed = updates.name.trim().slice(0, 100);
+    if (!trimmed) {
+      return { success: false, error: 'El nombre de la categoría no puede estar vacío.' };
+    }
+    payload.name = trimmed;
+  }
+
+  if (updates.status === 'activo' || updates.status === 'inactivo') {
+    payload.status = updates.status;
+  }
+
+  try {
+    let query = supabase.from('categories').update(payload).eq('id', categoryId);
+    if (tenantId && isValidTenantId(tenantId)) {
+      query = query.eq('tenant_id', tenantId);
+    }
+
+    const { data, error } = await query.select('*').maybeSingle();
+
+    if (error) {
+      console.error('[CentralBo StoreAdmin] Error al actualizar categoría en Supabase:', error);
+      return {
+        success: false,
+        error: error.message || 'Error al actualizar la categoría en el servidor.',
+      };
+    }
+
+    if (!data) {
+      return {
+        success: false,
+        error: 'No se encontró la categoría o no se poseen permisos para modificarla.',
+      };
+    }
+
+    const updatedCat = sanitizeCategoryItem(data, tenantId || data.tenant_id);
+    if (!updatedCat) {
+      return { success: false, error: 'Datos devueltos inválidos.' };
+    }
+
+    // Sincronizar caché local únicamente tras confirmación remota
+    const actualTenantId = tenantId || updatedCat.tenant_id;
+    if (actualTenantId && isValidTenantId(actualTenantId)) {
+      const currentCached = getCachedStoreCategories(actualTenantId);
+      const updatedList = currentCached.map((c) => (c.id === categoryId ? updatedCat : c));
+      saveToStorage(actualTenantId, 'categories', updatedList);
+    }
+
+    return { success: true, category: updatedCat };
+  } catch (err: any) {
+    console.error('[CentralBo StoreAdmin] Excepción al actualizar categoría en Supabase:', err);
+    return {
+      success: false,
+      error: err?.message || 'Error de conexión al actualizar la categoría.',
+    };
+  }
+}
+
+/**
+ * Elimina una categoría del catálogo en Supabase.
+ * Soporta firmas:
+ * - deleteStoreCategory(tenantId, categoryId)
+ * - deleteStoreCategory(categoryId)
+ */
+export async function deleteStoreCategory(
+  tenantIdOrCategoryId: string,
+  categoryIdArg?: string
+): Promise<{ success: boolean; error?: string }> {
+  let tenantId = '';
+  let categoryId = '';
+
+  if (categoryIdArg) {
+    tenantId = tenantIdOrCategoryId;
+    categoryId = categoryIdArg;
+  } else {
+    categoryId = tenantIdOrCategoryId;
+  }
+
+  if (!categoryId || typeof categoryId !== 'string') {
+    return { success: false, error: 'Identificador de categoría no válido.' };
+  }
+
+  try {
+    let query = supabase.from('categories').delete().eq('id', categoryId);
+    if (tenantId && isValidTenantId(tenantId)) {
+      query = query.eq('tenant_id', tenantId);
+    }
+
+    const { error } = await query;
+
+    if (error) {
+      console.error('[CentralBo StoreAdmin] Error al eliminar categoría en Supabase:', error);
+      return {
+        success: false,
+        error: error.message || 'Error al eliminar la categoría en el servidor.',
+      };
+    }
+
+    // Sincronizar caché local únicamente tras confirmación remota
+    if (tenantId && isValidTenantId(tenantId)) {
+      const currentCached = getCachedStoreCategories(tenantId);
+      const updatedList = currentCached.filter((c) => c.id !== categoryId);
+      saveToStorage(tenantId, 'categories', updatedList);
+    }
+
+    return { success: true };
+  } catch (err: any) {
+    console.error('[CentralBo StoreAdmin] Excepción al eliminar categoría en Supabase:', err);
+    return {
+      success: false,
+      error: err?.message || 'Error de conexión al eliminar la categoría.',
+    };
+  }
+}
+
+/**
+ * Guarda las categorías en la caché local del tenant (sincronización local).
+ */
 export function saveStoreCategories(
   tenantId: string,
   categories: Category[]
@@ -2155,324 +2550,376 @@ export function saveStoreCategories(
 }
 
 // ----------------------------------------------------------------------------
-// 9. PRODUCTOS (Por Tenant con particularidades por vertical)
+// 9. PRODUCTOS (Centralizados en Supabase - Fuente Canónica Multi-Tenant)
 // ----------------------------------------------------------------------------
-export function getStoreProducts(tenantId: string, storeType: StoreType): Product[] {
-  const defaultProducts: Product[] =
-    storeType === 'restaurante'
-      ? [
-          {
-            id: 'prod-rest-1',
-            tenant_id: tenantId,
-            category_id: 'cat-rest-1',
-            name: 'Pizza Margherita Di Bufala',
-            description: 'Masa madre fermentada 48h, salsa de tomate San Marzano, mozzarella di bufala y albahaca fresca.',
-            price: 65,
-            is_available: true,
-            image_url: 'https://images.unsplash.com/photo-1604382354936-07c5d9983bd3?w=600&auto=format&fit=crop&q=80',
-            status: 'activo',
-            attributes: {
-              is_featured: true,
-              previous_price: 75,
-              offer_price: 65,
-              modifiers: [
-                { name: 'Extra Mozzarella di Bufala', price: 12 },
-                { name: 'Jamón Prosciutto Di Parma', price: 18 },
-                { name: 'Champiñones Salteados', price: 8 },
-              ],
-              is_combo: false,
-              kitchen_notes_allowed: true,
-              allow_pickup: true,
-              allow_delivery: true,
-            },
-            created_at: '2026-09-01T12:00:00Z',
-            updated_at: '2026-09-01T12:00:00Z',
-          },
-          {
-            id: 'prod-rest-2',
-            tenant_id: tenantId,
-            category_id: 'cat-rest-2',
-            name: 'Fettuccine Al Tartufo Nero',
-            description: 'Pasta artesanal al huevo salteada con mantequilla de trufa negra, parmesano reggiano de 24 meses.',
-            price: 80,
-            is_available: true,
-            image_url: 'https://images.unsplash.com/photo-1621996346565-e3d5d6281691?w=600&auto=format&fit=crop&q=80',
-            status: 'activo',
-            attributes: {
-              is_featured: true,
-              previous_price: 80,
-              offer_price: null,
-              modifiers: [
-                { name: 'Extra Parmesano Reggiano', price: 10 },
-                { name: 'Pechuga de Pollo Grillada', price: 15 },
-              ],
-              is_combo: false,
-              kitchen_notes_allowed: true,
-              allow_pickup: true,
-              allow_delivery: true,
-            },
-            created_at: '2026-09-01T12:00:00Z',
-            updated_at: '2026-09-01T12:00:00Z',
-          },
-          {
-            id: 'prod-rest-3',
-            tenant_id: tenantId,
-            category_id: 'cat-rest-1',
-            name: 'Combo Especial Pareja',
-            description: '1 Pizza Familiar a elección + 2 Pastas clásicas + 2 Bebidas artesanales y 1 Tiramisú para compartir.',
-            price: 155,
-            is_available: true,
-            image_url: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=600&auto=format&fit=crop&q=80',
-            status: 'activo',
-            attributes: {
-              is_featured: true,
-              previous_price: 180,
-              offer_price: 155,
-              is_combo: true,
-              combo_items: ['1 Pizza Familiar', '2 Pastas Clásicas', '2 Bebidas', '1 Tiramisú'],
-              modifiers: [],
-              kitchen_notes_allowed: true,
-              allow_pickup: true,
-              allow_delivery: true,
-            },
-            created_at: '2026-09-01T12:00:00Z',
-            updated_at: '2026-09-01T12:00:00Z',
-          },
-          {
-            id: 'prod-rest-4',
-            tenant_id: tenantId,
-            category_id: 'cat-rest-4',
-            name: 'Tiramisú Tradizionale',
-            description: 'Bizcochos savoiardi embebidos en café expreso italiano con crema de mascarpone y cacao amargo.',
-            price: 32,
-            is_available: false, // Agotado
-            image_url: 'https://images.unsplash.com/photo-1571877227200-a0d98ea607e9?w=600&auto=format&fit=crop&q=80',
-            status: 'activo',
-            attributes: {
-              is_featured: false,
-              previous_price: 32,
-              offer_price: null,
-              modifiers: [],
-              is_combo: false,
-              kitchen_notes_allowed: false,
-              allow_pickup: true,
-              allow_delivery: true,
-            },
-            created_at: '2026-09-01T12:00:00Z',
-            updated_at: '2026-09-01T12:00:00Z',
-          },
-        ]
-      : storeType === 'moda'
-      ? [
-          {
-            id: 'prod-moda-1',
-            tenant_id: tenantId,
-            category_id: 'cat-moda-1',
-            name: 'Vestido Midi Plisado Clásico',
-            description: 'Vestido midi con caída fluida, escote en V y cinto ajustable. Tejido transpirable de alta resistencia.',
-            price: 240,
-            is_available: true,
-            image_url: 'https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?w=600&auto=format&fit=crop&q=80',
-            status: 'activo',
-            attributes: {
-              is_featured: true,
-              previous_price: 280,
-              offer_price: 240,
-              sizes: ['S', 'M', 'L'],
-              colors: [
-                { name: 'Azul Marino', hex: '#1e3a8a' },
-                { name: 'Verde Esmeralda', hex: '#065f46' },
-                { name: 'Terracota', hex: '#9a3412' },
-              ],
-              gallery_images: [
-                'https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?w=600&auto=format&fit=crop&q=80',
-                'https://images.unsplash.com/photo-1496747611176-843222e1e57c?w=600&auto=format&fit=crop&q=80',
-              ],
-              size_guide: 'Corte regular estándar. Consultar tabla de medidas.',
-              exchange_policy: 'Cambio disponible por talla hasta 7 días hábiles.',
-            },
-            created_at: '2026-09-02T12:00:00Z',
-            updated_at: '2026-09-02T12:00:00Z',
-          },
-          {
-            id: 'prod-moda-2',
-            tenant_id: tenantId,
-            category_id: 'cat-moda-2',
-            name: 'Abrigo Lana Premium Altiplano',
-            description: 'Confeccionado en mezcla de lana de alpaca suave con forro térmico satinado. Estilo elegante con botones cruzados.',
-            price: 490,
-            is_available: true,
-            image_url: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=600&auto=format&fit=crop&q=80',
-            status: 'activo',
-            attributes: {
-              is_featured: true,
-              previous_price: 520,
-              offer_price: 490,
-              sizes: ['M', 'L', 'XL'],
-              colors: [
-                { name: 'Camel Clásico', hex: '#c2884a' },
-                { name: 'Gris Grafito', hex: '#374151' },
-              ],
-              gallery_images: [
-                'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=600&auto=format&fit=crop&q=80',
-              ],
-              size_guide: 'Holgado para uso sobre jersey.',
-              exchange_policy: 'Garantía de confección 15 días.',
-            },
-            created_at: '2026-09-02T12:00:00Z',
-            updated_at: '2026-09-02T12:00:00Z',
-          },
-          {
-            id: 'prod-moda-3',
-            tenant_id: tenantId,
-            category_id: 'cat-moda-1',
-            name: 'Blusa Seda Satín Elegante',
-            description: 'Blusa en seda satinada de tacto sutil con cuello camisero atelier y puños drapeados. Confección refinada para eventos.',
-            price: 195,
-            is_available: true,
-            image_url: 'https://images.unsplash.com/photo-1551803091-e20673f15770?w=600&auto=format&fit=crop&q=80',
-            status: 'activo',
-            attributes: {
-              is_featured: true,
-              previous_price: 220,
-              offer_price: 195,
-              sizes: ['XS', 'S', 'M', 'L'],
-              colors: [
-                { name: 'Champagne Perla', hex: '#f7f1e5' },
-                { name: 'Rosa Empolvado', hex: '#d4a59a' },
-                { name: 'Negro Carbón', hex: '#1c1917' },
-              ],
-              gallery_images: [
-                'https://images.unsplash.com/photo-1551803091-e20673f15770?w=600&auto=format&fit=crop&q=80',
-              ],
-              size_guide: 'Caída suelta estándar.',
-              exchange_policy: 'Cambio hasta 7 días con etiqueta.',
-            },
-            created_at: '2026-09-02T12:00:00Z',
-            updated_at: '2026-09-02T12:00:00Z',
-          },
-          {
-            id: 'prod-moda-4',
-            tenant_id: tenantId,
-            category_id: 'cat-moda-3',
-            name: 'Botines Cuero Nappa Atelier',
-            description: 'Botines artesanales en cuero nappa flexible con tacón medio bloque y cierre lateral invisible. Acabado de lujo.',
-            price: 360,
-            is_available: true,
-            image_url: 'https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=600&auto=format&fit=crop&q=80',
-            status: 'activo',
-            attributes: {
-              is_featured: false,
-              sizes: ['36', '37', '38', '39'],
-              colors: [
-                { name: 'Negro Atelier', hex: '#18181b' },
-                { name: 'Camel Nuez', hex: '#a27035' },
-              ],
-              gallery_images: [
-                'https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=600&auto=format&fit=crop&q=80',
-              ],
-              size_guide: 'Horma estándar boliviana.',
-              exchange_policy: 'Cambio por número sin costo.',
-            },
-            created_at: '2026-09-02T12:00:00Z',
-            updated_at: '2026-09-02T12:00:00Z',
-          },
-        ]
-      : storeType === 'servicios'
-      ? [
-          {
-            id: 'srv-1',
-            tenant_id: tenantId,
-            category_id: 'cat-serv-1',
-            name: 'Masaje Descontracturante Profundo',
-            description: 'Terapia manual enfocada en aliviar tensiones musculares crónicas, espalda y cuello con aceites botánicos.',
-            price: 180,
-            is_available: true,
-            image_url: 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=600&auto=format&fit=crop&q=80',
-            status: 'activo',
-            attributes: {
-              is_service: true,
-              duration_minutes: 60,
-              specialty: 'Fisioterapia y Masajes',
-              professional_id: 'prof-2',
-              professional_name: 'Dr. Roberto Mendoza',
-              is_featured: true,
-              previous_price: 200,
-              offer_price: 180,
-            },
-            created_at: '2026-09-03T12:00:00Z',
-            updated_at: '2026-09-03T12:00:00Z',
-          },
-          {
-            id: 'srv-2',
-            tenant_id: tenantId,
-            category_id: 'cat-serv-2',
-            name: 'Limpieza Facial Hidratante Profunda',
-            description: 'Exfoliación suave, extracción de impurezas, vapor de ozono y máscara de ácido hialurónico hidratante.',
-            price: 150,
-            is_available: true,
-            image_url: 'https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=600&auto=format&fit=crop&q=80',
-            status: 'activo',
-            attributes: {
-              is_service: true,
-              duration_minutes: 45,
-              specialty: 'Cosmetología y Cuidado Facial',
-              professional_id: 'prof-1',
-              professional_name: 'Lic. Claudia Morales',
-              is_featured: true,
-              previous_price: 150,
-              offer_price: null,
-            },
-            created_at: '2026-09-03T12:00:00Z',
-            updated_at: '2026-09-03T12:00:00Z',
-          },
-        ]
-      : [
-          {
-            id: 'prod-gen-1',
-            tenant_id: tenantId,
-            category_id: 'cat-gen-1',
-            name: 'Café Yungas Tostado Especial 500g',
-            description: 'Granos de café arábica seleccionados de los valles de Los Yungas, tostado medio aromático.',
-            price: 45,
-            is_available: true,
-            image_url: 'https://images.unsplash.com/photo-1559056199-641a0ac8b55e?w=600&auto=format&fit=crop&q=80',
-            status: 'activo',
-            attributes: {
-              is_featured: true,
-              previous_price: 50,
-              offer_price: 45,
-              sku: 'CAF-YUNG-500',
-              stock_units: 34,
-            },
-            created_at: '2026-09-04T12:00:00Z',
-            updated_at: '2026-09-04T12:00:00Z',
-          },
-          {
-            id: 'prod-gen-2',
-            tenant_id: tenantId,
-            category_id: 'cat-gen-2',
-            name: 'Queso Menonita Artesanal 1kg',
-            description: 'Queso semi-maduro tradicional de excelente fundición para preparaciones típicas.',
-            price: 38,
-            is_available: true,
-            image_url: 'https://images.unsplash.com/photo-1486297678162-eb2a19b0a32d?w=600&auto=format&fit=crop&q=80',
-            status: 'activo',
-            attributes: {
-              is_featured: false,
-              previous_price: 38,
-              offer_price: null,
-              sku: 'QUE-MEN-1000',
-              stock_units: 18,
-            },
-            created_at: '2026-09-04T12:00:00Z',
-            updated_at: '2026-09-04T12:00:00Z',
-          },
-        ];
 
-  return loadFromStorage<Product[]>(tenantId, 'products', defaultProducts);
+/**
+ * Obtiene los productos del comercio desde la caché local del tenant.
+ * Respeta rigurosamente si el catálogo está vacío ([]) sin inyectar datos demo.
+ */
+export function getCachedStoreProducts(tenantId: string): Product[] {
+  if (!tenantId || typeof tenantId !== 'string' || !isValidTenantId(tenantId)) {
+    return [];
+  }
+  return loadFromStorage<Product[]>(tenantId, 'products', []);
 }
 
+/**
+ * Retorna los productos del comercio (síncrono para render inicial de la interfaz).
+ * NUNCA auto-genera productos DEMO ni sobrescribe catálogos vacíos.
+ */
+export function getStoreProducts(tenantId: string, _storeType?: StoreType): Product[] {
+  return getCachedStoreProducts(tenantId);
+}
+
+/**
+ * Consulta los productos del comercio con Supabase como fuente canónica de datos.
+ * Reglas:
+ * 1. Aislamiento estricto: filtra por tenant_id = tenantId.
+ * 2. Si Supabase devuelve productos válidos (incluso [] vacío): actualiza caché local y retorna.
+ * 3. Si Supabase devuelve [] (cero productos): SE CONSERVA [] y NO se inyectan datos demo.
+ * 4. Si la conexión falla: recurre a la caché local existente como fallback de resiliencia.
+ * 5. NO escribe datos demo en Supabase.
+ */
+export async function fetchStoreProducts(tenantId: string): Promise<Product[]> {
+  if (!tenantId || typeof tenantId !== 'string' || !isValidTenantId(tenantId)) {
+    return [];
+  }
+
+  const cached = getCachedStoreProducts(tenantId);
+
+  try {
+    const { data, error } = await supabase
+      .from('products')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .order('created_at', { ascending: false });
+
+    if (!error && Array.isArray(data)) {
+      const sanitized = data
+        .map((item) => sanitizeProductItem(item, tenantId))
+        .filter((p): p is Product => p !== null);
+
+      // Persistencia remota canónica confirmada: sincronizar la caché local del tenant
+      saveToStorage(tenantId, 'products', sanitized);
+      return sanitized;
+    }
+
+    if (error) {
+      console.warn('[CentralBo StoreAdmin] Aviso al consultar products en Supabase:', error.message);
+    }
+  } catch (err) {
+    console.warn('[CentralBo StoreAdmin] Excepción al consultar products en Supabase:', err);
+  }
+
+  // Fallback seguro ante fallo de red: caché local existente
+  return cached;
+}
+
+/**
+ * Crea un nuevo producto de catálogo en Supabase como fuente canónica.
+ * - NO genera manualmente el ID; delega en PostgreSQL gen_random_uuid().
+ * - Asocia estrictamente tenant_id = tenantId.
+ * - Valida category_id (UUID existente o null).
+ * - Sincroniza la caché local únicamente tras la confirmación exitosa de Supabase.
+ */
+export async function createStoreProduct(
+  tenantId: string,
+  productInput: Partial<Product>
+): Promise<{ success: boolean; product?: Product; error?: string }> {
+  if (!tenantId || typeof tenantId !== 'string' || !isValidTenantId(tenantId)) {
+    return { success: false, error: 'Identificador de comercio (tenantId) no válido.' };
+  }
+
+  const trimmedName = typeof productInput.name === 'string' ? productInput.name.trim().slice(0, 150) : '';
+  if (!trimmedName) {
+    return { success: false, error: 'El nombre del producto es obligatorio.' };
+  }
+
+  const rawPrice = productInput.price;
+  const numPrice = Number(rawPrice);
+  if (
+    (typeof rawPrice !== 'number' && typeof rawPrice !== 'string') ||
+    isNaN(numPrice) ||
+    !Number.isFinite(numPrice) ||
+    numPrice < 0
+  ) {
+    return { success: false, error: 'El precio debe ser un número válido mayor o igual a 0.' };
+  }
+
+  const validCategoryId =
+    productInput.category_id && isValidUUID(productInput.category_id)
+      ? productInput.category_id.trim()
+      : null;
+
+  const validStatus: ProductStatus =
+    productInput.status === 'inactivo' || productInput.status === 'borrador'
+      ? productInput.status
+      : 'activo';
+
+  const cleanAttrs =
+    sanitizeProductItem(
+      {
+        name: trimmedName,
+        price: numPrice,
+        attributes: productInput.attributes || {},
+      },
+      tenantId
+    )?.attributes || {};
+
+  const payload: Record<string, unknown> = {
+    tenant_id: tenantId,
+    category_id: validCategoryId,
+    name: trimmedName,
+    description:
+      typeof productInput.description === 'string' && productInput.description.trim()
+        ? productInput.description.trim().slice(0, 1000)
+        : null,
+    price: numPrice,
+    is_available: productInput.is_available ?? true,
+    image_url:
+      typeof productInput.image_url === 'string' && productInput.image_url.trim()
+        ? productInput.image_url.trim()
+        : null,
+    status: validStatus,
+    attributes: cleanAttrs,
+  };
+
+  try {
+    const { data, error } = await supabase
+      .from('products')
+      .insert(payload)
+      .select('*')
+      .single();
+
+    if (error) {
+      console.error('[CentralBo StoreAdmin] Error al crear producto en Supabase:', error);
+      return {
+        success: false,
+        error: error.message || 'Error al guardar el producto en el servidor.',
+      };
+    }
+
+    if (!data) {
+      return {
+        success: false,
+        error: 'No se recibió respuesta al crear el producto en el servidor.',
+      };
+    }
+
+    const newProduct = sanitizeProductItem(data, tenantId);
+    if (!newProduct) {
+      return {
+        success: false,
+        error: 'Los datos devueltos por el servidor no tienen un formato válido.',
+      };
+    }
+
+    // Actualizar caché local tras confirmación remota exitosa
+    const currentCached = getCachedStoreProducts(tenantId);
+    const updated = [newProduct, ...currentCached.filter((p) => p.id !== newProduct.id)];
+    saveToStorage(tenantId, 'products', updated);
+
+    return { success: true, product: newProduct };
+  } catch (err: any) {
+    console.error('[CentralBo StoreAdmin] Excepción al crear producto en Supabase:', err);
+    return {
+      success: false,
+      error: err?.message || 'Error de conexión al crear el producto.',
+    };
+  }
+}
+
+/**
+ * Actualiza los campos permitidos de un producto en Supabase.
+ * - Respeta id y tenant_id.
+ * - Valida category_id (UUID o null).
+ * - Sincroniza la caché local únicamente tras confirmación de Supabase.
+ */
+export async function updateStoreProduct(
+  tenantId: string,
+  productId: string,
+  updates: Partial<Product>
+): Promise<{ success: boolean; product?: Product; error?: string }> {
+  if (!tenantId || typeof tenantId !== 'string' || !isValidTenantId(tenantId)) {
+    return { success: false, error: 'Identificador de comercio (tenantId) no válido.' };
+  }
+
+  if (!productId || typeof productId !== 'string' || !isValidUUID(productId)) {
+    return { success: false, error: 'Identificador de producto (UUID) no válido.' };
+  }
+
+  const payload: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+  };
+
+  if (typeof updates.name === 'string') {
+    const trimmed = updates.name.trim().slice(0, 150);
+    if (!trimmed) {
+      return { success: false, error: 'El nombre del producto no puede estar vacío.' };
+    }
+    payload.name = trimmed;
+  }
+
+  if (updates.price !== undefined) {
+    const numPrice = Number(updates.price);
+    if (isNaN(numPrice) || !Number.isFinite(numPrice) || numPrice < 0) {
+      return { success: false, error: 'El precio debe ser un número válido mayor o igual a 0.' };
+    }
+    payload.price = numPrice;
+  }
+
+  if (updates.description !== undefined) {
+    payload.description =
+      typeof updates.description === 'string' && updates.description.trim()
+        ? updates.description.trim().slice(0, 1000)
+        : null;
+  }
+
+  if (updates.category_id !== undefined) {
+    payload.category_id =
+      updates.category_id && isValidUUID(updates.category_id)
+        ? updates.category_id.trim()
+        : null;
+  }
+
+  if (updates.is_available !== undefined) {
+    payload.is_available = Boolean(updates.is_available);
+  }
+
+  if (updates.image_url !== undefined) {
+    payload.image_url =
+      typeof updates.image_url === 'string' && updates.image_url.trim()
+        ? updates.image_url.trim()
+        : null;
+  }
+
+  if (updates.status !== undefined) {
+    payload.status =
+      updates.status === 'inactivo' || updates.status === 'borrador'
+        ? updates.status
+        : 'activo';
+  }
+
+  if (updates.attributes !== undefined && typeof updates.attributes === 'object') {
+    const cleanAttrs =
+      sanitizeProductItem(
+        {
+          name: updates.name || 'valid',
+          price: updates.price !== undefined ? Number(updates.price) : 10,
+          attributes: updates.attributes,
+        },
+        tenantId
+      )?.attributes || {};
+    payload.attributes = cleanAttrs;
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('products')
+      .update(payload)
+      .eq('id', productId)
+      .eq('tenant_id', tenantId)
+      .select('*')
+      .maybeSingle();
+
+    if (error) {
+      console.error('[CentralBo StoreAdmin] Error al actualizar producto en Supabase:', error);
+      return {
+        success: false,
+        error: error.message || 'Error al actualizar el producto en el servidor.',
+      };
+    }
+
+    if (!data) {
+      return {
+        success: false,
+        error: 'No se encontró el producto o no se poseen permisos para modificarlo.',
+      };
+    }
+
+    const updatedProduct = sanitizeProductItem(data, tenantId);
+    if (!updatedProduct) {
+      return { success: false, error: 'Datos devueltos inválidos por el servidor.' };
+    }
+
+    // Sincronizar caché local únicamente tras confirmación remota
+    const currentCached = getCachedStoreProducts(tenantId);
+    const updatedList = currentCached.map((p) => (p.id === productId ? updatedProduct : p));
+    saveToStorage(tenantId, 'products', updatedList);
+
+    return { success: true, product: updatedProduct };
+  } catch (err: any) {
+    console.error('[CentralBo StoreAdmin] Excepción al actualizar producto en Supabase:', err);
+    return {
+      success: false,
+      error: err?.message || 'Error de conexión al actualizar el producto.',
+    };
+  }
+}
+
+/**
+ * Elimina un producto del catálogo en Supabase.
+ * - Filtra por id y tenant_id.
+ * - Sincroniza la caché local únicamente tras confirmación remota.
+ * - Si se elimina el último producto, la lista queda en [] y no se reinyectan demos.
+ */
+export async function deleteStoreProduct(
+  tenantId: string,
+  productId: string
+): Promise<{ success: boolean; error?: string }> {
+  if (!tenantId || typeof tenantId !== 'string' || !isValidTenantId(tenantId)) {
+    return { success: false, error: 'Identificador de comercio (tenantId) no válido.' };
+  }
+
+  if (!productId || typeof productId !== 'string') {
+    return { success: false, error: 'Identificador de producto no válido.' };
+  }
+
+  try {
+    const { error } = await supabase
+      .from('products')
+      .delete()
+      .eq('id', productId)
+      .eq('tenant_id', tenantId);
+
+    if (error) {
+      console.error('[CentralBo StoreAdmin] Error al eliminar producto en Supabase:', error);
+      return {
+        success: false,
+        error: error.message || 'Error al eliminar el producto en el servidor.',
+      };
+    }
+
+    // Sincronizar caché local únicamente tras confirmación remota
+    const currentCached = getCachedStoreProducts(tenantId);
+    const updatedList = currentCached.filter((p) => p.id !== productId);
+    saveToStorage(tenantId, 'products', updatedList);
+
+    return { success: true };
+  } catch (err: any) {
+    console.error('[CentralBo StoreAdmin] Excepción al eliminar producto en Supabase:', err);
+    return {
+      success: false,
+      error: err?.message || 'Error de conexión al eliminar el producto.',
+    };
+  }
+}
+
+/**
+ * Cambia la disponibilidad de un producto en Supabase.
+ */
+export async function toggleStoreProductAvailability(
+  tenantId: string,
+  productId: string,
+  currentAvailability: boolean
+): Promise<{ success: boolean; product?: Product; error?: string }> {
+  return updateStoreProduct(tenantId, productId, { is_available: !currentAvailability });
+}
+
+/**
+ * Guarda los productos en la caché local del tenant (sincronización local).
+ */
 export function saveStoreProducts(
   tenantId: string,
   products: Product[]
