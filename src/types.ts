@@ -30,6 +30,7 @@ export interface Store {
   shipping?: StoreShippingSettings | null;
   scheduled_orders?: StoreScheduledOrdersSettings | null;
   payment_settings?: StorePaymentSettings | Record<string, any> | null;
+  vertical_config?: StoreVerticalConfig | Record<string, any> | null;
   created_at: string;
   updated_at: string;
 }
@@ -91,6 +92,11 @@ export interface OrderItem {
   quantity: number;
   unit_price: number;
   created_at: string;
+}
+
+export interface OrderItemDetail extends OrderItem {
+  product_name?: string;
+  product_image_url?: string | null;
 }
 
 // Estructura de fases del proyecto CentralBo
@@ -403,6 +409,12 @@ export interface GeneralSettings {
   showStockBadges: boolean;
 }
 
+export interface StoreVerticalConfig {
+  restaurant?: RestaurantSettings;
+  fashion?: FashionSettings;
+  general?: GeneralSettings;
+}
+
 // Servicios (para vertical servicios dentro de catálogo/configuración específica)
 export interface ServiceItem {
   id: string;
@@ -444,8 +456,13 @@ export interface ProfessionalItem {
   isActive: boolean;
   workDays: string[];
   shiftHours: string;
-  serviceIds: string[]; // IDs de los servicios que puede realizar
+  serviceIds: string[]; // IDs de los servicios que puede realizar (UUIDs de public.products)
   schedule: ProfessionalDaySchedule[]; // Horarios diferenciados por día de atención
+  created_at?: string;
+  updated_at?: string;
+  avatar_url?: string;
+  is_active?: boolean;
+  service_ids?: string[];
 }
 
 export interface ReservedTimeSlot {
@@ -454,8 +471,11 @@ export interface ReservedTimeSlot {
   professionalId: string;
   date: string; // YYYY-MM-DD
   time: string; // HH:MM
+  durationMinutes?: number;
   reason: string; // e.g. "Cita Externa", "Mantenimiento", "Bloqueo manual"
   isExternal: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface AppointmentRequest {
@@ -470,8 +490,10 @@ export interface AppointmentRequest {
   customerEmail: string;
   date: string; // YYYY-MM-DD (mismo día o día siguiente)
   time: string; // HH:MM
-  status: 'pendiente' | 'confirmada' | 'rechazada';
+  durationMinutes?: number;
+  status: 'pendiente' | 'confirmada' | 'rechazada' | 'pending' | 'confirmed' | 'rejected';
   createdAt: string;
+  updatedAt?: string;
   notes?: string;
 }
 

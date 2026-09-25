@@ -20,6 +20,7 @@ import {
   ProfessionalItem,
   FashionSettings,
   GeneralSettings,
+  RestaurantSettings,
 } from '../types';
 import { resolveStoreBySlug } from '../lib/multiTenantService';
 import {
@@ -46,8 +47,13 @@ import {
   getCachedStoreCategories,
   fetchStoreCategories,
   getStoreProfessionals,
+  fetchStoreProfessionals,
   getFashionSettings,
+  fetchFashionSettings,
   getGeneralSettings,
+  fetchGeneralSettings,
+  getRestaurantSettings,
+  fetchRestaurantSettings,
 } from '../lib/storeAdminService';
 import { useRouter } from '../context/RouterContext';
 import { useAuth } from '../context/AuthContext';
@@ -96,6 +102,7 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
   const [professionals, setProfessionals] = useState<ProfessionalItem[]>([]);
   const [fashionSettings, setFashionSettings] = useState<FashionSettings | null>(null);
   const [generalSettings, setGeneralSettings] = useState<GeneralSettings | null>(null);
+  const [restaurantSettings, setRestaurantSettings] = useState<RestaurantSettings | null>(null);
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [notFound, setNotFound] = useState<boolean>(false);
@@ -160,6 +167,9 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
     setProducts([]);
     setCategories([]);
     setProfessionals([]);
+    setFashionSettings(null);
+    setGeneralSettings(null);
+    setRestaurantSettings(null);
     setCartItems([]);
     setSelectedProduct(null);
     setIsBookingOpen(false);
@@ -184,6 +194,7 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
           const profs = getStoreProfessionals(tenantId);
           const fsh = getFashionSettings(tenantId);
           const gen = getGeneralSettings(tenantId);
+          const rest = getRestaurantSettings(tenantId);
 
           setProfile(prof);
 
@@ -253,9 +264,39 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
               setCategories(remoteCats);
             }
           });
+
+          // Sincronizar profesionales oficiales desde Supabase (H-02 Parte 1)
+          fetchStoreProfessionals(tenantId).then((remoteProfs) => {
+            if (mounted && Array.isArray(remoteProfs)) {
+              setProfessionals(remoteProfs);
+            }
+          });
+
           setProfessionals(profs);
           setFashionSettings(fsh);
           setGeneralSettings(gen);
+          setRestaurantSettings(rest);
+
+          // Sincronizar configuraciones oficiales de moda desde Supabase (H-03B.1)
+          fetchFashionSettings(tenantId).then((remoteFsh) => {
+            if (mounted && remoteFsh) {
+              setFashionSettings(remoteFsh);
+            }
+          });
+
+          // Sincronizar configuración oficial de catálogo general desde Supabase (H-03B.1)
+          fetchGeneralSettings(tenantId).then((remoteGen) => {
+            if (mounted && remoteGen) {
+              setGeneralSettings(remoteGen);
+            }
+          });
+
+          // Sincronizar configuración oficial de gastronomía desde Supabase (H-03B.2)
+          fetchRestaurantSettings(tenantId).then((remoteRest) => {
+            if (mounted && remoteRest) {
+              setRestaurantSettings(remoteRest);
+            }
+          });
 
           // Cargar carrito local del tenant
           const savedCart = getTenantCart(tenantId);
@@ -877,6 +918,7 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
           storeName={profile.name || store.name}
           categories={categories}
           fashionSettings={fashionSettings || undefined}
+          restaurantSettings={restaurantSettings || undefined}
           onAddToCart={(item) => handleAddToCart(item, false)}
           onOpenCart={() => setIsCartOpen(true)}
           onRequestAppointment={

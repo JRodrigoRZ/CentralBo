@@ -20,7 +20,7 @@ import {
   ArrowLeft,
 } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
-import { Product, Category, StoreType, FashionSettings } from '../../types';
+import { Product, Category, StoreType, FashionSettings, RestaurantSettings } from '../../types';
 import { CartItem, CartModifier, CartColorVariant } from './types';
 import { getModalMotionProps, getVerticalMotionProfile } from './motionSystem';
 
@@ -30,6 +30,7 @@ export interface ProductDetailModalProps {
   storeName?: string;
   categories?: Category[];
   fashionSettings?: FashionSettings;
+  restaurantSettings?: RestaurantSettings;
   onAddToCart: (item: CartItem) => void;
   onRequestAppointment?: (serviceId: string) => void;
   onOpenSizeGuide?: () => void;
@@ -59,6 +60,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   storeName,
   categories = [],
   fashionSettings,
+  restaurantSettings,
   onAddToCart,
   onRequestAppointment,
   onOpenSizeGuide,
@@ -70,6 +72,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const isFashion = storeType === 'moda';
   const isServices = storeType === 'servicios';
   const shouldReduceMotion = useReducedMotion();
+
+  const allowKitchenNotes = restaurantSettings ? restaurantSettings.allowKitchenNotes : true;
 
   const [copiedLink, setCopiedLink] = useState(false);
   const [quantity, setQuantity] = useState(1);
@@ -171,7 +175,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
       selectedSize: selectedSize || undefined,
       selectedColor: selectedColor || undefined,
       selectedModifiers: selectedModifiers.length > 0 ? selectedModifiers : undefined,
-      kitchenNotes: kitchenNotes.trim() || undefined,
+      kitchenNotes: (allowKitchenNotes && kitchenNotes.trim()) ? kitchenNotes.trim() : undefined,
       isCombo: isCombo,
       comboItems: comboItems.length > 0 ? comboItems : undefined,
       isService: isService,
@@ -563,18 +567,20 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   )}
 
                   {/* Instrucciones para Cocina */}
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-stone-700 dark:text-stone-300">
-                      Instrucciones para la Cocina (Opcional):
-                    </label>
-                    <textarea
-                      rows={2}
-                      value={kitchenNotes}
-                      onChange={(e) => setKitchenNotes(e.target.value)}
-                      placeholder="Ej. Sin cebolla, salsa aparte, aderezo extra..."
-                      className="w-full px-3 py-2 rounded-xl bg-stone-50 dark:bg-stone-950 border border-stone-200/80 dark:border-stone-800 text-xs text-stone-900 dark:text-stone-100 placeholder-stone-400 focus:outline-hidden focus:border-stone-400 resize-none"
-                    />
-                  </div>
+                  {allowKitchenNotes && (
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-stone-700 dark:text-stone-300">
+                        Instrucciones para la Cocina (Opcional):
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={kitchenNotes}
+                        onChange={(e) => setKitchenNotes(e.target.value)}
+                        placeholder="Ej. Sin cebolla, salsa aparte, aderezo extra..."
+                        className="w-full px-3 py-2 rounded-xl bg-stone-50 dark:bg-stone-950 border border-stone-200/80 dark:border-stone-800 text-xs text-stone-900 dark:text-stone-100 placeholder-stone-400 focus:outline-hidden focus:border-stone-400 resize-none"
+                      />
+                    </div>
+                  )}
 
                   {/* Indicadores de Entrega Neutros */}
                   <div className="flex items-center gap-2 text-[11px] text-stone-500 dark:text-stone-400">

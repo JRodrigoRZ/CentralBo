@@ -15,11 +15,15 @@ import {
   ArrowRight,
   Search,
   RefreshCw,
+  ChevronDown,
+  ChevronUp,
+  Package,
 } from 'lucide-react';
-import { Store, Order, OrderStatus } from '../../types';
+import { Store, Order, OrderStatus, OrderItemDetail } from '../../types';
 import {
   getStoreOrders,
   fetchStoreOrders,
+  fetchOrderItems,
   updateOrderStatus,
 } from '../../lib/storeAdminService';
 
@@ -93,6 +97,27 @@ export const StoreAdminPedidos: React.FC<StoreAdminPedidosProps> = ({ store }) =
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [notification, setNotification] = useState<string | null>(null);
+  const [expandedOrders, setExpandedOrders] = useState<Record<string, boolean>>({});
+  const [orderItemsMap, setOrderItemsMap] = useState<Record<string, OrderItemDetail[]>>({});
+  const [loadingItemsMap, setLoadingItemsMap] = useState<Record<string, boolean>>({});
+
+  const toggleOrderDetails = async (orderId: string) => {
+    const isCurrentlyExpanded = !!expandedOrders[orderId];
+    setExpandedOrders((prev) => ({ ...prev, [orderId]: !isCurrentlyExpanded }));
+
+    if (!isCurrentlyExpanded && !orderItemsMap[orderId]) {
+      setLoadingItemsMap((prev) => ({ ...prev, [orderId]: true }));
+      try {
+        const items = await fetchOrderItems(store.id, orderId);
+        setOrderItemsMap((prev) => ({ ...prev, [orderId]: items }));
+      } catch (err) {
+        console.error('[StoreAdminPedidos] Error al recuperar order_items:', err);
+        setOrderItemsMap((prev) => ({ ...prev, [orderId]: [] }));
+      } finally {
+        setLoadingItemsMap((prev) => ({ ...prev, [orderId]: false }));
+      }
+    }
+  };
 
   const loadOrders = async () => {
     setIsLoading(true);
@@ -274,74 +299,144 @@ export const StoreAdminPedidos: React.FC<StoreAdminPedidosProps> = ({ store }) =
               dateStyle: 'short',
               timeStyle: 'short',
             });
+            const isExpanded = !!expandedOrders[ord.id];
+            const items = orderItemsMap[ord.id] || [];
+            const isLoadingItems = !!loadingItemsMap[ord.id];
 
             return (
               <div
                 key={ord.id}
-                className="p-4 rounded-2xl bg-slate-950/70 border border-slate-800 hover:border-slate-700 transition flex flex-col md:flex-row md:items-center justify-between gap-4"
+                className="p-4 rounded-2xl bg-slate-950/70 border border-slate-800 hover:border-slate-700 transition flex flex-col gap-3"
               >
-                {/* Datos del Pedido */}
-                <div className="space-y-1.5 min-w-0">
-                  <div className="flex items-center gap-2.5 flex-wrap">
-                    <span className="font-mono text-xs font-black text-indigo-300">
-                      #{ord.id.slice(-4).toUpperCase()}
-                    </span>
-                    <span className="text-xs font-bold text-white">
-                      {ord.customer_name || 'Cliente Particular'}
-                    </span>
-                    <span
-                      className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[10px] font-bold border ${meta.bg} ${meta.color}`}
-                    >
-                      <Icon className="w-3 h-3" />
-                      <span>{meta.label}</span>
-                    </span>
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  {/* Datos del Pedido */}
+                  <div className="space-y-1.5 min-w-0">
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                      <span className="font-mono text-xs font-black text-indigo-300">
+                        #{ord.id.slice(-4).toUpperCase()}
+                      </span>
+                      <span className="text-xs font-bold text-white">
+                        {ord.customer_name || 'Cliente Particular'}
+                      </span>
+                      <span
+                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[10px] font-bold border ${meta.bg} ${meta.color}`}
+                      >
+                        <Icon className="w-3 h-3" />
+                        <span>{meta.label}</span>
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-4 text-xs text-slate-400 flex-wrap">
+                      <span>
+                        Fecha: <strong className="text-slate-300">{dateStr}</strong>
+                      </span>
+                      {ord.customer_phone && (
+                        <span className="flex items-center gap-1">
+                          <Phone className="w-3 h-3 text-emerald-400" />
+                          <strong className="text-emerald-300">{ord.customer_phone}</strong>
+                        </span>
+                      )}
+                      {ord.customer_email && (
+                        <span className="flex items-center gap-1">
+                          <Mail className="w-3 h-3 text-cyan-400" />
+                          <span>{ord.customer_email}</span>
+                        </span>
+                      )}
+                    </div>
                   </div>
 
-                  <div className="flex items-center gap-4 text-xs text-slate-400 flex-wrap">
-                    <span>
-                      Fecha: <strong className="text-slate-300">{dateStr}</strong>
-                    </span>
-                    {ord.customer_phone && (
-                      <span className="flex items-center gap-1">
-                        <Phone className="w-3 h-3 text-emerald-400" />
-                        <strong className="text-emerald-300">{ord.customer_phone}</strong>
+                  {/* Importe, Selector Rápido de Estado y Botón Detalle */}
+                  <div className="flex items-center justify-between md:justify-end gap-4 flex-shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-slate-800">
+                    <div className="text-left md:text-right">
+                      <span className="text-xs text-slate-400 block">Total</span>
+                      <span className="text-base font-black text-emerald-400">
+                        Bs {ord.total}
                       </span>
-                    )}
-                    {ord.customer_email && (
-                      <span className="flex items-center gap-1">
-                        <Mail className="w-3 h-3 text-cyan-400" />
-                        <span>{ord.customer_email}</span>
-                      </span>
-                    )}
+                    </div>
+
+                    {/* Selector del nuevo estado */}
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={ord.status}
+                        onChange={(e) =>
+                          handleStatusChange(ord.id, e.target.value as OrderStatus)
+                        }
+                        className="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs font-semibold focus:outline-none focus:border-indigo-500 cursor-pointer"
+                      >
+                        {ALL_STATUSES.map((st) => (
+                          <option key={st} value={st}>
+                            {ORDER_STATUS_META[st].label}
+                          </option>
+                        ))}
+                      </select>
+
+                      <button
+                        type="button"
+                        onClick={() => toggleOrderDetails(ord.id)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-xs font-semibold text-slate-300 hover:text-white hover:border-slate-500 transition cursor-pointer"
+                        title={isExpanded ? 'Ocultar detalle de productos' : 'Ver detalle de productos'}
+                      >
+                        <Package className="w-3.5 h-3.5 text-indigo-400" />
+                        <span>{isExpanded ? 'Ocultar detalle' : 'Ver detalle'}</span>
+                        {isExpanded ? (
+                          <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
+                        ) : (
+                          <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                        )}
+                      </button>
+                    </div>
                   </div>
                 </div>
 
-                {/* Importe y Selector Rápido de Estado */}
-                <div className="flex items-center justify-between md:justify-end gap-4 flex-shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-slate-800">
-                  <div className="text-left md:text-right">
-                    <span className="text-xs text-slate-400 block">Total</span>
-                    <span className="text-base font-black text-emerald-400">
-                      Bs {ord.total}
-                    </span>
+                {/* Detalle de productos de Supabase (order_items) */}
+                {isExpanded && (
+                  <div className="pt-3 border-t border-slate-800/80 mt-1">
+                    {isLoadingItems ? (
+                      <div className="flex items-center gap-2 py-3 text-xs text-slate-400 justify-center">
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin text-indigo-400" />
+                        <span>Cargando productos de Supabase...</span>
+                      </div>
+                    ) : items.length === 0 ? (
+                      <div className="py-2.5 px-3 rounded-xl bg-slate-900/40 text-xs text-slate-400 text-center">
+                        Sin detalle disponible en base de datos
+                      </div>
+                    ) : (
+                      <div className="space-y-1.5">
+                        <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-1">
+                          Productos del Pedido ({items.length})
+                        </div>
+                        <div className="rounded-xl border border-slate-800/80 overflow-hidden divide-y divide-slate-800/60 bg-slate-900/30">
+                          {items.map((it) => (
+                            <div
+                              key={it.id}
+                              className="px-3 py-2 flex items-center justify-between text-xs gap-3 hover:bg-slate-900/50 transition"
+                            >
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <div className="w-6 h-6 rounded-lg bg-indigo-950/60 border border-indigo-800/40 flex items-center justify-center flex-shrink-0">
+                                  <Package className="w-3.5 h-3.5 text-indigo-400" />
+                                </div>
+                                <div className="min-w-0">
+                                  <span className="font-semibold text-slate-200 block truncate">
+                                    {it.product_name || `Producto (#${it.product_id.slice(-4)})`}
+                                  </span>
+                                  <span className="text-[11px] text-slate-400">
+                                    Cantidad: <strong className="text-slate-300">{it.quantity} un.</strong> · Precio unitario: <strong className="text-slate-300">Bs {it.unit_price}</strong>
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="text-right flex-shrink-0">
+                                <span className="text-[10px] text-slate-400 block">Subtotal</span>
+                                <span className="font-bold text-emerald-400 text-xs">
+                                  Bs {(it.quantity * it.unit_price).toFixed(2)}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
-
-                  {/* Selector del nuevo estado */}
-                  <div className="flex items-center gap-2">
-                    <select
-                      value={ord.status}
-                      onChange={(e) =>
-                        handleStatusChange(ord.id, e.target.value as OrderStatus)
-                      }
-                      className="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs font-semibold focus:outline-none focus:border-indigo-500 cursor-pointer"
-                    >
-                      {ALL_STATUSES.map((st) => (
-                        <option key={st} value={st}>
-                          {ORDER_STATUS_META[st].label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
+                )}
               </div>
             );
           })}

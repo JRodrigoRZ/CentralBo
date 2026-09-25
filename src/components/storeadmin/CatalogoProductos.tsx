@@ -23,7 +23,7 @@ import {
   Utensils,
   X,
 } from 'lucide-react';
-import { Store, Product, Category, ProductStatus } from '../../types';
+import { Store, Product, Category, ProductStatus, ProfessionalItem } from '../../types';
 import {
   getCachedStoreProducts,
   fetchStoreProducts,
@@ -34,6 +34,7 @@ import {
   getCachedStoreCategories,
   fetchStoreCategories,
   getStoreProfessionals,
+  fetchStoreProfessionals,
   isValidUUID,
 } from '../../lib/storeAdminService';
 
@@ -48,11 +49,13 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
   const [categories, setCategories] = useState<Category[]>(() =>
     getCachedStoreCategories(store.id)
   );
+  const [professionals, setProfessionals] = useState<ProfessionalItem[]>(() =>
+    getStoreProfessionals(store.id)
+  );
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState<boolean>(false);
-  const professionals = getStoreProfessionals(store.id);
 
-  // Sincronizar catálogo y categorías oficiales desde Supabase (Fuente Canónica)
+  // Sincronizar catálogo, categorías y profesionales oficiales desde Supabase (Fuente Canónica)
   useEffect(() => {
     let mounted = true;
     setIsLoading(true);
@@ -60,14 +63,18 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
     Promise.all([
       fetchStoreProducts(store.id),
       fetchStoreCategories(store.id),
+      fetchStoreProfessionals(store.id),
     ])
-      .then(([remoteProds, remoteCats]) => {
+      .then(([remoteProds, remoteCats, remoteProfs]) => {
         if (!mounted) return;
         if (Array.isArray(remoteProds)) {
           setProducts(remoteProds);
         }
         if (Array.isArray(remoteCats)) {
           setCategories(remoteCats);
+        }
+        if (Array.isArray(remoteProfs)) {
+          setProfessionals(remoteProfs);
         }
         setIsLoading(false);
       })

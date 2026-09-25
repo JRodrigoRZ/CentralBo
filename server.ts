@@ -4,6 +4,9 @@ import dotenv from 'dotenv';
 import { createServer as createViteServer } from 'vite';
 import healthHandler from './api/health.js';
 import createStoreOwnerHandler from './api/superadmin/create-store-owner.js';
+import createOrderHandler from './api/checkout/create-order.js';
+import createAppointmentHandler from './api/appointments/create-appointment.js';
+import appointmentAvailabilityHandler from './api/appointments/availability.js';
 
 dotenv.config();
 
@@ -24,6 +27,21 @@ app.get('/api/health', (req: Request, res: Response) => {
 // 2. Creación Real de Comercio + Dueño (SuperAdmin)
 app.post('/api/superadmin/create-store-owner', (req: Request, res: Response) => {
   createStoreOwnerHandler(req as any, res as any);
+});
+
+// 3. Creación Atómica de Pedidos (Público / Checkout Anónimo H-01)
+app.all('/api/checkout/create-order', (req: Request, res: Response) => {
+  createOrderHandler(req as any, res as any);
+});
+
+// 4. Creación Atómica de Citas y Protección de Concurrencia (Público / Storefront H-02)
+app.all('/api/appointments/create-appointment', (req: Request, res: Response) => {
+  createAppointmentHandler(req as any, res as any);
+});
+
+// 5. Consulta Pública Segura de Disponibilidad (Privacidad Estricta H-02)
+app.all('/api/appointments/availability', (req: Request, res: Response) => {
+  appointmentAvailabilityHandler(req as any, res as any);
 });
 
 // ----------------------------------------------------------------------------

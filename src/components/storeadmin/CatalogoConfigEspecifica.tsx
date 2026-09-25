@@ -40,18 +40,32 @@ import {
 } from '../../types';
 import {
   getRestaurantSettings,
+  fetchRestaurantSettings,
   saveRestaurantSettings,
   getFashionSettings,
+  fetchFashionSettings,
   saveFashionSettings,
   getGeneralSettings,
+  fetchGeneralSettings,
   saveGeneralSettings,
   getStoreProfessionals,
+  fetchStoreProfessionals,
+  createStoreProfessional,
+  updateStoreProfessional,
+  deleteStoreProfessional,
   saveStoreProfessionals,
   getStoreReservedTimeSlots,
   saveStoreReservedTimeSlots,
+  fetchStoreAppointmentBlocks,
+  createStoreAppointmentBlock,
+  deleteStoreAppointmentBlock,
   getStoreAppointments,
   saveStoreAppointments,
+  fetchStoreAppointments,
+  updateAppointmentStatus,
+  deleteStoreAppointment,
   getStoreProducts,
+  fetchStoreProducts,
   getProfessionalAgendaSlots,
   createDefaultProfessionalSchedule,
 } from '../../lib/storeAdminService';
@@ -73,7 +87,7 @@ export const CatalogoConfigEspecifica: React.FC<CatalogoConfigEspecificaProps> =
   // --------------------------------------------------------------------------
   // 1. VERTICAL SERVICIOS (Profesionales, Disponibilidad, Citas, Bloqueos)
   // --------------------------------------------------------------------------
-  const [services] = useState<Product[]>(() =>
+  const [services, setServices] = useState<Product[]>(() =>
     getStoreProducts(store.id, 'servicios')
   );
   const [professionals, setProfessionals] = useState<ProfessionalItem[]>(() =>
@@ -85,6 +99,66 @@ export const CatalogoConfigEspecifica: React.FC<CatalogoConfigEspecificaProps> =
   const [appointments, setAppointments] = useState<AppointmentRequest[]>(() =>
     getStoreAppointments(store.id)
   );
+
+  // Sincronizar profesionales, servicios, bloqueos y citas canónicos desde Supabase (H-02)
+  useEffect(() => {
+    let mounted = true;
+    fetchStoreProfessionals(store.id).then((remoteProfs) => {
+      if (mounted && Array.isArray(remoteProfs)) {
+        setProfessionals(remoteProfs);
+        if (remoteProfs.length > 0) {
+          setSelectedProfId((prev) =>
+            remoteProfs.some((p) => p.id === prev) ? prev : remoteProfs[0].id
+          );
+        }
+      }
+    });
+
+    fetchStoreProducts(store.id).then((remoteProds) => {
+      if (mounted && Array.isArray(remoteProds)) {
+        const srvs = remoteProds.filter(
+          (p) => p.attributes?.is_service || store.store_type === 'servicios'
+        );
+        setServices(srvs);
+      }
+    });
+
+    fetchStoreAppointmentBlocks(store.id).then((remoteBlocks) => {
+      if (mounted && Array.isArray(remoteBlocks)) {
+        setReservedSlots(remoteBlocks);
+      }
+    });
+
+    fetchStoreAppointments(store.id).then((remoteAppts) => {
+      if (mounted && Array.isArray(remoteAppts)) {
+        setAppointments(remoteAppts);
+      }
+    });
+
+    if (store.store_type === 'restaurante') {
+      fetchRestaurantSettings(store.id).then((remoteRest) => {
+        if (mounted && remoteRest) {
+          setRestaurant(remoteRest);
+        }
+      });
+    } else if (store.store_type === 'moda') {
+      fetchFashionSettings(store.id).then((remoteFash) => {
+        if (mounted && remoteFash) {
+          setFashion(remoteFash);
+        }
+      });
+    } else if (store.store_type === 'general') {
+      fetchGeneralSettings(store.id).then((remoteGen) => {
+        if (mounted && remoteGen) {
+          setGeneral(remoteGen);
+        }
+      });
+    }
+
+    return () => {
+      mounted = false;
+    };
+  }, [store.id, store.store_type]);
 
   // Profesional seleccionado para gestionar su agenda y disponibilidad
   const [selectedProfId, setSelectedProfId] = useState<string>(() => professionals[0]?.id || '');
@@ -121,7 +195,7 @@ export const CatalogoConfigEspecifica: React.FC<CatalogoConfigEspecificaProps> =
       setEditingServiceIds(currentProf.serviceIds || []);
       setBlockProfId(currentProf.id);
     }
-  }, [selectedProfId]);
+  }, [selectedProfId, currentProf]);
 
   // Estados para nuevo bloqueo manual de horario (ej. citas externas para evitar doble reserva)
   const [blockProfId, setBlockProfId] = useState(currentProf?.id || professionals[0]?.id || '');
@@ -129,45 +203,49 @@ export const CatalogoConfigEspecifica: React.FC<CatalogoConfigEspecificaProps> =
   const [blockTime, setBlockTime] = useState('11:00');
   const [blockReason, setBlockReason] = useState('Cita Externa en Domicilio');
 
-  const handleAddProfessional = (e: React.FormEvent) => {
+  const handleAddProfessional = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newProfName.trim()) return;
 
     const defaultSchedule = createDefaultProfessionalSchedule([1, 2, 3, 4, 5], '09:00', '18:00', '13:00');
-    const newProf: ProfessionalItem = {
-      id: `prof-${Date.now()}`,
-      tenant_id: store.id,
+    const validServiceIds = services.map((s) => s.id);
+
+    const res = await createStoreProfessional(store.id, {
       name: newProfName.trim(),
       specialty: newProfSpecialty.trim() || 'Especialista',
-      phone: newProfPhone.trim() || '+591 70000000',
+      phone: newProfPhone.trim() || '',
       avatarUrl: '',
       isActive: true,
-      workDays: ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'],
-      shiftHours: '09:00 - 18:00',
-      serviceIds: services.map((s) => s.id), // Habilitado para todos los servicios inicialmente
+      serviceIds: validServiceIds,
       schedule: defaultSchedule,
-    };
+    });
 
-    const updated = [...professionals, newProf];
-    setProfessionals(updated);
-    saveStoreProfessionals(store.id, updated);
-    setSelectedProfId(newProf.id);
-    setNewProfName('');
-    setNewProfSpecialty('');
-    setNewProfPhone('');
-    setIsAddingProf(false);
-    showNotification(`Profesional ${newProf.name} añadido con éxito.`);
+    if (res.success && res.professional) {
+      const updated = [...professionals.filter((p) => p.id !== res.professional!.id), res.professional];
+      setProfessionals(updated);
+      setSelectedProfId(res.professional.id);
+      setNewProfName('');
+      setNewProfSpecialty('');
+      setNewProfPhone('');
+      setIsAddingProf(false);
+      showNotification(`Profesional ${res.professional.name} añadido con éxito.`);
+    } else {
+      showNotification(res.error || 'Error al añadir profesional.');
+    }
   };
 
-  const handleToggleProfActive = (id: string) => {
+  const handleToggleProfActive = async (id: string) => {
+    const target = professionals.find((p) => p.id === id);
+    if (!target) return;
+    const newActive = !target.isActive;
     const updated = professionals.map((p) =>
-      p.id === id ? { ...p, isActive: !p.isActive } : p
+      p.id === id ? { ...p, isActive: newActive } : p
     );
     setProfessionals(updated);
-    saveStoreProfessionals(store.id, updated);
+    await updateStoreProfessional(store.id, id, { isActive: newActive });
   };
 
-  const handleDeleteProf = (id: string) => {
+  const handleDeleteProf = async (id: string) => {
     if (professionals.length <= 1) {
       alert('Debe existir al menos un profesional en el establecimiento.');
       return;
@@ -175,10 +253,10 @@ export const CatalogoConfigEspecifica: React.FC<CatalogoConfigEspecificaProps> =
     if (window.confirm('¿Eliminar este profesional y su agenda asociada?')) {
       const updated = professionals.filter((p) => p.id !== id);
       setProfessionals(updated);
-      saveStoreProfessionals(store.id, updated);
       if (selectedProfId === id) {
         setSelectedProfId(updated[0]?.id || '');
       }
+      await deleteStoreProfessional(store.id, id);
       showNotification('Profesional eliminado.');
     }
   };
@@ -204,88 +282,87 @@ export const CatalogoConfigEspecifica: React.FC<CatalogoConfigEspecificaProps> =
   };
 
   // Guardar configuración de disponibilidad, horarios por día y servicios
-  const handleSaveProfAvailability = () => {
+  const handleSaveProfAvailability = async () => {
     if (!currentProf) return;
 
-    // Calcular días de trabajo en texto
-    const openDaysNames = editingSchedule.filter((d) => d.isOpen).map((d) => d.dayName);
-    const summaryHours = editingSchedule.find((d) => d.isOpen)
-      ? `${editingSchedule.find((d) => d.isOpen)?.startTime} - ${editingSchedule.find((d) => d.isOpen)?.endTime}`
-      : 'Sin turnos';
+    const res = await updateStoreProfessional(store.id, currentProf.id, {
+      schedule: editingSchedule,
+      serviceIds: editingServiceIds,
+    });
 
-    const updated = professionals.map((p) =>
-      p.id === currentProf.id
-        ? {
-            ...p,
-            schedule: editingSchedule,
-            serviceIds: editingServiceIds,
-            workDays: openDaysNames,
-            shiftHours: summaryHours,
-          }
-        : p
-    );
-
-    setProfessionals(updated);
-    saveStoreProfessionals(store.id, updated);
-    showNotification(`Agenda y servicios de ${currentProf.name} actualizados.`);
+    if (res.success && res.professional) {
+      const updated = professionals.map((p) =>
+        p.id === currentProf.id ? res.professional! : p
+      );
+      setProfessionals(updated);
+      showNotification(`Agenda y servicios de ${currentProf.name} actualizados.`);
+    } else {
+      showNotification(res.error || 'Error al guardar cambios.');
+    }
   };
 
-  const handleAddReservedSlot = (e: React.FormEvent) => {
+  const handleAddReservedSlot = async (e: React.FormEvent) => {
     e.preventDefault();
     const newSlot: ReservedTimeSlot = {
-      id: `res-${Date.now()}`,
+      id: crypto.randomUUID(),
       tenant_id: store.id,
       professionalId: blockProfId || currentProf?.id || '',
       date: blockDate,
       time: blockTime,
+      durationMinutes: 60,
       reason: blockReason.trim() || 'Bloqueo Manual / Cita Externa',
       isExternal: true,
     };
 
-    const updated = [...reservedSlots, newSlot];
-    setReservedSlots(updated);
-    saveStoreReservedTimeSlots(store.id, updated);
-    showNotification(
-      `Horario ${blockTime} el ${blockDate} bloqueado correctamente para evitar doble reserva.`
-    );
+    const res = await createStoreAppointmentBlock(store.id, newSlot);
+    if (res.success && res.block) {
+      setReservedSlots((prev) => [res.block!, ...prev.filter((s) => s.id !== res.block!.id)]);
+      showNotification(
+        `Horario ${blockTime} el ${blockDate} bloqueado correctamente para evitar doble reserva.`
+      );
+    } else {
+      showNotification(res.error || 'Error al guardar el bloqueo de horario.');
+    }
   };
 
   // Bloqueo rápido de una franja directamente desde la grilla de turnos
-  const handleQuickBlockSlot = (time: string) => {
+  const handleQuickBlockSlot = async (time: string) => {
     if (!currentProf) return;
     const newSlot: ReservedTimeSlot = {
-      id: `res-${Date.now()}`,
+      id: crypto.randomUUID(),
       tenant_id: store.id,
       professionalId: currentProf.id,
       date: agendaDate,
       time,
+      durationMinutes: 60,
       reason: 'Cita Externa / Bloqueo Manual',
       isExternal: true,
     };
-    const updated = [...reservedSlots, newSlot];
-    setReservedSlots(updated);
-    saveStoreReservedTimeSlots(store.id, updated);
-    showNotification(`Horario ${time} marcado como no disponible para ${currentProf.name}.`);
+    const res = await createStoreAppointmentBlock(store.id, newSlot);
+    if (res.success && res.block) {
+      setReservedSlots((prev) => [res.block!, ...prev.filter((s) => s.id !== res.block!.id)]);
+      showNotification(`Horario ${time} marcado como no disponible para ${currentProf.name}.`);
+    } else {
+      showNotification(res.error || 'Error al guardar el bloqueo de horario.');
+    }
   };
 
-  const handleRemoveReservedSlot = (id: string) => {
-    const updated = reservedSlots.filter((s) => s.id !== id);
-    setReservedSlots(updated);
-    saveStoreReservedTimeSlots(store.id, updated);
+  const handleRemoveReservedSlot = async (id: string) => {
+    await deleteStoreAppointmentBlock(store.id, id);
+    setReservedSlots((prev) => prev.filter((s) => s.id !== id));
     showNotification('Bloqueo de horario liberado.');
   };
 
-  const handleUpdateAppointmentStatus = (
+  const handleUpdateAppointmentStatus = async (
     id: string,
-    newStatus: 'confirmada' | 'rechazada'
+    newStatus: 'confirmed' | 'rejected'
   ) => {
-    const updated = appointments.map((a) =>
-      a.id === id ? { ...a, status: newStatus } : a
+    await updateAppointmentStatus(store.id, id, newStatus);
+    setAppointments((prev) =>
+      prev.map((a) => (a.id === id ? { ...a, status: newStatus } : a))
     );
-    setAppointments(updated);
-    saveStoreAppointments(store.id, updated);
     showNotification(
-      `Cita ${newStatus === 'confirmada' ? 'confirmada' : 'rechazada'} por el profesional.`
+      `Cita ${newStatus === 'confirmed' ? 'confirmada' : 'rechazada'} por el profesional.`
     );
   };
 
@@ -301,10 +378,14 @@ export const CatalogoConfigEspecifica: React.FC<CatalogoConfigEspecificaProps> =
     getRestaurantSettings(store.id)
   );
 
-  const handleSaveRestaurant = (e: React.FormEvent) => {
+  const handleSaveRestaurant = async (e: React.FormEvent) => {
     e.preventDefault();
-    saveRestaurantSettings(store.id, restaurant);
-    showNotification('Ajustes gastronómicos guardados.');
+    const res = await saveRestaurantSettings(store.id, restaurant);
+    if (res.success) {
+      showNotification('Ajustes gastronómicos guardados.');
+    } else {
+      showNotification(res.error || 'Error al guardar ajustes gastronómicos.');
+    }
   };
 
   // --------------------------------------------------------------------------
@@ -314,10 +395,14 @@ export const CatalogoConfigEspecifica: React.FC<CatalogoConfigEspecificaProps> =
     getFashionSettings(store.id)
   );
 
-  const handleSaveFashion = (e: React.FormEvent) => {
+  const handleSaveFashion = async (e: React.FormEvent) => {
     e.preventDefault();
-    saveFashionSettings(store.id, fashion);
-    showNotification('Ajustes de moda y guía de tallas guardados.');
+    const res = await saveFashionSettings(store.id, fashion);
+    if (res.success) {
+      showNotification('Ajustes de moda y guía de tallas guardados.');
+    } else {
+      showNotification(res.error || 'Error al guardar ajustes de moda.');
+    }
   };
 
   // --------------------------------------------------------------------------
@@ -327,10 +412,14 @@ export const CatalogoConfigEspecifica: React.FC<CatalogoConfigEspecificaProps> =
     getGeneralSettings(store.id)
   );
 
-  const handleSaveGeneral = (e: React.FormEvent) => {
+  const handleSaveGeneral = async (e: React.FormEvent) => {
     e.preventDefault();
-    saveGeneralSettings(store.id, general);
-    showNotification('Ajustes generales del catálogo guardados.');
+    const res = await saveGeneralSettings(store.id, general);
+    if (res.success) {
+      showNotification('Ajustes generales del catálogo guardados.');
+    } else {
+      showNotification(res.error || 'Error al guardar ajustes generales.');
+    }
   };
 
   return (
@@ -890,7 +979,7 @@ export const CatalogoConfigEspecifica: React.FC<CatalogoConfigEspecificaProps> =
                               <button
                                 type="button"
                                 onClick={() =>
-                                  handleUpdateAppointmentStatus(slot.appointment!.id, 'confirmada')
+                                  handleUpdateAppointmentStatus(slot.appointment!.id, 'confirmed')
                                 }
                                 className="px-2 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-semibold flex items-center gap-1 transition cursor-pointer"
                               >
@@ -900,7 +989,7 @@ export const CatalogoConfigEspecifica: React.FC<CatalogoConfigEspecificaProps> =
                               <button
                                 type="button"
                                 onClick={() =>
-                                  handleUpdateAppointmentStatus(slot.appointment!.id, 'rechazada')
+                                  handleUpdateAppointmentStatus(slot.appointment!.id, 'rejected')
                                 }
                                 className="px-2 py-1 rounded-lg bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 text-[10px] font-semibold flex items-center gap-1 transition cursor-pointer"
                               >
@@ -1072,17 +1161,22 @@ export const CatalogoConfigEspecifica: React.FC<CatalogoConfigEspecificaProps> =
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-xs font-bold text-white">
                           {apt.serviceName}
+                          {apt.durationMinutes ? ` (${apt.durationMinutes} min)` : ''}
                         </span>
                         <span
                           className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase ${
-                            apt.status === 'pendiente'
+                            apt.status === 'pending' || apt.status === 'pendiente'
                               ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-                              : apt.status === 'confirmada'
+                              : apt.status === 'confirmed' || apt.status === 'confirmada'
                               ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
                               : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
                           }`}
                         >
-                          {apt.status}
+                          {apt.status === 'confirmed' || apt.status === 'confirmada'
+                            ? 'Confirmada'
+                            : apt.status === 'rejected' || apt.status === 'rechazada'
+                            ? 'Rechazada'
+                            : 'Pendiente'}
                         </span>
                       </div>
 
@@ -1112,11 +1206,11 @@ export const CatalogoConfigEspecifica: React.FC<CatalogoConfigEspecificaProps> =
 
                     {/* Acciones para el Profesional */}
                     <div className="flex items-center gap-2 flex-shrink-0 self-end md:self-auto">
-                      {apt.status === 'pendiente' ? (
+                      {apt.status === 'pending' || apt.status === 'pendiente' ? (
                         <>
                           <button
                             type="button"
-                            onClick={() => handleUpdateAppointmentStatus(apt.id, 'confirmada')}
+                            onClick={() => handleUpdateAppointmentStatus(apt.id, 'confirmed')}
                             className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition cursor-pointer"
                           >
                             <Check className="w-3.5 h-3.5" />
@@ -1124,7 +1218,7 @@ export const CatalogoConfigEspecifica: React.FC<CatalogoConfigEspecificaProps> =
                           </button>
                           <button
                             type="button"
-                            onClick={() => handleUpdateAppointmentStatus(apt.id, 'rechazada')}
+                            onClick={() => handleUpdateAppointmentStatus(apt.id, 'rejected')}
                             className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/40 text-xs font-semibold transition cursor-pointer"
                           >
                             <Ban className="w-3.5 h-3.5" />
@@ -1133,7 +1227,7 @@ export const CatalogoConfigEspecifica: React.FC<CatalogoConfigEspecificaProps> =
                         </>
                       ) : (
                         <span className="text-xs text-slate-400 italic">
-                          {apt.status === 'confirmada' ? 'Cita Agendada' : 'Cita Desestimada'}
+                          {apt.status === 'confirmed' || apt.status === 'confirmada' ? 'Cita Agendada' : 'Cita Desestimada'}
                         </span>
                       )}
                     </div>

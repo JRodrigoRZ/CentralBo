@@ -24,6 +24,9 @@ import {
   getStoreAppointments,
   saveStoreAppointments,
   getProfessionalAgendaSlots,
+  fetchProfessionalAgendaSlots,
+  createStoreAppointment,
+  getServiceDurationMinutes,
 } from '../../lib/storeAdminService';
 import { recordCustomerAppointment, getSavedCustomerProfile } from './cartStorage';
 
@@ -58,40 +61,39 @@ export const ServiceBookingModal: React.FC<ServiceBookingModalProps> = ({
 
   const selectedService = services.find((s) => s.id === selectedServiceId);
 
-  // Filtrar profesionales que pueden realizar este servicio
+  // Filtrar profesionales activos asignados a este servicio mediante sus serviceIds reales (H-02 Parte 1)
   const eligibleProfessionals = professionals.filter(
     (p) =>
       p.isActive &&
-      (!p.serviceIds || p.serviceIds.length === 0 || p.serviceIds.includes(selectedServiceId))
+      Array.isArray(p.serviceIds) &&
+      p.serviceIds.includes(selectedServiceId)
   );
 
-  const availableProfessionals =
-    eligibleProfessionals.length > 0
-      ? eligibleProfessionals
-      : professionals.filter((p) => p.isActive);
+  const availableProfessionals = eligibleProfessionals;
 
   const [selectedProfId, setSelectedProfId] = useState<string>(() => {
     const preferredProfId = selectedService?.attributes?.professional_id as string;
     if (preferredProfId && availableProfessionals.some((p) => p.id === preferredProfId)) {
       return preferredProfId;
     }
-    return availableProfessionals[0]?.id || professionals[0]?.id || '';
+    return availableProfessionals[0]?.id || '';
   });
 
   // Si cambia el servicio y el profesional actual no puede realizarlo, auto-seleccionar uno habilitado
   useEffect(() => {
-    if (
-      availableProfessionals.length > 0 &&
-      !availableProfessionals.some((p) => p.id === selectedProfId)
-    ) {
-      setSelectedProfId(availableProfessionals[0].id);
+    if (availableProfessionals.length > 0) {
+      if (!availableProfessionals.some((p) => p.id === selectedProfId)) {
+        setSelectedProfId(availableProfessionals[0].id);
+      }
+    } else {
+      setSelectedProfId('');
     }
   }, [selectedServiceId, availableProfessionals, selectedProfId]);
 
   const currentProfessional =
     professionals.find((p) => p.id === selectedProfId) ||
     availableProfessionals[0] ||
-    professionals[0];
+    null;
 
   // Fecha: Mismo día (Hoy) o Día siguiente (Mañana)
   const today = new Date();
@@ -145,10 +147,40 @@ export const ServiceBookingModal: React.FC<ServiceBookingModalProps> = ({
     return () => clearInterval(timer);
   }, [bookingCooldownRemaining, tenantId]);
 
-  // Obtener turnos calculados según la disponibilidad propia de este profesional
-  const professionalSlots: ProfessionalAgendaSlot[] = currentProfessional
-    ? getProfessionalAgendaSlots(tenantId, currentProfessional, selectedDate)
-    : [];
+  const serviceDuration = getServiceDurationMinutes(selectedService);
+
+  // Obtener turnos calculados según la disponibilidad propia de este profesional y duración del servicio
+  const [professionalSlots, setProfessionalSlots] = useState<ProfessionalAgendaSlot[]>(() => {
+    return currentProfessional
+      ? getProfessionalAgendaSlots(tenantId, currentProfessional, selectedDate, serviceDuration)
+      : [];
+  });
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+
+  // Sincronizar turnos en tiempo real con Supabase y solapamientos reales
+  useEffect(() => {
+    let mounted = true;
+    if (currentProfessional) {
+      fetchProfessionalAgendaSlots(tenantId, currentProfessional, selectedDate, serviceDuration)
+        .then((fresh) => {
+          if (mounted) {
+            setProfessionalSlots(fresh);
+          }
+        })
+        .catch(() => {
+          if (mounted) {
+            setProfessionalSlots(
+              getProfessionalAgendaSlots(tenantId, currentProfessional, selectedDate, serviceDuration)
+            );
+          }
+        });
+    } else {
+      setProfessionalSlots([]);
+    }
+    return () => {
+      mounted = false;
+    };
+  }, [tenantId, currentProfessional?.id, selectedDate, serviceDuration]);
 
   // Resetear hora si la hora seleccionada ya no es válida para la nueva fecha/profesional
   useEffect(() => {
@@ -181,7 +213,7 @@ export const ServiceBookingModal: React.FC<ServiceBookingModalProps> = ({
     );
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
 
@@ -252,7 +284,7 @@ export const ServiceBookingModal: React.FC<ServiceBookingModalProps> = ({
     const pendingForCustomer = existing.filter(
       (appt) =>
         appt.customerPhone.replace(/\D/g, '') === digitsOnly &&
-        appt.status === 'pendiente'
+        (appt.status === 'pending' || appt.status === 'pendiente')
     );
 
     if (pendingForCustomer.length >= MAX_PENDING_APPOINTMENTS_PER_CLIENT) {
@@ -262,20 +294,8 @@ export const ServiceBookingModal: React.FC<ServiceBookingModalProps> = ({
       return;
     }
 
-    // Revalidar en tiempo real contra los turnos actuales del profesional
-    const freshSlots = getProfessionalAgendaSlots(tenantId, currentProfessional, selectedDate);
-    const chosenSlot = freshSlots.find((s) => s.time === selectedTime);
-
-    if (!chosenSlot || chosenSlot.status !== 'disponible') {
-      setErrorMsg(
-        'El horario seleccionado ya no está disponible (ha sido reservado o bloqueado). Por favor elige otro horario.'
-      );
-      return;
-    }
-
-    const newAppointment: AppointmentRequest = {
-      id: `cita-${Date.now()}`,
-      tenant_id: tenantId,
+    setIsSubmitting(true);
+    const result = await createStoreAppointment(tenantId, {
       serviceId: selectedService.id,
       serviceName: selectedService.name,
       professionalId: currentProfessional.id,
@@ -285,34 +305,57 @@ export const ServiceBookingModal: React.FC<ServiceBookingModalProps> = ({
       customerEmail: customerEmail.trim().slice(0, 120) || 'cliente@centralbo.bo',
       date: selectedDate,
       time: selectedTime,
-      status: 'pendiente', // Siempre queda pendiente de confirmación por el profesional
-      createdAt: new Date().toISOString(),
+      durationMinutes: serviceDuration,
       notes: notes.trim().slice(0, 300),
-    };
+    });
+    setIsSubmitting(false);
 
-    // Guardar en la base del tenant
-    saveStoreAppointments(tenantId, [newAppointment, ...existing]);
+    if (!result.success || !result.appointment) {
+      setErrorMsg(
+        result.error ||
+          'El horario seleccionado ya no está disponible (ha sido reservado o bloqueado). Por favor elige otro horario.'
+      );
+      // Revalidar y actualizar turnos en tiempo real
+      if (currentProfessional) {
+        fetchProfessionalAgendaSlots(tenantId, currentProfessional, selectedDate, serviceDuration).then(
+          (fresh) => setProfessionalSlots(fresh)
+        );
+      }
+      return;
+    }
 
     // Guardar en pedidos/citas del cliente local
-    recordCustomerAppointment(newAppointment);
+    recordCustomerAppointment(result.appointment);
 
     // SEC-14A-03: Registrar emisión para cooldown temporal
     sessionStorage.setItem(`cb_last_booking_${tenantId}`, String(Date.now()));
     setBookingCooldownRemaining(Math.ceil(BOOKING_COOLDOWN_MS / 1000));
 
-    setSubmittedAppointment(newAppointment);
+    setSubmittedAppointment(result.appointment);
     setIsSubmitted(true);
   };
 
   const cleanWhatsapp = (storeWhatsapp || '').replace(/\D/g, '');
 
+  const formatEndTime = (startTimeStr: string, durationMin: number) => {
+    const [h, m] = startTimeStr.split(':').map(Number);
+    const startM = (isNaN(h) ? 0 : h) * 60 + (isNaN(m) ? 0 : m);
+    const endM = startM + durationMin;
+    const endH = Math.floor(endM / 60);
+    const endMin = endM % 60;
+    return `${String(endH).padStart(2, '0')}:${String(endMin).padStart(2, '0')}`;
+  };
+
   if (isSubmitted && submittedAppointment) {
+    const apptDuration = submittedAppointment.durationMinutes || serviceDuration;
+    const endTime = formatEndTime(submittedAppointment.time, apptDuration);
+
     const waText = `¡Hola *${storeName}*! 👋 Acabo de solicitar una cita para un servicio:
 
-💆 *SERVICIO:* ${submittedAppointment.serviceName}
+💆 *SERVICIO:* ${submittedAppointment.serviceName} (${apptDuration} min)
 👤 *PROFESIONAL:* ${submittedAppointment.professionalName}
 📅 *FECHA:* ${submittedAppointment.date === todayStr ? 'Hoy' : 'Mañana'} (${submittedAppointment.date})
-⏰ *HORA SOLICITADA:* ${submittedAppointment.time}
+⏰ *HORA SOLICITADA:* ${submittedAppointment.time} a ${endTime}
 
 👤 *DATOS DEL CLIENTE:*
 Nombre: ${submittedAppointment.customerName}
@@ -488,44 +531,50 @@ ${submittedAppointment.notes ? `Notas: ${submittedAppointment.notes}\n` : ''}
                   {availableProfessionals.length} disponible{availableProfessionals.length !== 1 ? 's' : ''} para este servicio
                 </span>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {availableProfessionals.map((prof) => (
-                  <button
-                    type="button"
-                    key={prof.id}
-                    onClick={() => {
-                      setSelectedProfId(prof.id);
-                      setSelectedTime('');
-                    }}
-                    className={`p-3 rounded-2xl border text-left transition cursor-pointer flex items-start gap-3 ${
-                      selectedProfId === prof.id
-                        ? 'bg-stone-100/90 dark:bg-stone-800 border-stone-400 dark:border-stone-600 shadow-xs ring-1 ring-stone-400 dark:ring-stone-500'
-                        : 'bg-stone-50/50 dark:bg-stone-950/70 border-stone-200/80 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300 dark:hover:border-stone-700'
-                    }`}
-                  >
-                    <div
-                      className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5"
-                      style={{
-                        backgroundColor: selectedProfId === prof.id ? `${primaryColor}22` : undefined,
-                        color: selectedProfId === prof.id ? primaryColor : undefined,
+              {availableProfessionals.length === 0 ? (
+                <div className="p-3.5 rounded-2xl border border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400 text-xs text-center font-medium">
+                  No hay profesionales o especialistas asignados actualmente a este servicio.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {availableProfessionals.map((prof) => (
+                    <button
+                      type="button"
+                      key={prof.id}
+                      onClick={() => {
+                        setSelectedProfId(prof.id);
+                        setSelectedTime('');
                       }}
+                      className={`p-3 rounded-2xl border text-left transition cursor-pointer flex items-start gap-3 ${
+                        selectedProfId === prof.id
+                          ? 'bg-stone-100/90 dark:bg-stone-800 border-stone-400 dark:border-stone-600 shadow-xs ring-1 ring-stone-400 dark:ring-stone-500'
+                          : 'bg-stone-50/50 dark:bg-stone-950/70 border-stone-200/80 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300 dark:hover:border-stone-700'
+                      }`}
                     >
-                      <User className="w-4 h-4" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-semibold text-xs text-stone-900 dark:text-white truncate">{prof.name}</p>
-                      {prof.specialty && (
-                        <p className="text-[10px] text-stone-500 dark:text-stone-400 truncate">{prof.specialty}</p>
-                      )}
-                      {prof.shiftHours && (
-                        <p className="text-[9px] mt-1 font-mono text-stone-500 dark:text-stone-400">
-                          Turno: {prof.shiftHours}
-                        </p>
-                      )}
-                    </div>
-                  </button>
-                ))}
-              </div>
+                      <div
+                        className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5"
+                        style={{
+                          backgroundColor: selectedProfId === prof.id ? `${primaryColor}22` : undefined,
+                          color: selectedProfId === prof.id ? primaryColor : undefined,
+                        }}
+                      >
+                        <User className="w-4 h-4" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-xs text-stone-900 dark:text-white truncate">{prof.name}</p>
+                        {prof.specialty && (
+                          <p className="text-[10px] text-stone-500 dark:text-stone-400 truncate">{prof.specialty}</p>
+                        )}
+                        {prof.shiftHours && (
+                          <p className="text-[9px] mt-1 font-mono text-stone-500 dark:text-stone-400">
+                            Turno: {prof.shiftHours}
+                          </p>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* 3. FECHA (Mismo día o día siguiente) */}
@@ -739,11 +788,16 @@ ${submittedAppointment.notes ? `Notas: ${submittedAppointment.notes}\n` : ''}
           <button
             type="submit"
             form="service-booking-form"
-            disabled={bookingCooldownRemaining > 0}
+            disabled={bookingCooldownRemaining > 0 || isSubmitting}
             className="w-full py-3 rounded-2xl text-white text-xs font-bold transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:brightness-105 active:scale-98"
             style={{ backgroundColor: primaryColor }}
           >
-            {bookingCooldownRemaining > 0 ? (
+            {isSubmitting ? (
+              <span className="inline-flex items-center justify-center gap-1.5 text-white">
+                <Clock className="w-4 h-4 animate-spin" />
+                <span>Verificando y reservando turno...</span>
+              </span>
+            ) : bookingCooldownRemaining > 0 ? (
               <span className="inline-flex items-center justify-center gap-1.5 text-amber-200">
                 <Clock className="w-4 h-4 animate-spin" />
                 <span>Espera ({bookingCooldownRemaining}s) para enviar</span>

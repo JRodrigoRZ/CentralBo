@@ -412,6 +412,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       return;
     }
 
+    if (!Array.isArray(items) || items.length === 0) {
+      setFormError('El carrito no contiene productos.');
+      return;
+    }
+
     setIsProcessing(true);
 
     const orderNumber = `ORD-${Math.floor(100000 + Math.random() * 900000)}`;
@@ -424,35 +429,68 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             return v.toString(16);
           });
 
-    // 1. Persistencia centralizada en Supabase (tabla 'orders')
-    try {
-      const { error: insertError } = await supabase
-        .from('orders')
-        .insert({
-          id: orderId,
-          tenant_id: store.id,
-          customer_id: null,
-          customer_name: trimmedName.slice(0, 100),
-          customer_email: email.trim().slice(0, 120) || null,
-          customer_phone: trimmedPhone.slice(0, 25),
-          status: 'pendiente',
-          total: Number(finalTotal.toFixed(2)),
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        });
+    const payloadItems = items.map((it) => {
+      const qty = Math.floor(Number(it.quantity));
+      const unitPrice = Number(Number(it.price).toFixed(2));
+      return {
+        tenant_id: store.id,
+        order_id: orderId,
+        product_id: String(it.productId).trim(),
+        quantity: qty,
+        unit_price: unitPrice,
+      };
+    });
 
-      if (insertError) {
-        console.error('[CentralBo Checkout] Error al registrar pedido en Supabase:', insertError);
+    const hasInvalidItem = payloadItems.some(
+      (p) => !p.product_id || isNaN(p.quantity) || p.quantity <= 0 || isNaN(p.unit_price) || p.unit_price < 0
+    );
+
+    if (hasInvalidItem) {
+      setIsProcessing(false);
+      setFormError('Hay productos en el carrito con cantidades o datos no válidos.');
+      return;
+    }
+
+    // 1. Persistencia atómica y segura mediante endpoint server-side (H-01)
+    try {
+      const orderPayload = {
+        orderId,
+        tenantId: store.id,
+        customerId: null,
+        customerName: trimmedName.slice(0, 100),
+        customerPhone: trimmedPhone.slice(0, 25),
+        customerEmail: email.trim().slice(0, 120) || null,
+        status: 'pendiente',
+        total: Number(finalTotal.toFixed(2)),
+        items: payloadItems.map((it) => ({
+          productId: it.product_id,
+          quantity: it.quantity,
+          unitPrice: it.unit_price,
+        })),
+      };
+
+      const response = await fetch('/api/checkout/create-order', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(orderPayload),
+      });
+
+      const result = await response.json().catch(() => null);
+
+      if (!response.ok || !result || !result.success) {
         setIsProcessing(false);
         setFormError(
-          `No se pudo registrar el pedido en el comercio: ${insertError.message || 'Error de base de datos'}. Por favor intenta nuevamente.`
+          result?.error ||
+            'No se pudo registrar el pedido en el comercio. Por favor intenta nuevamente.'
         );
         return;
       }
     } catch (err: any) {
-      console.error('[CentralBo Checkout] Excepción al registrar pedido en Supabase:', err);
+      console.error('[CentralBo Checkout] Excepción de red al procesar pedido:', err);
       setIsProcessing(false);
-      setFormError('Error de red al registrar el pedido. Por favor verifica tu conexión e intenta nuevamente.');
+      setFormError('Error de red al procesar el pedido. Por favor verifica tu conexión e intenta nuevamente.');
       return;
     }
 

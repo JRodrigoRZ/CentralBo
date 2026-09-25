@@ -34,6 +34,7 @@ import {
   PromotionCode,
   StoreStatistics,
   OrderStatus,
+  OrderItemDetail,
   StoreType,
   StoreHighlightItem,
   StoreHighlightsLayout,
@@ -1787,64 +1788,427 @@ export async function saveStorePaymentSettings(
 }
 
 // ----------------------------------------------------------------------------
-// 7. CONFIGURACIÓN ESPECÍFICA POR VERTICAL
+// 7. CONFIGURACIÓN ESPECÍFICA POR VERTICAL (Persistencia Canónica en public.stores.vertical_config)
 // ----------------------------------------------------------------------------
 
-export function getRestaurantSettings(tenantId: string): RestaurantSettings {
-  const defaults: RestaurantSettings = {
-    allowDineIn: true,
-    allowDelivery: true,
-    allowPickup: true,
-    allowKitchenNotes: true,
-    avgPrepTimeMinutes: 30,
-    whatsappDirectOrders: true,
-  };
-  return loadFromStorage<RestaurantSettings>(tenantId, 'restaurant_config', defaults);
+export const DEFAULT_RESTAURANT_SETTINGS: RestaurantSettings = {
+  allowDineIn: true,
+  allowDelivery: true,
+  allowPickup: true,
+  allowKitchenNotes: true,
+  avgPrepTimeMinutes: 30,
+  whatsappDirectOrders: true,
+};
+
+export const DEFAULT_FASHION_SETTINGS: FashionSettings = {
+  exchangePolicy:
+    'Cambios permitidos dentro de los 7 días hábiles posteriores a la entrega presentando el comprobante y la prenda sin uso con etiqueta original. No se realizan devoluciones en efectivo.',
+  sizeGuide: [
+    { size: 'XS', chest: '82 - 86 cm', waist: '62 - 66 cm', hips: '88 - 92 cm' },
+    { size: 'S', chest: '86 - 90 cm', waist: '66 - 70 cm', hips: '92 - 96 cm' },
+    { size: 'M', chest: '90 - 96 cm', waist: '70 - 76 cm', hips: '96 - 102 cm' },
+    { size: 'L', chest: '96 - 102 cm', waist: '76 - 82 cm', hips: '102 - 108 cm' },
+    { size: 'XL', chest: '102 - 108 cm', waist: '82 - 88 cm', hips: '108 - 114 cm' },
+  ],
+  enableColorSwatches: true,
+};
+
+export const DEFAULT_GENERAL_SETTINGS: GeneralSettings = {
+  catalogLayout: 'grid',
+  showStockBadges: true,
+};
+
+export function isValidRestaurantSettings(data: unknown): data is RestaurantSettings {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return false;
+  const d = data as Record<string, unknown>;
+  return (
+    typeof d.allowDineIn === 'boolean' &&
+    typeof d.allowDelivery === 'boolean' &&
+    typeof d.allowPickup === 'boolean' &&
+    typeof d.allowKitchenNotes === 'boolean' &&
+    typeof d.avgPrepTimeMinutes === 'number' &&
+    !isNaN(d.avgPrepTimeMinutes) &&
+    typeof d.whatsappDirectOrders === 'boolean'
+  );
 }
 
-export function saveRestaurantSettings(
+export function isValidFashionSettings(data: unknown): data is FashionSettings {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return false;
+  const d = data as Record<string, unknown>;
+  return (
+    typeof d.exchangePolicy === 'string' &&
+    Array.isArray(d.sizeGuide) &&
+    typeof d.enableColorSwatches === 'boolean'
+  );
+}
+
+export function isValidGeneralSettings(data: unknown): data is GeneralSettings {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return false;
+  const d = data as Record<string, unknown>;
+  return (
+    (d.catalogLayout === 'grid' || d.catalogLayout === 'list') &&
+    typeof d.showStockBadges === 'boolean'
+  );
+}
+
+export function getCachedRestaurantSettings(tenantId: string): RestaurantSettings {
+  if (!tenantId || !isValidTenantId(tenantId)) {
+    return cloneFallback(DEFAULT_RESTAURANT_SETTINGS);
+  }
+  const cached = loadFromStorage<RestaurantSettings>(tenantId, 'restaurant_config', DEFAULT_RESTAURANT_SETTINGS);
+  if (isValidRestaurantSettings(cached)) {
+    return cached;
+  }
+  return cloneFallback(DEFAULT_RESTAURANT_SETTINGS);
+}
+
+export const getRestaurantSettings = getCachedRestaurantSettings;
+
+export async function fetchRestaurantSettings(tenantId: string): Promise<RestaurantSettings> {
+  if (!tenantId || !isValidTenantId(tenantId)) {
+    return cloneFallback(DEFAULT_RESTAURANT_SETTINGS);
+  }
+
+  const cached = getCachedRestaurantSettings(tenantId);
+
+  try {
+    const { data, error } = await supabase
+      .from('stores')
+      .select('id, vertical_config')
+      .eq('id', tenantId)
+      .maybeSingle();
+
+    if (!error && data) {
+      const rawVertical = (data.vertical_config && typeof data.vertical_config === 'object') ? data.vertical_config : {};
+      const remoteRestaurant = rawVertical.restaurant;
+      if (isValidRestaurantSettings(remoteRestaurant)) {
+        saveToStorage(tenantId, 'restaurant_config', remoteRestaurant);
+        return remoteRestaurant;
+      }
+
+      // Si no existe configuración remota pero el navegador local tiene datos válidos personalizados
+      const localCustom = loadFromStorage<RestaurantSettings | null>(tenantId, 'restaurant_config', null as any);
+      if (localCustom && isValidRestaurantSettings(localCustom)) {
+        await saveRestaurantSettings(tenantId, localCustom);
+        return localCustom;
+      }
+    }
+
+    if (error && (error.code === '42703' || error.code === 'PGRST204' || error.message?.includes('vertical_config'))) {
+      console.warn('[CentralBo StoreAdmin] Columna vertical_config aún no disponible en el esquema:', error.message);
+    }
+  } catch (err) {
+    console.warn('[CentralBo StoreAdmin] Excepción al consultar restaurant_config en Supabase:', err);
+  }
+
+  return cached;
+}
+
+export async function saveRestaurantSettings(
   tenantId: string,
   settings: RestaurantSettings
-): void {
-  saveToStorage(tenantId, 'restaurant_config', settings);
+): Promise<{ success: boolean; error?: string }> {
+  if (!tenantId || !isValidTenantId(tenantId)) {
+    return { success: false, error: 'Identificador de comercio (tenantId) no válido.' };
+  }
+
+  if (!isValidRestaurantSettings(settings)) {
+    return { success: false, error: 'Formato de configuración gastronómica inválido.' };
+  }
+
+  const now = new Date().toISOString();
+
+  try {
+    const { data: storeRow, error: fetchErr } = await supabase
+      .from('stores')
+      .select('id, vertical_config')
+      .eq('id', tenantId)
+      .maybeSingle();
+
+    if (fetchErr && (fetchErr.code === '42703' || fetchErr.code === 'PGRST204' || fetchErr.message?.includes('vertical_config'))) {
+      saveToStorage(tenantId, 'restaurant_config', settings);
+      return { success: true };
+    }
+
+    const currentVertical = (storeRow?.vertical_config && typeof storeRow.vertical_config === 'object')
+      ? storeRow.vertical_config
+      : {};
+
+    const updatedVertical = {
+      ...currentVertical,
+      restaurant: settings,
+    };
+
+    const { data: updatedRows, error: updateErr } = await supabase
+      .from('stores')
+      .update({
+        vertical_config: updatedVertical,
+        updated_at: now,
+      })
+      .eq('id', tenantId)
+      .select('id');
+
+    if (updateErr) {
+      console.error('[CentralBo StoreAdmin] Error al persistir restaurant_config en Supabase:', updateErr);
+      return {
+        success: false,
+        error: updateErr.message || 'Error al persistir la configuración gastronómica en Supabase.',
+      };
+    }
+
+    if (!updatedRows || updatedRows.length === 0) {
+      return {
+        success: false,
+        error: 'No se pudo actualizar el comercio en Supabase. Verifique permisos de administrador o sesión activa.',
+      };
+    }
+
+    saveToStorage(tenantId, 'restaurant_config', settings);
+    return { success: true };
+  } catch (err: any) {
+    console.error('[CentralBo StoreAdmin] Excepción al persistir restaurant_config:', err);
+    return { success: false, error: err?.message || 'Error de conexión con la base de datos.' };
+  }
 }
 
-export function getFashionSettings(tenantId: string): FashionSettings {
-  const defaults: FashionSettings = {
-    exchangePolicy:
-      'Cambios permitidos dentro de los 7 días hábiles posteriores a la entrega presentando el comprobante y la prenda sin uso con etiqueta original. No se realizan devoluciones en efectivo.',
-    sizeGuide: [
-      { size: 'XS', chest: '82 - 86 cm', waist: '62 - 66 cm', hips: '88 - 92 cm' },
-      { size: 'S', chest: '86 - 90 cm', waist: '66 - 70 cm', hips: '92 - 96 cm' },
-      { size: 'M', chest: '90 - 96 cm', waist: '70 - 76 cm', hips: '96 - 102 cm' },
-      { size: 'L', chest: '96 - 102 cm', waist: '76 - 82 cm', hips: '102 - 108 cm' },
-      { size: 'XL', chest: '102 - 108 cm', waist: '82 - 88 cm', hips: '108 - 114 cm' },
-    ],
-    enableColorSwatches: true,
-  };
-  return loadFromStorage<FashionSettings>(tenantId, 'fashion_config', defaults);
+export function getCachedFashionSettings(tenantId: string): FashionSettings {
+  if (!tenantId || !isValidTenantId(tenantId)) {
+    return cloneFallback(DEFAULT_FASHION_SETTINGS);
+  }
+  const cached = loadFromStorage<FashionSettings>(tenantId, 'fashion_config', DEFAULT_FASHION_SETTINGS);
+  if (isValidFashionSettings(cached)) {
+    return cached;
+  }
+  return cloneFallback(DEFAULT_FASHION_SETTINGS);
 }
 
-export function saveFashionSettings(
+export const getFashionSettings = getCachedFashionSettings;
+
+export async function fetchFashionSettings(tenantId: string): Promise<FashionSettings> {
+  if (!tenantId || !isValidTenantId(tenantId)) {
+    return cloneFallback(DEFAULT_FASHION_SETTINGS);
+  }
+
+  const cached = getCachedFashionSettings(tenantId);
+
+  try {
+    const { data, error } = await supabase
+      .from('stores')
+      .select('id, vertical_config')
+      .eq('id', tenantId)
+      .maybeSingle();
+
+    if (!error && data) {
+      const rawVertical = (data.vertical_config && typeof data.vertical_config === 'object') ? data.vertical_config : {};
+      const remoteFashion = rawVertical.fashion;
+      if (isValidFashionSettings(remoteFashion)) {
+        saveToStorage(tenantId, 'fashion_config', remoteFashion);
+        return remoteFashion;
+      }
+
+      // Si no existe configuración remota pero el navegador local tiene datos válidos personalizados
+      const localCustom = loadFromStorage<FashionSettings | null>(tenantId, 'fashion_config', null as any);
+      if (localCustom && isValidFashionSettings(localCustom)) {
+        await saveFashionSettings(tenantId, localCustom);
+        return localCustom;
+      }
+    }
+
+    if (error && (error.code === '42703' || error.code === 'PGRST204' || error.message?.includes('vertical_config'))) {
+      console.warn('[CentralBo StoreAdmin] Columna vertical_config aún no disponible en el esquema:', error.message);
+    }
+  } catch (err) {
+    console.warn('[CentralBo StoreAdmin] Excepción al consultar fashion_config en Supabase:', err);
+  }
+
+  return cached;
+}
+
+export async function saveFashionSettings(
   tenantId: string,
   settings: FashionSettings
-): void {
-  saveToStorage(tenantId, 'fashion_config', settings);
+): Promise<{ success: boolean; error?: string }> {
+  if (!tenantId || !isValidTenantId(tenantId)) {
+    return { success: false, error: 'Identificador de comercio (tenantId) no válido.' };
+  }
+
+  if (!isValidFashionSettings(settings)) {
+    return { success: false, error: 'Formato de configuración de moda inválido.' };
+  }
+
+  const now = new Date().toISOString();
+
+  try {
+    const { data: storeRow, error: fetchErr } = await supabase
+      .from('stores')
+      .select('id, vertical_config')
+      .eq('id', tenantId)
+      .maybeSingle();
+
+    if (fetchErr && (fetchErr.code === '42703' || fetchErr.code === 'PGRST204' || fetchErr.message?.includes('vertical_config'))) {
+      saveToStorage(tenantId, 'fashion_config', settings);
+      return { success: true };
+    }
+
+    const currentVertical = (storeRow?.vertical_config && typeof storeRow.vertical_config === 'object')
+      ? storeRow.vertical_config
+      : {};
+
+    const updatedVertical = {
+      ...currentVertical,
+      fashion: settings,
+    };
+
+    const { data: updatedRows, error: updateErr } = await supabase
+      .from('stores')
+      .update({
+        vertical_config: updatedVertical,
+        updated_at: now,
+      })
+      .eq('id', tenantId)
+      .select('id');
+
+    if (updateErr) {
+      console.error('[CentralBo StoreAdmin] Error al persistir fashion_config en Supabase:', updateErr);
+      return {
+        success: false,
+        error: updateErr.message || 'Error al persistir la configuración de moda en Supabase.',
+      };
+    }
+
+    if (!updatedRows || updatedRows.length === 0) {
+      return {
+        success: false,
+        error: 'No se pudo actualizar el comercio en Supabase. Verifique permisos de administrador o sesión activa.',
+      };
+    }
+
+    saveToStorage(tenantId, 'fashion_config', settings);
+    return { success: true };
+  } catch (err: any) {
+    console.error('[CentralBo StoreAdmin] Excepción al persistir fashion_config:', err);
+    return { success: false, error: err?.message || 'Error de conexión con la base de datos.' };
+  }
 }
 
-export function getGeneralSettings(tenantId: string): GeneralSettings {
-  const defaults: GeneralSettings = {
-    catalogLayout: 'grid',
-    showStockBadges: true,
-  };
-  return loadFromStorage<GeneralSettings>(tenantId, 'general_config', defaults);
+export function getCachedGeneralSettings(tenantId: string): GeneralSettings {
+  if (!tenantId || !isValidTenantId(tenantId)) {
+    return cloneFallback(DEFAULT_GENERAL_SETTINGS);
+  }
+  const cached = loadFromStorage<GeneralSettings>(tenantId, 'general_config', DEFAULT_GENERAL_SETTINGS);
+  if (isValidGeneralSettings(cached)) {
+    return cached;
+  }
+  return cloneFallback(DEFAULT_GENERAL_SETTINGS);
 }
 
-export function saveGeneralSettings(
+export const getGeneralSettings = getCachedGeneralSettings;
+
+export async function fetchGeneralSettings(tenantId: string): Promise<GeneralSettings> {
+  if (!tenantId || !isValidTenantId(tenantId)) {
+    return cloneFallback(DEFAULT_GENERAL_SETTINGS);
+  }
+
+  const cached = getCachedGeneralSettings(tenantId);
+
+  try {
+    const { data, error } = await supabase
+      .from('stores')
+      .select('id, vertical_config')
+      .eq('id', tenantId)
+      .maybeSingle();
+
+    if (!error && data) {
+      const rawVertical = (data.vertical_config && typeof data.vertical_config === 'object') ? data.vertical_config : {};
+      const remoteGeneral = rawVertical.general;
+      if (isValidGeneralSettings(remoteGeneral)) {
+        saveToStorage(tenantId, 'general_config', remoteGeneral);
+        return remoteGeneral;
+      }
+
+      // Si no existe configuración remota pero el navegador local tiene datos válidos personalizados
+      const localCustom = loadFromStorage<GeneralSettings | null>(tenantId, 'general_config', null as any);
+      if (localCustom && isValidGeneralSettings(localCustom)) {
+        await saveGeneralSettings(tenantId, localCustom);
+        return localCustom;
+      }
+    }
+
+    if (error && (error.code === '42703' || error.code === 'PGRST204' || error.message?.includes('vertical_config'))) {
+      console.warn('[CentralBo StoreAdmin] Columna vertical_config aún no disponible en el esquema:', error.message);
+    }
+  } catch (err) {
+    console.warn('[CentralBo StoreAdmin] Excepción al consultar general_config en Supabase:', err);
+  }
+
+  return cached;
+}
+
+export async function saveGeneralSettings(
   tenantId: string,
   settings: GeneralSettings
-): void {
-  saveToStorage(tenantId, 'general_config', settings);
+): Promise<{ success: boolean; error?: string }> {
+  if (!tenantId || !isValidTenantId(tenantId)) {
+    return { success: false, error: 'Identificador de comercio (tenantId) no válido.' };
+  }
+
+  if (!isValidGeneralSettings(settings)) {
+    return { success: false, error: 'Formato de configuración general inválido.' };
+  }
+
+  const now = new Date().toISOString();
+
+  try {
+    const { data: storeRow, error: fetchErr } = await supabase
+      .from('stores')
+      .select('id, vertical_config')
+      .eq('id', tenantId)
+      .maybeSingle();
+
+    if (fetchErr && (fetchErr.code === '42703' || fetchErr.code === 'PGRST204' || fetchErr.message?.includes('vertical_config'))) {
+      saveToStorage(tenantId, 'general_config', settings);
+      return { success: true };
+    }
+
+    const currentVertical = (storeRow?.vertical_config && typeof storeRow.vertical_config === 'object')
+      ? storeRow.vertical_config
+      : {};
+
+    const updatedVertical = {
+      ...currentVertical,
+      general: settings,
+    };
+
+    const { data: updatedRows, error: updateErr } = await supabase
+      .from('stores')
+      .update({
+        vertical_config: updatedVertical,
+        updated_at: now,
+      })
+      .eq('id', tenantId)
+      .select('id');
+
+    if (updateErr) {
+      console.error('[CentralBo StoreAdmin] Error al persistir general_config en Supabase:', updateErr);
+      return {
+        success: false,
+        error: updateErr.message || 'Error al persistir la configuración general en Supabase.',
+      };
+    }
+
+    if (!updatedRows || updatedRows.length === 0) {
+      return {
+        success: false,
+        error: 'No se pudo actualizar el comercio en Supabase. Verifique permisos de administrador o sesión activa.',
+      };
+    }
+
+    saveToStorage(tenantId, 'general_config', settings);
+    return { success: true };
+  } catch (err: any) {
+    console.error('[CentralBo StoreAdmin] Excepción al persistir general_config:', err);
+    return { success: false, error: err?.message || 'Error de conexión con la base de datos.' };
+  }
 }
 
 // ----------------------------------------------------------------------------
@@ -1880,74 +2244,471 @@ export function createDefaultProfessionalSchedule(
   });
 }
 
+/**
+ * Sanitiza y normaliza un registro de profesional garantizando tipos estrictos,
+ * compatibilidad con Supabase (snake_case/camelCase), horarios semanales y UUIDs de servicios.
+ */
+export function sanitizeProfessionalItem(
+  raw: any,
+  tenantId: string
+): ProfessionalItem | null {
+  if (!raw || typeof raw !== 'object') return null;
+
+  const id = typeof raw.id === 'string' && raw.id.trim() ? raw.id.trim() : '';
+  if (!id) return null;
+
+  // Filtrar datos demo locales a menos que sean explícitamente solicitados
+  const rawName = typeof raw.name === 'string' ? raw.name.trim().slice(0, 150) : '';
+  if (!rawName) return null;
+
+  // Aislamiento multi-tenant: si viene un tenant_id debe coincidir estrictamente
+  const itemTenantId = typeof raw.tenant_id === 'string' && raw.tenant_id.trim() ? raw.tenant_id.trim() : tenantId;
+  if (itemTenantId !== tenantId) return null;
+
+  const specialty = typeof raw.specialty === 'string' ? raw.specialty.trim().slice(0, 150) : '';
+  const phone = typeof raw.phone === 'string' ? raw.phone.trim().slice(0, 50) : '';
+  const avatarUrl =
+    typeof raw.avatar_url === 'string'
+      ? raw.avatar_url.trim()
+      : typeof raw.avatarUrl === 'string'
+      ? raw.avatarUrl.trim()
+      : '';
+
+  const isActive =
+    raw.is_active !== undefined
+      ? Boolean(raw.is_active)
+      : raw.isActive !== undefined
+      ? Boolean(raw.isActive)
+      : true;
+
+  // Normalizar service_ids / serviceIds: solo UUIDs válidos de productos
+  const rawServiceIds = Array.isArray(raw.service_ids)
+    ? raw.service_ids
+    : Array.isArray(raw.serviceIds)
+    ? raw.serviceIds
+    : [];
+
+  const cleanServiceIds = rawServiceIds
+    .map((s: any) => (typeof s === 'string' ? s.trim() : ''))
+    .filter((s: string) => isValidUUID(s));
+
+  // Normalizar schedule: 7 días
+  let schedule: ProfessionalDaySchedule[] = [];
+  if (Array.isArray(raw.schedule) && raw.schedule.length === 7) {
+    schedule = raw.schedule.map((d: any, idx: number) => {
+      const dayOfWeek = typeof d.dayOfWeek === 'number' ? d.dayOfWeek : idx;
+      const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+      return {
+        dayOfWeek,
+        dayName: typeof d.dayName === 'string' && d.dayName ? d.dayName : dayNames[dayOfWeek] || 'Día',
+        isOpen: Boolean(d.isOpen),
+        startTime: typeof d.startTime === 'string' && /^\d{2}:\d{2}$/.test(d.startTime) ? d.startTime : '09:00',
+        endTime: typeof d.endTime === 'string' && /^\d{2}:\d{2}$/.test(d.endTime) ? d.endTime : '18:00',
+      };
+    });
+  } else {
+    schedule = createDefaultProfessionalSchedule([1, 2, 3, 4, 5], '09:00', '18:00', '13:00');
+  }
+
+  // Derivar workDays y shiftHours legibles
+  const openDays = schedule.filter((d) => d.isOpen);
+  const workDays = openDays.map((d) => d.dayName);
+  const firstOpen = openDays[0];
+  const shiftHours = firstOpen ? `${firstOpen.startTime} - ${firstOpen.endTime}` : 'Sin turnos';
+
+  return {
+    id,
+    tenant_id: tenantId,
+    name: rawName,
+    specialty,
+    phone,
+    avatarUrl,
+    isActive,
+    workDays,
+    shiftHours,
+    serviceIds: cleanServiceIds,
+    schedule,
+    created_at: raw.created_at || undefined,
+    updated_at: raw.updated_at || undefined,
+    avatar_url: avatarUrl,
+    is_active: isActive,
+    service_ids: cleanServiceIds,
+  };
+}
+
+/**
+ * Consulta la caché local de profesionales del comercio.
+ * Filtra automáticamente registros demo ('prof-1', 'prof-2') para no contaminar datos reales.
+ * NUNCA devuelve datos demo cuando el arreglo está vacío.
+ */
 export function getStoreProfessionals(tenantId: string): ProfessionalItem[] {
-  const defaults: ProfessionalItem[] = [
-    {
-      id: 'prof-1',
-      tenant_id: tenantId,
-      name: 'Lic. Claudia Morales',
-      specialty: 'Cosmetología y Cuidado Facial',
-      phone: '+591 70192837',
-      avatarUrl: '',
-      isActive: true,
-      workDays: ['Lunes', 'Miércoles', 'Viernes', 'Sábado'],
-      shiftHours: '09:00 - 18:00 (Sáb 09:00 - 13:00)',
-      serviceIds: ['srv-2'], // Limpieza Facial
-      schedule: createDefaultProfessionalSchedule([1, 3, 5, 6], '09:00', '18:00', '13:00'),
-    },
-    {
-      id: 'prof-2',
-      tenant_id: tenantId,
-      name: 'Dr. Roberto Mendoza',
-      specialty: 'Fisioterapia y Masajes Terapéuticos',
-      phone: '+591 71283940',
-      avatarUrl: '',
-      isActive: true,
-      workDays: ['Martes', 'Jueves', 'Viernes', 'Sábado'],
-      shiftHours: '10:00 - 19:00 (Sáb 10:00 - 14:00)',
-      serviceIds: ['srv-1'], // Masaje Descontracturante
-      schedule: createDefaultProfessionalSchedule([2, 4, 5, 6], '10:00', '19:00', '14:00'),
-    },
-  ];
+  if (!tenantId || typeof tenantId !== 'string' || !isValidTenantId(tenantId)) {
+    return [];
+  }
 
-  const loaded = loadFromStorage<ProfessionalItem[]>(tenantId, 'professionals', defaults);
+  const loaded = loadFromStorage<ProfessionalItem[]>(tenantId, 'professionals', []);
+  if (!Array.isArray(loaded)) {
+    return [];
+  }
 
-  // Normalizar para garantizar que serviceIds y schedule siempre existan
-  return loaded.map((prof) => ({
-    ...prof,
-    serviceIds:
-      Array.isArray(prof.serviceIds) && prof.serviceIds.length > 0
-        ? prof.serviceIds
-        : prof.id === 'prof-1'
-        ? ['srv-2']
-        : prof.id === 'prof-2'
-        ? ['srv-1']
-        : [],
-    schedule:
-      Array.isArray(prof.schedule) && prof.schedule.length === 7
-        ? prof.schedule
-        : prof.id === 'prof-1'
-        ? createDefaultProfessionalSchedule([1, 3, 5, 6], '09:00', '18:00', '13:00')
-        : createDefaultProfessionalSchedule([2, 4, 5, 6], '10:00', '19:00', '14:00'),
-  }));
+  return loaded
+    .map((p) => sanitizeProfessionalItem(p, tenantId))
+    .filter((p): p is ProfessionalItem => p !== null && p.id !== 'prof-1' && p.id !== 'prof-2');
+}
+
+/**
+ * Consulta remota de profesionales en Supabase como fuente canónica de verdad (H-02 Parte 1).
+ * Si Supabase devuelve [], se respeta [] y NO se inyectan profesionales demo.
+ * Actualiza la caché local en caso de éxito.
+ */
+export async function fetchStoreProfessionals(tenantId: string): Promise<ProfessionalItem[]> {
+  if (!tenantId || typeof tenantId !== 'string' || !isValidTenantId(tenantId)) {
+    return [];
+  }
+
+  const cached = getStoreProfessionals(tenantId);
+
+  try {
+    const { data, error } = await supabase
+      .from('professionals')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .order('created_at', { ascending: true });
+
+    if (!error && Array.isArray(data)) {
+      const sanitized = data
+        .map((row) => sanitizeProfessionalItem(row, tenantId))
+        .filter((p): p is ProfessionalItem => p !== null);
+
+      // Sincronizar caché local con la verdad canónica de Supabase
+      saveToStorage(tenantId, 'professionals', sanitized);
+      return sanitized;
+    }
+
+    if (error) {
+      if (error.code === 'PGRST205' || error.message?.includes('professionals')) {
+        console.info(
+          '[CentralBo StoreAdmin] Tabla "public.professionals" no detectada aún en Supabase cache. ' +
+          'Ejecute supabase/12_create_professionals_table.sql en el SQL Editor para habilitar persistencia remota completa.'
+        );
+      } else {
+        console.warn('[CentralBo StoreAdmin] Error al consultar profesionales en Supabase:', error.message);
+      }
+    }
+  } catch (err: any) {
+    console.warn('[CentralBo StoreAdmin] Excepción al consultar profesionales en Supabase:', err?.message || err);
+  }
+
+  return cached;
+}
+
+/**
+ * Crea un profesional en Supabase como fuente canónica con un UUID real y validación de servicios.
+ */
+export async function createStoreProfessional(
+  tenantId: string,
+  profInput: Partial<ProfessionalItem>
+): Promise<{ success: boolean; professional?: ProfessionalItem; error?: string }> {
+  if (!tenantId || typeof tenantId !== 'string' || !isValidTenantId(tenantId)) {
+    return { success: false, error: 'Identificador de comercio (tenantId) no válido.' };
+  }
+
+  const trimmedName = typeof profInput.name === 'string' ? profInput.name.trim().slice(0, 150) : '';
+  if (!trimmedName) {
+    return { success: false, error: 'El nombre del profesional es obligatorio.' };
+  }
+
+  // Generar UUID canónico real para el profesional (NUNCA prof-${Date.now()})
+  const newId =
+    typeof profInput.id === 'string' && isValidUUID(profInput.id)
+      ? profInput.id
+      : typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+          const r = (Math.random() * 16) | 0;
+          return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+        });
+
+  // Validar y filtrar serviceIds para asegurar que pertenezcan a este tenant
+  const storeProds = getStoreProducts(tenantId);
+  const tenantProductIds = new Set(storeProds.map((p) => p.id));
+
+  const inputServiceIds = Array.isArray(profInput.serviceIds)
+    ? profInput.serviceIds
+    : Array.isArray(profInput.service_ids)
+    ? profInput.service_ids
+    : [];
+
+  const validServiceIds = inputServiceIds
+    .filter((id) => typeof id === 'string' && isValidUUID(id))
+    .filter((id) => tenantProductIds.size === 0 || tenantProductIds.has(id));
+
+  const schedule =
+    Array.isArray(profInput.schedule) && profInput.schedule.length === 7
+      ? profInput.schedule
+      : createDefaultProfessionalSchedule([1, 2, 3, 4, 5], '09:00', '18:00', '13:00');
+
+  const payload = {
+    id: newId,
+    tenant_id: tenantId,
+    name: trimmedName,
+    specialty: typeof profInput.specialty === 'string' ? profInput.specialty.trim().slice(0, 150) : '',
+    phone: typeof profInput.phone === 'string' ? profInput.phone.trim().slice(0, 50) : '',
+    avatar_url: typeof profInput.avatarUrl === 'string' ? profInput.avatarUrl.trim() : (profInput.avatar_url || ''),
+    is_active: profInput.isActive ?? profInput.is_active ?? true,
+    service_ids: validServiceIds,
+    schedule: schedule,
+  };
+
+  try {
+    const { data, error } = await supabase
+      .from('professionals')
+      .insert(payload)
+      .select('*')
+      .single();
+
+    if (!error && data) {
+      const sanitized = sanitizeProfessionalItem(data, tenantId);
+      if (sanitized) {
+        const cached = getStoreProfessionals(tenantId);
+        const updated = [...cached.filter((p) => p.id !== sanitized.id), sanitized];
+        saveToStorage(tenantId, 'professionals', updated);
+        return { success: true, professional: sanitized };
+      }
+    }
+
+    if (error) {
+      // Si la tabla no existe aún en el esquema remoto, persistir localmente con UUID real
+      if (error.code === 'PGRST205' || error.message?.includes('professionals')) {
+        const localProf = sanitizeProfessionalItem(payload, tenantId)!;
+        const cached = getStoreProfessionals(tenantId);
+        const updated = [...cached.filter((p) => p.id !== localProf.id), localProf];
+        saveToStorage(tenantId, 'professionals', updated);
+        return { success: true, professional: localProf };
+      }
+      return { success: false, error: error.message };
+    }
+  } catch (err: any) {
+    // Fallback de resiliencia local con UUID canónico
+    const localProf = sanitizeProfessionalItem(payload, tenantId)!;
+    const cached = getStoreProfessionals(tenantId);
+    const updated = [...cached.filter((p) => p.id !== localProf.id), localProf];
+    saveToStorage(tenantId, 'professionals', updated);
+    return { success: true, professional: localProf };
+  }
+
+  return { success: false, error: 'No se pudo crear el profesional.' };
+}
+
+/**
+ * Actualiza un profesional en Supabase como fuente canónica.
+ */
+export async function updateStoreProfessional(
+  tenantId: string,
+  profId: string,
+  updates: Partial<ProfessionalItem>
+): Promise<{ success: boolean; professional?: ProfessionalItem; error?: string }> {
+  if (!tenantId || !isValidTenantId(tenantId) || !profId) {
+    return { success: false, error: 'Parámetros no válidos.' };
+  }
+
+  const cached = getStoreProfessionals(tenantId);
+  const existing = cached.find((p) => p.id === profId);
+  if (!existing) {
+    return { success: false, error: 'Profesional no encontrado.' };
+  }
+
+  // Filtrar service_ids si se actualizan
+  let validServiceIds = existing.serviceIds;
+  if (updates.serviceIds !== undefined || updates.service_ids !== undefined) {
+    const rawIds = updates.serviceIds !== undefined ? updates.serviceIds : updates.service_ids!;
+    const storeProds = getStoreProducts(tenantId);
+    const tenantProductIds = new Set(storeProds.map((p) => p.id));
+    validServiceIds = (Array.isArray(rawIds) ? rawIds : [])
+      .filter((id) => typeof id === 'string' && isValidUUID(id))
+      .filter((id) => tenantProductIds.size === 0 || tenantProductIds.has(id));
+  }
+
+  const payload: Record<string, any> = {};
+  if (updates.name !== undefined) payload.name = String(updates.name).trim().slice(0, 150);
+  if (updates.specialty !== undefined) payload.specialty = String(updates.specialty).trim().slice(0, 150);
+  if (updates.phone !== undefined) payload.phone = String(updates.phone).trim().slice(0, 50);
+  if (updates.avatarUrl !== undefined || updates.avatar_url !== undefined) {
+    payload.avatar_url = String(updates.avatarUrl ?? updates.avatar_url ?? '').trim();
+  }
+  if (updates.isActive !== undefined || updates.is_active !== undefined) {
+    payload.is_active = Boolean(updates.isActive ?? updates.is_active);
+  }
+  if (updates.schedule !== undefined && Array.isArray(updates.schedule) && updates.schedule.length === 7) {
+    payload.schedule = updates.schedule;
+  }
+  if (updates.serviceIds !== undefined || updates.service_ids !== undefined) {
+    payload.service_ids = validServiceIds;
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('professionals')
+      .update(payload)
+      .eq('tenant_id', tenantId)
+      .eq('id', profId)
+      .select('*')
+      .maybeSingle();
+
+    if (!error && data) {
+      const sanitized = sanitizeProfessionalItem(data, tenantId);
+      if (sanitized) {
+        const updatedList = cached.map((p) => (p.id === profId ? sanitized : p));
+        saveToStorage(tenantId, 'professionals', updatedList);
+        return { success: true, professional: sanitized };
+      }
+    }
+
+    if (error && (error.code === 'PGRST205' || error.message?.includes('professionals'))) {
+      const merged = sanitizeProfessionalItem({ ...existing, ...payload, id: profId, tenant_id: tenantId }, tenantId)!;
+      const updatedList = cached.map((p) => (p.id === profId ? merged : p));
+      saveToStorage(tenantId, 'professionals', updatedList);
+      return { success: true, professional: merged };
+    }
+  } catch (err: any) {
+    const merged = sanitizeProfessionalItem({ ...existing, ...payload, id: profId, tenant_id: tenantId }, tenantId)!;
+    const updatedList = cached.map((p) => (p.id === profId ? merged : p));
+    saveToStorage(tenantId, 'professionals', updatedList);
+    return { success: true, professional: merged };
+  }
+
+  return { success: false, error: 'Error al actualizar profesional.' };
+}
+
+/**
+ * Elimina un profesional en Supabase y sincroniza la caché local.
+ */
+export async function deleteStoreProfessional(
+  tenantId: string,
+  profId: string
+): Promise<{ success: boolean; error?: string }> {
+  if (!tenantId || !isValidTenantId(tenantId) || !profId) {
+    return { success: false, error: 'Parámetros no válidos.' };
+  }
+
+  try {
+    await supabase
+      .from('professionals')
+      .delete()
+      .eq('tenant_id', tenantId)
+      .eq('id', profId);
+  } catch (err: any) {
+    console.warn('[CentralBo StoreAdmin] Aviso al eliminar en Supabase:', err?.message);
+  }
+
+  const cached = getStoreProfessionals(tenantId);
+  const updated = cached.filter((p) => p.id !== profId);
+  saveToStorage(tenantId, 'professionals', updated);
+
+  return { success: true };
 }
 
 export function saveStoreProfessionals(
   tenantId: string,
   professionals: ProfessionalItem[]
 ): void {
-  saveToStorage(tenantId, 'professionals', professionals);
+  const sanitized = (professionals || [])
+    .map((p) => sanitizeProfessionalItem(p, tenantId))
+    .filter((p): p is ProfessionalItem => p !== null && p.id !== 'prof-1' && p.id !== 'prof-2');
+  saveToStorage(tenantId, 'professionals', sanitized);
+}
+
+// ----------------------------------------------------------------------------
+// 7. CITAS, RESERVAS Y DISPONIBILIDAD (H-02 Parte 2: Persistencia y Solapamiento Real)
+// ----------------------------------------------------------------------------
+
+export function getServiceDurationMinutes(service: any): number {
+  if (!service) return 60;
+  const raw =
+    service.attributes?.duration_minutes ??
+    service.attributes?.duration ??
+    service.duration_minutes ??
+    service.duration;
+  const num = Number(raw);
+  return !isNaN(num) && num > 0 ? num : 60;
+}
+
+function timeToMinutes(timeStr: string): number {
+  if (!timeStr || typeof timeStr !== 'string') return 0;
+  const [h, m] = timeStr.split(':').map(Number);
+  return (isNaN(h) ? 0 : h) * 60 + (isNaN(m) ? 0 : m);
+}
+
+function sanitizeAppointmentRequest(data: any, tenantId: string): AppointmentRequest | null {
+  if (!data || typeof data !== 'object') return null;
+  const rawId = data.id;
+  const cleanId = typeof rawId === 'string' && rawId.trim() ? rawId.trim() : crypto.randomUUID();
+  const rawDate = typeof data.date === 'string' ? data.date.trim() : '';
+  const rawTime =
+    typeof data.time === 'string'
+      ? data.time.trim()
+      : typeof data.start_time === 'string'
+      ? data.start_time.trim()
+      : '';
+  if (!rawDate || !rawTime) return null;
+
+  return {
+    id: cleanId,
+    tenant_id: tenantId,
+    serviceId: String(data.serviceId || data.service_id || ''),
+    serviceName: String(data.serviceName || data.service_name || 'Servicio'),
+    professionalId: String(data.professionalId || data.professional_id || ''),
+    professionalName: String(data.professionalName || data.professional_name || 'Profesional'),
+    customerName: String(data.customerName || data.customer_name || 'Cliente'),
+    customerPhone: String(data.customerPhone || data.customer_phone || ''),
+    customerEmail: String(data.customerEmail || data.customer_email || ''),
+    date: rawDate,
+    time: rawTime,
+    durationMinutes: Number(data.durationMinutes || data.duration_minutes) || 60,
+    status: data.status || 'pendiente',
+    createdAt: data.createdAt || data.created_at || new Date().toISOString(),
+    updatedAt: data.updatedAt || data.updated_at,
+    notes: data.notes || '',
+  };
+}
+
+function sanitizeReservedTimeSlot(data: any, tenantId: string): ReservedTimeSlot | null {
+  if (!data || typeof data !== 'object') return null;
+  const rawId = data.id;
+  const cleanId = typeof rawId === 'string' && rawId.trim() ? rawId.trim() : crypto.randomUUID();
+  const rawDate = typeof data.date === 'string' ? data.date.trim() : '';
+  const rawTime =
+    typeof data.time === 'string'
+      ? data.time.trim()
+      : typeof data.start_time === 'string'
+      ? data.start_time.trim()
+      : '';
+  if (!rawDate || !rawTime) return null;
+
+  return {
+    id: cleanId,
+    tenant_id: tenantId,
+    professionalId: String(data.professionalId || data.professional_id || ''),
+    date: rawDate,
+    time: rawTime,
+    durationMinutes: Number(data.durationMinutes || data.duration_minutes) || 60,
+    reason: String(data.reason || 'Bloqueo manual'),
+    isExternal: Boolean(data.isExternal ?? data.is_external),
+    createdAt: data.createdAt || data.created_at || new Date().toISOString(),
+    updatedAt: data.updatedAt || data.updated_at,
+  };
 }
 
 /**
  * Genera la grilla de turnos de un profesional para una fecha específica (YYYY-MM-DD),
- * calculando los 4 estados canónicos: 'disponible', 'pendiente', 'confirmada', 'bloqueada'.
- * Respeta rigurosamente los días y horas de atención configurados para ese día.
+ * utilizando un grid fijo de inicio de 15 minutos y calculando solapamiento real por intervalo
+ * contra la duración real del servicio (products.attributes.duration_minutes).
  */
 export function getProfessionalAgendaSlots(
   tenantId: string,
   professional: ProfessionalItem,
-  dateStr: string
+  dateStr: string,
+  serviceDurationMinutes: number = 60
 ): ProfessionalAgendaSlot[] {
   if (!professional || !professional.schedule) {
     return [];
@@ -1971,52 +2732,61 @@ export function getProfessionalAgendaSlots(
   const startTotalMinutes = (isNaN(startHour) ? 9 : startHour) * 60 + (isNaN(startMin) ? 0 : startMin);
   const endTotalMinutes = (isNaN(endHour) ? 18 : endHour) * 60 + (isNaN(endMin) ? 0 : endMin);
 
-  // Intervalos de 60 minutos por sesión
-  const intervalMinutes = 60;
+  // Duración real del servicio solicitado (mínimo 15 min)
+  const duration = serviceDurationMinutes > 0 ? serviceDurationMinutes : 60;
   const rawTimes: string[] = [];
 
-  for (let m = startTotalMinutes; m + intervalMinutes <= endTotalMinutes; m += intervalMinutes) {
+  // Grid de inicio fijo de 15 minutos: solo se consideran inicios donde el servicio completo entra en la jornada
+  for (let m = startTotalMinutes; m + duration <= endTotalMinutes; m += 15) {
     const hh = String(Math.floor(m / 60)).padStart(2, '0');
     const mm = String(m % 60).padStart(2, '0');
     rawTimes.push(`${hh}:${mm}`);
   }
 
-  // Cargar bloqueos manuales / citas externas y citas del comercio
+  // Cargar bloqueos manuales y citas del comercio (fuente local/Supabase sin datos demo)
   const reservedSlots = getStoreReservedTimeSlots(tenantId);
   const appointments = getStoreAppointments(tenantId);
 
   return rawTimes.map((time) => {
-    // 1. Bloqueo manual o cita externa
-    const reserved = reservedSlots.find(
-      (r) =>
-        r.date === dateStr &&
-        r.time === time &&
-        (r.professionalId === professional.id || !r.professionalId)
-    );
+    const candStart = timeToMinutes(time);
+    const candEnd = candStart + duration;
 
-    if (reserved) {
+    // 1. Bloqueo manual o cita externa (solapamiento estricto por intervalo: startA < endB && endA > startB)
+    const matchingBlock = reservedSlots.find((r) => {
+      if (r.date !== dateStr) return false;
+      if (r.professionalId && r.professionalId !== professional.id) return false;
+      const blkStart = timeToMinutes(r.time);
+      const blkDuration = r.durationMinutes && r.durationMinutes > 0 ? r.durationMinutes : 60;
+      const blkEnd = blkStart + blkDuration;
+      return candStart < blkEnd && candEnd > blkStart;
+    });
+
+    if (matchingBlock) {
       return {
         time,
         status: 'bloqueada' as AgendaSlotStatus,
-        reason: reserved.reason || 'Bloqueo manual / Cita externa',
-        reservedSlot: reserved,
+        reason: matchingBlock.reason || 'Bloqueo manual / Cita externa',
+        reservedSlot: matchingBlock,
       };
     }
 
-    // 2. Cita solicitada en el sistema (excluyendo rechazadas)
-    const apt = appointments.find(
-      (a) =>
-        a.professionalId === professional.id &&
-        a.date === dateStr &&
-        a.time === time &&
-        a.status !== 'rechazada'
-    );
+    // 2. Cita solicitada en el sistema (solapamiento por intervalo, excluyendo rechazadas)
+    const matchingAppt = appointments.find((a) => {
+      if (a.professionalId !== professional.id) return false;
+      if (a.date !== dateStr) return false;
+      if (a.status === 'rechazada' || a.status === 'rejected') return false;
+      const apptStart = timeToMinutes(a.time);
+      const apptDuration = a.durationMinutes && a.durationMinutes > 0 ? a.durationMinutes : 60;
+      const apptEnd = apptStart + apptDuration;
+      return candStart < apptEnd && candEnd > apptStart;
+    });
 
-    if (apt) {
+    if (matchingAppt) {
+      const isConfirmed = matchingAppt.status === 'confirmada' || matchingAppt.status === 'confirmed';
       return {
         time,
-        status: apt.status as AgendaSlotStatus, // 'pendiente' | 'confirmada'
-        appointment: apt,
+        status: (isConfirmed ? 'confirmada' : 'pendiente') as AgendaSlotStatus,
+        appointment: matchingAppt,
       };
     }
 
@@ -2028,84 +2798,434 @@ export function getProfessionalAgendaSlots(
   });
 }
 
+// ----------------------------------------------------------------------------
+// BLOQUEOS MANUALES (Persistencia Central en Supabase con Caché Local)
+// ----------------------------------------------------------------------------
+
 export function getStoreReservedTimeSlots(tenantId: string): ReservedTimeSlot[] {
-  const today = new Date().toISOString().split('T')[0];
-  const defaults: ReservedTimeSlot[] = [
-    {
-      id: 'res-1',
-      tenant_id: tenantId,
-      professionalId: 'prof-1',
-      date: today,
-      time: '11:00',
-      reason: 'Cita Externa en Domicilio',
-      isExternal: true,
-    },
-    {
-      id: 'res-2',
-      tenant_id: tenantId,
-      professionalId: 'prof-2',
-      date: today,
-      time: '16:00',
-      reason: 'Mantenimiento de Cabina de Masajes',
-      isExternal: false,
-    },
-  ];
-  return loadFromStorage<ReservedTimeSlot[]>(tenantId, 'reserved_slots', defaults);
+  // Retorna únicamente los registros reales guardados; nunca inyecta demo ficticio
+  return loadFromStorage<ReservedTimeSlot[]>(tenantId, 'reserved_slots', []);
 }
 
 export function saveStoreReservedTimeSlots(
   tenantId: string,
   slots: ReservedTimeSlot[]
 ): void {
-  saveToStorage(tenantId, 'reserved_slots', slots);
+  const sanitized = (slots || [])
+    .map((s) => sanitizeReservedTimeSlot(s, tenantId))
+    .filter((s): s is ReservedTimeSlot => s !== null && s.id !== 'res-1' && s.id !== 'res-2');
+  saveToStorage(tenantId, 'reserved_slots', sanitized);
 }
 
-export function getStoreAppointments(tenantId: string): AppointmentRequest[] {
-  const today = new Date().toISOString().split('T')[0];
-  const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+export async function fetchStoreAppointmentBlocks(
+  tenantId: string
+): Promise<ReservedTimeSlot[]> {
+  try {
+    const { data, error } = await supabase
+      .from('appointment_blocks')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .order('date', { ascending: true })
+      .order('start_time', { ascending: true });
 
-  const defaults: AppointmentRequest[] = [
-    {
-      id: 'cita-101',
+    if (error) {
+      if (error.code === 'PGRST205') {
+        console.warn(
+          '[CentralBo H-02] Tabla "public.appointment_blocks" no encontrada en Supabase. Se utilizará caché local temporal.'
+        );
+      } else {
+        console.error('[CentralBo H-02] Error al consultar bloqueos en Supabase:', error);
+      }
+      return getStoreReservedTimeSlots(tenantId);
+    }
+
+    const items: ReservedTimeSlot[] = (data || []).map((row: any) => ({
+      id: row.id,
+      tenant_id: row.tenant_id,
+      professionalId: row.professional_id,
+      date: row.date,
+      time: row.start_time,
+      durationMinutes: row.duration_minutes || 60,
+      reason: row.reason || '',
+      isExternal: Boolean(row.is_external),
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    }));
+
+    saveStoreReservedTimeSlots(tenantId, items);
+    return items;
+  } catch (err) {
+    console.error('[CentralBo H-02] Excepción al consultar bloqueos:', err);
+    return getStoreReservedTimeSlots(tenantId);
+  }
+}
+
+export async function createStoreAppointmentBlock(
+  tenantId: string,
+  blockInput: Partial<ReservedTimeSlot>
+): Promise<{ success: boolean; block?: ReservedTimeSlot; error?: string }> {
+  try {
+    const blockId =
+      typeof blockInput.id === 'string' && isValidUUID(blockInput.id)
+        ? blockInput.id
+        : crypto.randomUUID();
+
+    const newBlock: ReservedTimeSlot = {
+      id: blockId,
       tenant_id: tenantId,
-      serviceId: 'srv-1',
-      serviceName: 'Masaje Descontracturante Profundo (60 min)',
-      professionalId: 'prof-2',
-      professionalName: 'Dr. Roberto Mendoza',
-      customerName: 'Silvia Vargas',
-      customerPhone: '+591 78912345',
-      customerEmail: 'silvia.vargas@email.bo',
-      date: today,
-      time: '15:00',
-      status: 'pendiente',
-      createdAt: '2026-09-07T08:15:00Z',
-      notes: 'Sufro de tensión en cuello y hombros por trabajo sedentario.',
-    },
-    {
-      id: 'cita-102',
-      tenant_id: tenantId,
-      serviceId: 'srv-2',
-      serviceName: 'Limpieza Facial Hidratante con Ácido Hialurónico (45 min)',
-      professionalId: 'prof-1',
-      professionalName: 'Lic. Claudia Morales',
-      customerName: 'Carlos Paredes',
-      customerPhone: '+591 76543219',
-      customerEmail: 'cparedes@gmail.com',
-      date: tomorrow,
-      time: '10:30',
-      status: 'confirmada',
-      createdAt: '2026-09-06T19:40:00Z',
-      notes: 'Primera sesión facial.',
-    },
-  ];
-  return loadFromStorage<AppointmentRequest[]>(tenantId, 'appointments', defaults);
+      professionalId: blockInput.professionalId || '',
+      date: blockInput.date || new Date().toISOString().split('T')[0],
+      time: blockInput.time || '09:00',
+      durationMinutes: Number(blockInput.durationMinutes) || 60,
+      reason: (blockInput.reason || 'Bloqueo manual').trim(),
+      isExternal: Boolean(blockInput.isExternal),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    const { error } = await supabase
+      .from('appointment_blocks')
+      .insert({
+        id: newBlock.id,
+        tenant_id: tenantId,
+        professional_id: newBlock.professionalId,
+        date: newBlock.date,
+        start_time: newBlock.time,
+        duration_minutes: newBlock.durationMinutes,
+        reason: newBlock.reason,
+        is_external: newBlock.isExternal,
+      });
+
+    if (error && error.code !== 'PGRST205') {
+      console.error('[CentralBo H-02] Error al insertar bloqueo en Supabase:', error);
+      return { success: false, error: error.message };
+    }
+
+    const current = getStoreReservedTimeSlots(tenantId);
+    saveStoreReservedTimeSlots(tenantId, [newBlock, ...current.filter((b) => b.id !== newBlock.id)]);
+
+    return { success: true, block: newBlock };
+  } catch (err: any) {
+    console.error('[CentralBo H-02] Excepción al crear bloqueo:', err);
+    return { success: false, error: err?.message || 'Error inesperado al crear bloqueo' };
+  }
+}
+
+export async function deleteStoreAppointmentBlock(
+  tenantId: string,
+  blockId: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { error } = await supabase
+      .from('appointment_blocks')
+      .delete()
+      .eq('id', blockId)
+      .eq('tenant_id', tenantId);
+
+    if (error && error.code !== 'PGRST205') {
+      console.error('[CentralBo H-02] Error al eliminar bloqueo en Supabase:', error);
+      return { success: false, error: error.message };
+    }
+
+    const current = getStoreReservedTimeSlots(tenantId);
+    saveStoreReservedTimeSlots(tenantId, current.filter((b) => b.id !== blockId));
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'Error al eliminar bloqueo' };
+  }
+}
+
+// ----------------------------------------------------------------------------
+// CITAS / RESERVAS (Persistencia Central en Supabase con Caché Local)
+// ----------------------------------------------------------------------------
+
+export function getStoreAppointments(tenantId: string): AppointmentRequest[] {
+  // Retorna únicamente citas reales; nunca inyecta demo ficticio
+  return loadFromStorage<AppointmentRequest[]>(tenantId, 'appointments', []);
 }
 
 export function saveStoreAppointments(
   tenantId: string,
   appointments: AppointmentRequest[]
 ): void {
-  saveToStorage(tenantId, 'appointments', appointments);
+  const sanitized = (appointments || [])
+    .map((a) => sanitizeAppointmentRequest(a, tenantId))
+    .filter((a): a is AppointmentRequest => a !== null && a.id !== 'cita-101' && a.id !== 'cita-102');
+  saveToStorage(tenantId, 'appointments', sanitized);
+}
+
+export async function fetchStoreAppointments(
+  tenantId: string
+): Promise<AppointmentRequest[]> {
+  try {
+    const { data, error } = await supabase
+      .from('appointments')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .order('date', { ascending: false })
+      .order('start_time', { ascending: true });
+
+    if (error) {
+      if (error.code === 'PGRST205') {
+        console.warn(
+          '[CentralBo H-02] Tabla "public.appointments" no encontrada en Supabase. Se utilizará caché local temporal.'
+        );
+      } else {
+        console.error('[CentralBo H-02] Error al consultar citas en Supabase:', error);
+      }
+      return getStoreAppointments(tenantId);
+    }
+
+    const items: AppointmentRequest[] = (data || []).map((row: any) => ({
+      id: row.id,
+      tenant_id: row.tenant_id,
+      serviceId: row.service_id,
+      serviceName: row.service_name,
+      professionalId: row.professional_id,
+      professionalName: row.professional_name,
+      customerName: row.customer_name,
+      customerPhone: row.customer_phone,
+      customerEmail: row.customer_email || '',
+      date: row.date,
+      time: row.start_time,
+      durationMinutes: row.duration_minutes || 60,
+      status: row.status,
+      notes: row.notes || '',
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    }));
+
+    saveStoreAppointments(tenantId, items);
+    return items;
+  } catch (err) {
+    console.error('[CentralBo H-02] Excepción al consultar citas:', err);
+    return getStoreAppointments(tenantId);
+  }
+}
+
+export async function createStoreAppointment(
+  tenantId: string,
+  apptInput: Partial<AppointmentRequest>
+): Promise<{ success: boolean; appointment?: AppointmentRequest; error?: string }> {
+  try {
+    // 1. Intentar creación atómica server-side (protección de concurrencia y validación central)
+    const payload = {
+      id: apptInput.id && isValidUUID(apptInput.id) ? apptInput.id : crypto.randomUUID(),
+      tenantId,
+      serviceId: apptInput.serviceId,
+      serviceName: apptInput.serviceName,
+      professionalId: apptInput.professionalId,
+      professionalName: apptInput.professionalName,
+      customerName: apptInput.customerName,
+      customerPhone: apptInput.customerPhone,
+      customerEmail: apptInput.customerEmail,
+      date: apptInput.date,
+      startTime: apptInput.time,
+      durationMinutes: apptInput.durationMinutes || 60,
+      notes: apptInput.notes,
+    };
+
+    const res = await fetch('/api/appointments/create-appointment', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const resData = await res.json().catch(() => null);
+
+    if (!res.ok || !resData?.success) {
+      return {
+        success: false,
+        error: resData?.error || 'No se pudo reservar el turno. Por favor selecciona otro horario.',
+      };
+    }
+
+    const created: AppointmentRequest = {
+      id: resData.appointment?.id || payload.id,
+      tenant_id: tenantId,
+      serviceId: payload.serviceId || '',
+      serviceName: payload.serviceName || 'Servicio',
+      professionalId: payload.professionalId || '',
+      professionalName: payload.professionalName || 'Profesional',
+      customerName: payload.customerName || 'Cliente',
+      customerPhone: payload.customerPhone || '',
+      customerEmail: payload.customerEmail || '',
+      date: payload.date || '',
+      time: payload.startTime || '',
+      durationMinutes: payload.durationMinutes,
+      status: (resData.appointment?.status || 'pending') as any,
+      notes: payload.notes || '',
+      createdAt: resData.appointment?.created_at || new Date().toISOString(),
+    };
+
+    // Actualizar caché local
+    const current = getStoreAppointments(tenantId);
+    saveStoreAppointments(tenantId, [created, ...current.filter((a) => a.id !== created.id)]);
+
+    return { success: true, appointment: created };
+  } catch (err: any) {
+    console.error('[CentralBo H-02] Excepción al crear cita:', err);
+    return { success: false, error: err?.message || 'Error de conexión al procesar la cita.' };
+  }
+}
+
+export async function updateAppointmentStatus(
+  tenantId: string,
+  appointmentId: string,
+  newStatus: 'confirmada' | 'rechazada' | 'pending' | 'confirmed' | 'rejected'
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const dbStatus =
+      newStatus === 'confirmada' ? 'confirmed' : newStatus === 'rechazada' ? 'rejected' : newStatus;
+
+    const { error } = await supabase
+      .from('appointments')
+      .update({
+        status: dbStatus,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', appointmentId)
+      .eq('tenant_id', tenantId);
+
+    if (error && error.code !== 'PGRST205') {
+      console.error('[CentralBo H-02] Error al actualizar estado de cita en Supabase:', error);
+      return { success: false, error: error.message };
+    }
+
+    const current = getStoreAppointments(tenantId);
+    const updated = current.map((a) =>
+      a.id === appointmentId
+        ? { ...a, status: newStatus as any, updatedAt: new Date().toISOString() }
+        : a
+    );
+    saveStoreAppointments(tenantId, updated);
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'Error al actualizar estado de la cita' };
+  }
+}
+
+export async function deleteStoreAppointment(
+  tenantId: string,
+  appointmentId: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { error } = await supabase
+      .from('appointments')
+      .delete()
+      .eq('id', appointmentId)
+      .eq('tenant_id', tenantId);
+
+    if (error && error.code !== 'PGRST205') {
+      console.error('[CentralBo H-02] Error al eliminar cita en Supabase:', error);
+      return { success: false, error: error.message };
+    }
+
+    const current = getStoreAppointments(tenantId);
+    saveStoreAppointments(tenantId, current.filter((a) => a.id !== appointmentId));
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'Error al eliminar cita' };
+  }
+}
+
+export function computePublicAgendaSlotsFromIntervals(
+  professional: ProfessionalItem,
+  dateStr: string,
+  serviceDurationMinutes: number,
+  occupiedIntervals: Array<{ startTime: string; durationMinutes: number }>
+): ProfessionalAgendaSlot[] {
+  if (!professional || !professional.schedule) {
+    return [];
+  }
+
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const targetDate = new Date(year, month - 1, day, 12, 0, 0);
+  const dayOfWeek = targetDate.getDay();
+
+  const daySchedule = professional.schedule.find((s) => s.dayOfWeek === dayOfWeek);
+  if (!daySchedule || !daySchedule.isOpen) {
+    return [];
+  }
+
+  const [startHour, startMin] = (daySchedule.startTime || '09:00').split(':').map(Number);
+  const [endHour, endMin] = (daySchedule.endTime || '18:00').split(':').map(Number);
+
+  const startTotalMinutes = (isNaN(startHour) ? 9 : startHour) * 60 + (isNaN(startMin) ? 0 : startMin);
+  const endTotalMinutes = (isNaN(endHour) ? 18 : endHour) * 60 + (isNaN(endMin) ? 0 : endMin);
+
+  const duration = serviceDurationMinutes > 0 ? serviceDurationMinutes : 60;
+  const rawTimes: string[] = [];
+
+  for (let m = startTotalMinutes; m + duration <= endTotalMinutes; m += 15) {
+    const hh = String(Math.floor(m / 60)).padStart(2, '0');
+    const mm = String(m % 60).padStart(2, '0');
+    rawTimes.push(`${hh}:${mm}`);
+  }
+
+  return rawTimes.map((time) => {
+    const candStart = timeToMinutes(time);
+    const candEnd = candStart + duration;
+
+    const isOccupied = (occupiedIntervals || []).some((occ) => {
+      const occStart = timeToMinutes(occ.startTime);
+      const occDur = Number(occ.durationMinutes) || 60;
+      const occEnd = occStart + occDur;
+      return candStart < occEnd && candEnd > occStart;
+    });
+
+    if (isOccupied) {
+      return {
+        time,
+        status: 'bloqueada' as AgendaSlotStatus,
+        reason: 'Horario no disponible',
+      };
+    }
+
+    return {
+      time,
+      status: 'disponible' as AgendaSlotStatus,
+    };
+  });
+}
+
+export async function fetchProfessionalAgendaSlots(
+  tenantId: string,
+  professional: ProfessionalItem,
+  dateStr: string,
+  serviceDurationMinutes: number = 60
+): Promise<ProfessionalAgendaSlot[]> {
+  try {
+    // 1. Consultar endpoint seguro de disponibilidad (cero exposición de datos privados)
+    const res = await fetch(
+      `/api/appointments/availability?tenantId=${encodeURIComponent(tenantId)}&professionalId=${encodeURIComponent(
+        professional.id
+      )}&date=${encodeURIComponent(dateStr)}`
+    );
+
+    if (res.ok) {
+      const data = await res.json().catch(() => null);
+      if (data?.success && Array.isArray(data.intervals)) {
+        return computePublicAgendaSlotsFromIntervals(
+          professional,
+          dateStr,
+          serviceDurationMinutes,
+          data.intervals
+        );
+      }
+    }
+  } catch (err) {
+    console.warn('[CentralBo Agenda] Error al consultar API de disponibilidad, usando cálculo local:', err);
+  }
+
+  // Fallback si la API no está disponible
+  await Promise.all([
+    fetchStoreAppointmentBlocks(tenantId).catch(() => []),
+    fetchStoreAppointments(tenantId).catch(() => []),
+  ]);
+  return getProfessionalAgendaSlots(tenantId, professional, dateStr, serviceDurationMinutes);
 }
 
 // ----------------------------------------------------------------------------
@@ -2990,6 +4110,50 @@ export async function fetchStoreOrders(tenantId: string): Promise<Order[]> {
 
   // Respaldo de pedidos en caché local
   return getStoreOrders(tenantId);
+}
+
+/**
+ * Recupera de forma canónica las líneas de un pedido desde Supabase (order_items),
+ * enriquecidas con el nombre de producto desde la tabla products.
+ * Respeta estrictamente el aislamiento por tenant_id.
+ */
+export async function fetchOrderItems(
+  tenantId: string,
+  orderId: string
+): Promise<OrderItemDetail[]> {
+  if (!tenantId || !orderId) return [];
+
+  try {
+    const { data, error } = await supabase
+      .from('order_items')
+      .select('id, tenant_id, order_id, product_id, quantity, unit_price, created_at, products(name, image_url)')
+      .eq('tenant_id', tenantId)
+      .eq('order_id', orderId)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.warn('[CentralBo StoreAdmin] Error al consultar order_items:', error.message);
+      return [];
+    }
+
+    if (Array.isArray(data)) {
+      return data.map((item: any) => ({
+        id: String(item.id),
+        tenant_id: String(item.tenant_id),
+        order_id: String(item.order_id),
+        product_id: String(item.product_id),
+        quantity: Number(item.quantity) || 1,
+        unit_price: Number(item.unit_price) || 0,
+        created_at: item.created_at || new Date().toISOString(),
+        product_name: item.products?.name || undefined,
+        product_image_url: item.products?.image_url || null,
+      }));
+    }
+  } catch (err) {
+    console.warn('[CentralBo StoreAdmin] Excepción al consultar order_items:', err);
+  }
+
+  return [];
 }
 
 export function saveStoreOrders(tenantId: string, orders: Order[]): void {
