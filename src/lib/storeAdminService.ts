@@ -4220,42 +4220,327 @@ export async function updateOrderStatus(
 }
 
 // ----------------------------------------------------------------------------
-// 11. PROMOCIONES
+// 11. PROMOCIONES (FASE 2 - PARTE 1: PERSISTENCIA CANÓNICA Y ADMINISTRACIÓN)
 // ----------------------------------------------------------------------------
-export function getStorePromotions(tenantId: string): PromotionCode[] {
-  const defaultPromotions: PromotionCode[] = [
-    {
-      id: 'promo-1',
-      tenant_id: tenantId,
-      code: 'BIENVENIDO10',
-      discountType: 'percentage',
-      discountValue: 10,
-      startDate: '2026-09-01',
-      endDate: '2026-09-30',
-      minPurchase: 50,
-      isActive: true,
-    },
-    {
-      id: 'promo-2',
-      tenant_id: tenantId,
-      code: 'ENVIOGRATIS20',
-      discountType: 'fixed',
-      discountValue: 15,
-      startDate: '2026-09-01',
-      endDate: '2026-09-15',
-      minPurchase: 100,
-      isActive: true,
-    },
-  ];
 
-  return loadFromStorage<PromotionCode[]>(tenantId, 'promotions', defaultPromotions);
+export interface DbPromotionRow {
+  id: string;
+  tenant_id: string;
+  code: string;
+  discount_type: 'percentage' | 'fixed';
+  discount_value: number;
+  start_date: string;
+  end_date: string;
+  min_purchase: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
+function mapDbRowToPromotion(row: any): PromotionCode {
+  return {
+    id: String(row.id),
+    tenant_id: String(row.tenant_id),
+    code: String(row.code).trim().toUpperCase(),
+    discountType: row.discount_type === 'fixed' ? 'fixed' : 'percentage',
+    discountValue: Number(row.discount_value) || 0,
+    startDate: String(row.start_date || ''),
+    endDate: String(row.end_date || ''),
+    minPurchase: Number(row.min_purchase) || 0,
+    isActive: Boolean(row.is_active),
+    createdAt: row.created_at ? String(row.created_at) : undefined,
+    updatedAt: row.updated_at ? String(row.updated_at) : undefined,
+  };
+}
+
+/**
+ * Obtiene las promociones cacheadas localmente para un tenant.
+ * NOTA CANÓNICA: Retorna exclusivamente la caché local. Si está vacía retorna [],
+ * NUNCA datos ficticios ni fallbacks demo como BIENVENIDO10 o ENVIOGRATIS20.
+ */
+export function getCachedStorePromotions(tenantId: string): PromotionCode[] {
+  if (!tenantId) return [];
+  return loadFromStorage<PromotionCode[]>(tenantId, 'promotions', []);
+}
+
+/**
+ * Mantiene compatibilidad sincrónica para lectores existentes utilizando la caché local no-autoritativa.
+ */
+export function getStorePromotions(tenantId: string): PromotionCode[] {
+  return getCachedStorePromotions(tenantId);
+}
+
+/**
+ * Actualiza la caché local de promociones del tenant.
+ */
 export function saveStorePromotions(
   tenantId: string,
   promos: PromotionCode[]
 ): void {
+  if (!tenantId) return;
   saveToStorage(tenantId, 'promotions', promos);
+}
+
+/**
+ * Consulta canónica de promociones directamente desde Supabase.
+ * En caso de éxito, actualiza la caché local.
+ */
+export async function fetchStorePromotions(tenantId: string): Promise<PromotionCode[]> {
+  if (!tenantId || !isValidTenantId(tenantId)) {
+    return getCachedStorePromotions(tenantId);
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('promotions')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      if (error.code === '42P01' || error.code === 'PGRST205' || error.message?.includes('promotions')) {
+        console.warn('[CentralBo StoreAdmin] Tabla public.promotions pendiente de migración en Supabase:', error.message);
+      } else {
+        console.error('[CentralBo StoreAdmin] Error al consultar promociones en Supabase:', error.message);
+      }
+      return getCachedStorePromotions(tenantId);
+    }
+
+    if (Array.isArray(data)) {
+      const canonicalPromotions = data.map(mapDbRowToPromotion);
+      saveStorePromotions(tenantId, canonicalPromotions);
+      return canonicalPromotions;
+    }
+  } catch (err) {
+    console.error('[CentralBo StoreAdmin] Excepción inesperada al consultar promociones:', err);
+  }
+
+  return getCachedStorePromotions(tenantId);
+}
+
+/**
+ * Crea una nueva promoción canónica en Supabase.
+ * Genera el UUID persistente en el backend y valida unicidad por (tenant_id, code).
+ * La caché local se actualiza exclusivamente tras confirmación remota exitosa.
+ */
+export async function createStorePromotion(
+  tenantId: string,
+  promoData: Omit<PromotionCode, 'id'>
+): Promise<{ success: boolean; data?: PromotionCode; error?: string }> {
+  if (!tenantId || !isValidTenantId(tenantId)) {
+    return { success: false, error: 'Identificador de comercio (tenantId) inválido.' };
+  }
+
+  const cleanCode = (promoData.code || '').trim().toUpperCase().replace(/\s+/g, '');
+  if (!cleanCode) {
+    return { success: false, error: 'El código promocional no puede estar vacío.' };
+  }
+
+  const numDiscount = Number(promoData.discountValue);
+  if (!Number.isFinite(numDiscount) || numDiscount <= 0) {
+    return { success: false, error: 'El valor de descuento debe ser un número positivo.' };
+  }
+
+  const numMinPurchase = Number(promoData.minPurchase || 0);
+  if (!Number.isFinite(numMinPurchase) || numMinPurchase < 0) {
+    return { success: false, error: 'El monto de compra mínima no puede ser negativo.' };
+  }
+
+  const dbPayload = {
+    tenant_id: tenantId,
+    code: cleanCode,
+    discount_type: promoData.discountType === 'fixed' ? 'fixed' : 'percentage',
+    discount_value: numDiscount,
+    start_date: promoData.startDate || new Date().toISOString().split('T')[0],
+    end_date: promoData.endDate || new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
+    min_purchase: numMinPurchase,
+    is_active: promoData.isActive !== undefined ? Boolean(promoData.isActive) : true,
+  };
+
+  try {
+    const { data, error } = await supabase
+      .from('promotions')
+      .insert(dbPayload)
+      .select('*')
+      .single();
+
+    if (error) {
+      if (
+        error.code === '23505' ||
+        error.message?.includes('uq_promotions_tenant_code') ||
+        error.message?.includes('duplicate key')
+      ) {
+        return {
+          success: false,
+          error: `El código promocional "${cleanCode}" ya existe en este comercio.`,
+        };
+      }
+      return {
+        success: false,
+        error: error.message || 'Error al persistir la promoción en la base de datos.',
+      };
+    }
+
+    if (data) {
+      const createdPromo = mapDbRowToPromotion(data);
+      const currentCached = getCachedStorePromotions(tenantId);
+      const updatedCache = [createdPromo, ...currentCached.filter(p => p.id !== createdPromo.id)];
+      saveStorePromotions(tenantId, updatedCache);
+      return { success: true, data: createdPromo };
+    }
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err?.message || 'Excepción inesperada al crear promoción.',
+    };
+  }
+
+  return { success: false, error: 'Respuesta inválida del servidor.' };
+}
+
+/**
+ * Actualiza puntualmente una promoción en Supabase (edición, pausar, reactivar).
+ * La caché local se actualiza exclusivamente tras confirmación remota exitosa.
+ */
+export async function updateStorePromotion(
+  tenantId: string,
+  promoId: string,
+  updates: Partial<PromotionCode>
+): Promise<{ success: boolean; data?: PromotionCode; error?: string }> {
+  if (!tenantId || !isValidTenantId(tenantId)) {
+    return { success: false, error: 'Identificador de comercio (tenantId) inválido.' };
+  }
+
+  if (!promoId || !promoId.trim()) {
+    return { success: false, error: 'Identificador de promoción no proporcionado.' };
+  }
+
+  const dbUpdates: Record<string, any> = {
+    updated_at: new Date().toISOString(),
+  };
+
+  if (updates.code !== undefined) {
+    const cleanCode = updates.code.trim().toUpperCase().replace(/\s+/g, '');
+    if (!cleanCode) {
+      return { success: false, error: 'El código promocional no puede estar vacío.' };
+    }
+    dbUpdates.code = cleanCode;
+  }
+
+  if (updates.discountType !== undefined) {
+    dbUpdates.discount_type = updates.discountType === 'fixed' ? 'fixed' : 'percentage';
+  }
+
+  if (updates.discountValue !== undefined) {
+    const val = Number(updates.discountValue);
+    if (!Number.isFinite(val) || val <= 0) {
+      return { success: false, error: 'El valor de descuento debe ser un número positivo.' };
+    }
+    dbUpdates.discount_value = val;
+  }
+
+  if (updates.startDate !== undefined) {
+    dbUpdates.start_date = updates.startDate;
+  }
+
+  if (updates.endDate !== undefined) {
+    dbUpdates.end_date = updates.endDate;
+  }
+
+  if (updates.minPurchase !== undefined) {
+    const minP = Number(updates.minPurchase);
+    if (!Number.isFinite(minP) || minP < 0) {
+      return { success: false, error: 'La compra mínima no puede ser negativa.' };
+    }
+    dbUpdates.min_purchase = minP;
+  }
+
+  if (updates.isActive !== undefined) {
+    dbUpdates.is_active = Boolean(updates.isActive);
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('promotions')
+      .update(dbUpdates)
+      .eq('id', promoId)
+      .eq('tenant_id', tenantId)
+      .select('*')
+      .single();
+
+    if (error) {
+      if (
+        error.code === '23505' ||
+        error.message?.includes('uq_promotions_tenant_code') ||
+        error.message?.includes('duplicate key')
+      ) {
+        return {
+          success: false,
+          error: 'El código promocional ya existe en este comercio.',
+        };
+      }
+      return {
+        success: false,
+        error: error.message || 'Error al actualizar la promoción en la base de datos.',
+      };
+    }
+
+    if (data) {
+      const updatedPromo = mapDbRowToPromotion(data);
+      const currentCached = getCachedStorePromotions(tenantId);
+      const updatedCache = currentCached.map(p => p.id === promoId ? updatedPromo : p);
+      saveStorePromotions(tenantId, updatedCache);
+      return { success: true, data: updatedPromo };
+    }
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err?.message || 'Excepción al actualizar promoción.',
+    };
+  }
+
+  return { success: false, error: 'No se pudo actualizar la promoción.' };
+}
+
+/**
+ * Elimina una promoción exclusivamente en Supabase por ID y tenant_id.
+ * La caché local se actualiza únicamente tras confirmación remota exitosa.
+ */
+export async function deleteStorePromotion(
+  tenantId: string,
+  promoId: string
+): Promise<{ success: boolean; error?: string }> {
+  if (!tenantId || !isValidTenantId(tenantId)) {
+    return { success: false, error: 'Identificador de comercio (tenantId) inválido.' };
+  }
+
+  if (!promoId || !promoId.trim()) {
+    return { success: false, error: 'Identificador de promoción inválido.' };
+  }
+
+  try {
+    const { error } = await supabase
+      .from('promotions')
+      .delete()
+      .eq('id', promoId)
+      .eq('tenant_id', tenantId);
+
+    if (error) {
+      return {
+        success: false,
+        error: error.message || 'Error al eliminar la promoción en Supabase.',
+      };
+    }
+
+    const currentCached = getCachedStorePromotions(tenantId);
+    saveStorePromotions(tenantId, currentCached.filter(p => p.id !== promoId));
+    return { success: true };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err?.message || 'Excepción al eliminar promoción.',
+    };
+  }
 }
 
 // ----------------------------------------------------------------------------

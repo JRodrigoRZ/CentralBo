@@ -507,6 +507,8 @@ export interface PromotionCode {
   endDate: string;
   minPurchase: number; // en Bs (0 = sin mínimo)
   isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface StoreStatistics {
