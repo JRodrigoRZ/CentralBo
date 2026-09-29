@@ -19,14 +19,12 @@ import {
   getSuperAdminStores,
   fetchSuperAdminStores,
 } from '../../lib/superadminService';
-import { SuperAdminStoreRecord, Store, StoreType, StoreStatus } from '../../types';
-import { StoreAdminArea } from '../StoreAdminArea';
+import { SuperAdminStoreRecord, StoreType, StoreStatus } from '../../types';
 import { useRouter } from '../../context/RouterContext';
 
 export const SuperAdminGestionTiendas: React.FC = () => {
   const [stores, setStores] = useState<SuperAdminStoreRecord[]>(getSuperAdminStores());
   const [loading, setLoading] = useState<boolean>(true);
-  const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const { navigate } = useRouter();
 
@@ -49,32 +47,6 @@ export const SuperAdminGestionTiendas: React.FC = () => {
       window.removeEventListener('centralbo:superadmin_stores_changed', handleStoresChanged);
     };
   }, []);
-
-  const selectedStore = stores.find((s) => s.id === selectedStoreId);
-
-  // Si se ha seleccionado una tienda, se monta la Administración de Tienda existente
-  if (selectedStoreId && selectedStore) {
-    const adaptedStore: Store = {
-      id: selectedStore.id,
-      name: selectedStore.name,
-      slug: selectedStore.slug,
-      store_type: selectedStore.store_type,
-      status: selectedStore.status,
-      logo_url: selectedStore.logo_url,
-      created_at: selectedStore.created_at,
-      updated_at: selectedStore.updated_at,
-    };
-
-    return (
-      <div className="w-full space-y-4">
-        <StoreAdminArea
-          tenantId={selectedStore.id}
-          initialStore={adaptedStore}
-          onBack={() => setSelectedStoreId(null)}
-        />
-      </div>
-    );
-  }
 
   // Filtrado de tiendas por búsqueda
   const filteredStores = stores.filter((s) => {
@@ -240,7 +212,7 @@ export const SuperAdminGestionTiendas: React.FC = () => {
               <div className="flex items-center gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
                 <button
                   type="button"
-                  onClick={() => setSelectedStoreId(store.id)}
+                  onClick={() => navigate(`/admin/${store.id}`)}
                   className="flex-1 inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition cursor-pointer shadow-xs"
                 >
                   <StoreIcon className="w-3.5 h-3.5" />

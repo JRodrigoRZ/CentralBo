@@ -94,6 +94,17 @@ export const StoreAdminArea: React.FC<StoreAdminAreaProps> = ({
     };
   }, [activeTenantId]);
 
+  // Inyección reactiva del manifiesto PWA específico para la administración de este comercio
+  useAdminPWA(
+    store
+      ? {
+          tenantId: store.id,
+          storeName: store.name,
+          description: store.description,
+        }
+      : null
+  );
+
   // Si la sesión aún está cargando o resolviendo el perfil, mostrar estado de carga limpio
   if (isLoading) {
     return (
@@ -169,17 +180,6 @@ export const StoreAdminArea: React.FC<StoreAdminAreaProps> = ({
 
   const currentStore = store;
   const planInfo = getStorePlan(currentStore.id);
-
-  // Inyección reactiva del manifiesto PWA específico para la administración de este comercio
-  useAdminPWA(
-    currentStore
-      ? {
-          tenantId: currentStore.id,
-          storeName: currentStore.name,
-          description: currentStore.description,
-        }
-      : null
-  );
 
   // Navegación jerárquica con grupos
   const isMiTiendaGroup = activeTab.startsWith('tienda_');
@@ -510,7 +510,7 @@ export const StoreAdminArea: React.FC<StoreAdminAreaProps> = ({
         {/* CUERPO DEL PANEL ADMINISTRATIVO */}
         <main className="flex-1 p-3 sm:p-4 lg:p-5 w-full max-w-6xl mx-auto space-y-3 sm:space-y-3.5">
           {/* Banner de SuperAdmin cuando está administrando una tienda seleccionada */}
-          {onBack && (
+          {(onBack || user?.profile === 'superadmin') && (
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/40 text-blue-800 dark:text-blue-200 text-xs shadow-2xs">
               <div className="flex items-center gap-2">
                 <ShieldCheck className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
@@ -520,7 +520,7 @@ export const StoreAdminArea: React.FC<StoreAdminAreaProps> = ({
               </div>
               <button
                 type="button"
-                onClick={onBack}
+                onClick={onBack ? onBack : () => navigate('/superadmin')}
                 className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition cursor-pointer shadow-xs whitespace-nowrap self-start sm:self-auto"
               >
                 <ArrowLeft className="w-3 h-3" />
