@@ -10,10 +10,18 @@ interface AuthContextType {
   profile: CentralBoProfile;
   isLoading: boolean;
   error: string | null;
+  isPasswordRecovery: boolean;
+  setIsPasswordRecovery: (isRecovery: boolean) => void;
   signInWithPassword: (
     email: string,
     password: string
   ) => Promise<{ success: boolean; error?: string; user?: AuthenticatedUser }>;
+  updatePassword: (
+    newPassword: string
+  ) => Promise<{ success: boolean; error?: string }>;
+  resetPasswordForEmail: (
+    email: string
+  ) => Promise<{ success: boolean; error?: string }>;
   switchDemoProfile: (type: 'superadmin' | 'adminRoma' | 'adminMilano' | 'adminZenit' | 'adminLosAndes' | 'public') => void;
   signOut: () => Promise<void>;
   clearError: () => void;
@@ -25,6 +33,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<AuthenticatedUser | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return (
+        window.location.hash.includes('type=recovery') ||
+        window.location.search.includes('type=recovery')
+      );
+    }
+    return false;
+  });
 
   // Inicialización de sesión
   useEffect(() => {
@@ -38,6 +55,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try {
           localStorage.removeItem(SESSION_STORAGE_KEY);
         } catch {}
+
+        if (
+          typeof window !== 'undefined' &&
+          (window.location.hash.includes('type=recovery') ||
+            window.location.search.includes('type=recovery'))
+        ) {
+          setIsPasswordRecovery(true);
+        }
 
         // Verificar sesión activa legítima exclusivamente desde Supabase Auth
         const { data, error: sessionError } = await supabase.auth.getSession();
@@ -68,12 +93,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     initSession();
 
-    // 2. Suscripción a cambios en Supabase Auth
+    // 2. Suscripción a cambios en Supabase Auth (incluyendo PASSWORD_RECOVERY)
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!mounted) return;
 
-        if (event === 'SIGNED_IN' && session?.user) {
+        if (event === 'PASSWORD_RECOVERY') {
+          setIsPasswordRecovery(true);
+          if (session?.user) {
+            const resolved = await resolveUserProfile(
+              session.user.id,
+              session.user.email || ''
+            );
+            setUser(resolved);
+          }
+          setIsLoading(false);
+        } else if (event === 'SIGNED_IN' && session?.user) {
           setIsLoading(true);
           const resolved = await resolveUserProfile(
             session.user.id,
@@ -86,6 +121,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setIsLoading(false);
         } else if (event === 'SIGNED_OUT') {
           setUser(null);
+          setIsPasswordRecovery(false);
           try {
             localStorage.removeItem(SESSION_STORAGE_KEY);
           } catch {}
@@ -139,6 +175,56 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Actualizar contraseña del usuario autenticado mediante Supabase Auth
+  const updatePassword = async (
+    newPassword: string
+  ): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (updateError) {
+        return { success: false, error: updateError.message };
+      }
+
+      setIsPasswordRecovery(false);
+      return { success: true };
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : 'Error inesperado al actualizar la contraseña';
+      return { success: false, error: message };
+    }
+  };
+
+  // Solicitar enlace de recuperación de contraseña por correo mediante Supabase Auth
+  const resetPasswordForEmail = async (
+    email: string
+  ): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const cleanEmail = email.trim().toLowerCase();
+      const origin =
+        typeof window !== 'undefined' && window.location.origin
+          ? window.location.origin
+          : 'https://centralbo.bo';
+      const redirectTo = `${origin}/#/login`;
+
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
+        redirectTo,
+      });
+
+      if (resetError) {
+        return { success: false, error: resetError.message };
+      }
+
+      return { success: true };
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : 'Error inesperado al solicitar restablecimiento';
+      return { success: false, error: message };
+    }
+  };
+
   // Selector rápido de perfiles (solo permite limpiar sesión o cerrar acceso; no inyecta identidades ficticias)
   const switchDemoProfile = (
     type: 'superadmin' | 'adminRoma' | 'adminMilano' | 'adminZenit' | 'adminLosAndes' | 'public'
@@ -177,7 +263,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         profile,
         isLoading,
         error,
+        isPasswordRecovery,
+        setIsPasswordRecovery,
         signInWithPassword,
+        updatePassword,
+        resetPasswordForEmail,
         switchDemoProfile,
         signOut,
         clearError: () => setError(null),

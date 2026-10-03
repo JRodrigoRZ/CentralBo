@@ -11,29 +11,82 @@ interface RouterContextType {
 const RouterContext = createContext<RouterContextType | undefined>(undefined);
 
 /**
+ * Detecta si el hostname actual corresponde a un subdominio de tienda en producción (ej. cafedelicia.centralbo.bo)
+ * Reglas:
+ * - Debe ser un subdominio de centralbo.bo
+ * - centralbo.bo NO produce slug de tienda
+ * - www.centralbo.bo NO produce slug de tienda
+ * - Entornos de desarrollo/preview (localhost, 127.0.0.1, *.run.app, etc.) devuelven null
+ */
+export function getStoreSlugFromHostname(): string | null {
+  if (typeof window === 'undefined') return null;
+
+  try {
+    const rawHostname = window.location.hostname || '';
+    const hostname = rawHostname.toLowerCase().split(':')[0].trim();
+    const baseDomain = 'centralbo.bo';
+
+    // Debe ser estrictamente un subdominio de centralbo.bo
+    if (!hostname.endsWith(`.${baseDomain}`)) {
+      return null;
+    }
+
+    // Extraer la porción anterior a .centralbo.bo
+    const subdomain = hostname.slice(0, -(baseDomain.length + 1)).trim();
+
+    // Validar que no sea vacío ni 'www'
+    if (!subdomain || subdomain === 'www') {
+      return null;
+    }
+
+    // Si hubiera subdominios anidados (ej. promo.cafedelicia), extraer el slug correspondiente
+    const parts = subdomain.split('.');
+    const candidateSlug = parts[parts.length - 1];
+    if (!candidateSlug || candidateSlug === 'www') {
+      return null;
+    }
+
+    return candidateSlug;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Resuelve la ruta inicial respetando el parámetro de apertura PWA (?pwa_slug=... o ?pwa_admin=...),
- * el hash de URL (#/tienda/slug o #/activar/token) o el pathname directo (/tienda/slug o /activar/token).
+ * el hash de URL (#/tienda/slug), el pathname directo (/tienda/slug)
+ * o el subdominio de tienda en producción (ej. cafedelicia.centralbo.bo).
  */
 function getInitialPath(): string {
   if (typeof window === 'undefined') return '/';
 
-  // 1. Hash en la URL si existe (ej. #/tienda/restaurante-roma, #/activar/token o #/admin/tenantId)
+  // 1. Hash en la URL si existe (ej. #/tienda/restaurante-roma o #/admin/tenantId)
   if (window.location.hash && window.location.hash.length > 1) {
     let hash = window.location.hash.slice(1);
-    if (!hash.startsWith('/')) {
-      hash = `/${hash}`;
+
+    // Fragmentos de recuperación o autenticación de Supabase (ej. #access_token=... o #error=... o type=recovery)
+    // Se dirigen a /login para que LoginView y AuthContext procesen el estado de recuperación sin colisionar con rutas de tienda
+    if (
+      hash.includes('access_token=') ||
+      hash.includes('type=recovery') ||
+      hash.includes('error_description=')
+    ) {
+      return '/login';
     }
-    return hash;
+
+    // Si es un ancla interna de producto (#prod-...), no es una ruta de navegación principal
+    if (!hash.startsWith('prod-')) {
+      if (!hash.startsWith('/')) {
+        hash = `/${hash}`;
+      }
+      return hash;
+    }
   }
 
-  // 2. Parámetros de apertura específicos (?token=... o ?pwa_slug=... o ?pwa_admin=...)
+  // 2. Parámetros de apertura específicos (?pwa_slug=... o ?pwa_admin=...)
   if (window.location.search) {
     try {
       const searchParams = new URLSearchParams(window.location.search);
-      const token = searchParams.get('token');
-      if (token) {
-        return `/activar/${token}`;
-      }
       const pwaSlug = searchParams.get('pwa_slug') || searchParams.get('tienda');
       if (pwaSlug) {
         return `/tienda/${pwaSlug}`;
@@ -47,10 +100,16 @@ function getInitialPath(): string {
     }
   }
 
-  // 3. Pathname directo (ej. /tienda/restaurante-roma o /activar/:token)
+  // 3. Pathname directo (ej. /tienda/restaurante-roma)
   const pathname = window.location.pathname;
   if (pathname && pathname !== '/' && pathname !== '/index.html') {
     return pathname;
+  }
+
+  // 4. Subdominio de tienda en producción (ej. cafedelicia.centralbo.bo)
+  const subdomainSlug = getStoreSlugFromHostname();
+  if (subdomainSlug) {
+    return `/tienda/${subdomainSlug}`;
   }
 
   return '/';
@@ -75,8 +134,21 @@ export const RouterProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const cleanPath = effectivePath.split('?')[0] || '/';
     const parts = cleanPath.split('/').filter(Boolean);
 
-    // 1. Ruta Inicio
+    // Fragmentos de recuperación o autenticación de Supabase (evitar resolver como slug de tienda)
+    if (
+      effectivePath.includes('access_token=') ||
+      effectivePath.includes('type=recovery') ||
+      effectivePath.includes('error_description=')
+    ) {
+      return { type: 'login' };
+    }
+
+    // 1. Ruta Inicio (o Storefront si se accede mediante subdominio de tienda)
     if (parts.length === 0 || cleanPath === '/') {
+      const subdomainSlug = getStoreSlugFromHostname();
+      if (subdomainSlug) {
+        return { type: 'public_store', slug: subdomainSlug };
+      }
       return { type: 'home' };
     }
 
@@ -88,22 +160,6 @@ export const RouterProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           : ''
       );
       return { type: 'login', redirect: urlParams.get('redirect') || undefined };
-    }
-
-    // 2.1. Ruta Activación de Dueño de Comercio (pública mediante token único)
-    if (parts[0] === 'activar') {
-      const hashParams =
-        typeof window !== 'undefined' && window.location.hash.includes('?')
-          ? new URLSearchParams(window.location.hash.split('?')[1])
-          : new URLSearchParams();
-      const searchParams =
-        typeof window !== 'undefined' && window.location.search
-          ? new URLSearchParams(window.location.search)
-          : new URLSearchParams();
-
-      const rawToken = parts[1] || hashParams.get('token') || searchParams.get('token') || '';
-      const token = decodeURIComponent(rawToken).trim().replace(/\/+$/, '');
-      return { type: 'activar', token };
     }
 
     // 3. Tienda Pública (Accesible por slug SIN requerir autenticación)
@@ -198,7 +254,7 @@ export const RouterProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
 
     // 6. Tienda Pública accesible por slug directo (ej. /mitienda o /restaurante-roma)
-    if (parts.length === 1 && !['login', 'superadmin', 'admin', 'tienda', 'activar'].includes(parts[0])) {
+    if (parts.length === 1 && !['login', 'superadmin', 'admin', 'tienda'].includes(parts[0])) {
       return { type: 'public_store', slug: parts[0] };
     }
 

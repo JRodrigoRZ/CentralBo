@@ -844,6 +844,213 @@ export async function uploadStoreLogo(
 }
 
 // ----------------------------------------------------------------------------
+// 2.2 GESTIÓN DE ALMACENAMIENTO DE IMÁGENES DE PRODUCTOS (Bucket 'product-images')
+// ----------------------------------------------------------------------------
+
+export const ALLOWED_PRODUCT_IMAGE_MIME_TYPES = [
+  'image/png',
+  'image/jpeg',
+  'image/webp',
+];
+
+export const MAX_PRODUCT_IMAGE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
+
+export interface UploadProductImageResult {
+  success: boolean;
+  publicUrl?: string;
+  path?: string;
+  error?: string;
+}
+
+/**
+ * Determina si una URL pertenece al bucket 'product-images' de Supabase Storage.
+ */
+export function isProductStorageUrl(url: string | null | undefined): boolean {
+  if (!url || typeof url !== 'string') return false;
+  return (
+    url.includes('/storage/v1/object/public/product-images/') ||
+    url.includes('/product-images/')
+  );
+}
+
+/**
+ * Extrae la ruta de almacenamiento relativa dentro de 'product-images' para un tenant específico.
+ * Garantiza estrictamente el prefijo {tenantId}/ para evitar cualquier manipulación cross-tenant.
+ */
+export function extractStoragePathFromProductUrl(
+  url: string,
+  tenantId: string
+): string | null {
+  if (!isProductStorageUrl(url)) return null;
+  const marker = '/product-images/';
+  const idx = url.indexOf(marker);
+  if (idx === -1) return null;
+  const rawPath = url.substring(idx + marker.length).split('?')[0];
+  const cleanTenantId = tenantId.trim();
+  if (rawPath.startsWith(`${cleanTenantId}/`)) {
+    return rawPath;
+  }
+  return null;
+}
+
+/**
+ * Sube la imagen principal de un producto al bucket público 'product-images' de Supabase Storage.
+ *
+ * Reglas de Seguridad y Consistencia:
+ * 1. Valida tenantId y productId en formato UUID.
+ * 2. Valida tamaño (<= 5 MB) y formatos permitidos (PNG, JPEG, WEBP).
+ * 3. Aislamiento estricto por tenant en el path: '{cleanTenantId}/{cleanProductId}.{ext}'.
+ * 4. Limpia archivos obsoletos con extensión diferente para el mismo producto.
+ * 5. Obtiene la URL pública canónica generada por Supabase Storage.
+ */
+export async function uploadProductImage(
+  tenantId: string,
+  productId: string,
+  file: File
+): Promise<UploadProductImageResult> {
+  if (!tenantId || typeof tenantId !== 'string' || !isValidTenantId(tenantId)) {
+    return { success: false, error: 'Identificador de comercio (tenantId) no válido.' };
+  }
+
+  if (!productId || typeof productId !== 'string' || !isValidUUID(productId)) {
+    return { success: false, error: 'Identificador de producto (productId) no válido.' };
+  }
+
+  if (!file) {
+    return { success: false, error: 'No se ha seleccionado ningún archivo de imagen.' };
+  }
+
+  if (file.size > MAX_PRODUCT_IMAGE_SIZE_BYTES) {
+    return {
+      success: false,
+      error: 'La imagen supera el tamaño máximo permitido de 5 MB.',
+    };
+  }
+
+  const normalizedType = file.type?.toLowerCase() || '';
+  if (!ALLOWED_PRODUCT_IMAGE_MIME_TYPES.includes(normalizedType)) {
+    return {
+      success: false,
+      error: 'Formato no permitido. Solo se aceptan imágenes en formato PNG, JPEG/JPG o WEBP.',
+    };
+  }
+
+  // Mapeo seguro de extensión desde MIME validado
+  let ext = 'jpg';
+  if (normalizedType === 'image/png') ext = 'png';
+  else if (normalizedType === 'image/webp') ext = 'webp';
+  else if (normalizedType === 'image/jpeg') ext = 'jpg';
+
+  const cleanTenantId = tenantId.trim();
+  const cleanProductId = productId.trim();
+  const targetFileName = `${cleanProductId}.${ext}`;
+  const targetPath = `${cleanTenantId}/${targetFileName}`;
+
+  try {
+    // 1. Subir archivo al bucket product-images (upsert reemplaza archivo con idéntico nombre)
+    const { error: uploadError } = await supabase.storage
+      .from('product-images')
+      .upload(targetPath, file, {
+        contentType: normalizedType,
+        cacheControl: '3600',
+        upsert: true,
+      });
+
+    if (uploadError) {
+      console.error('[CentralBo StoreAdmin] Error al subir imagen de producto a Storage:', uploadError);
+      return {
+        success: false,
+        error: `Error al subir la imagen: ${uploadError.message}`,
+      };
+    }
+
+    // 2. Limpieza de extensiones previas obsoletas para este producto dentro de la carpeta del tenant
+    try {
+      const { data: existingFiles } = await supabase.storage
+        .from('product-images')
+        .list(cleanTenantId);
+
+      if (existingFiles && Array.isArray(existingFiles) && existingFiles.length > 0) {
+        const obsoleteFiles = existingFiles
+          .filter(
+            (item) =>
+              item.name.startsWith(`${cleanProductId}.`) && item.name !== targetFileName
+          )
+          .map((item) => `${cleanTenantId}/${item.name}`);
+
+        if (obsoleteFiles.length > 0) {
+          await supabase.storage.from('product-images').remove(obsoleteFiles);
+        }
+      }
+    } catch (cleanupErr) {
+      console.warn('[uploadProductImage] Advertencia no bloqueante al limpiar imágenes obsoletas:', cleanupErr);
+    }
+
+    // 3. Obtener URL pública oficial
+    const { data: urlData } = supabase.storage
+      .from('product-images')
+      .getPublicUrl(targetPath);
+
+    if (!urlData?.publicUrl) {
+      return {
+        success: false,
+        error: 'No se pudo resolver la URL pública de la imagen en Supabase Storage.',
+      };
+    }
+
+    return {
+      success: true,
+      publicUrl: urlData.publicUrl,
+      path: targetPath,
+    };
+  } catch (err: any) {
+    console.error('[CentralBo StoreAdmin] Excepción inesperada al subir imagen de producto:', err);
+    return {
+      success: false,
+      error: err?.message || 'Error inesperado al subir la imagen del producto.',
+    };
+  }
+}
+
+/**
+ * Elimina una imagen del bucket 'product-images' si corresponde a Supabase Storage.
+ * Si es una URL externa (ej. Unsplash), no realiza ninguna acción en Storage y retorna éxito.
+ */
+export async function deleteProductImage(
+  tenantId: string,
+  urlOrPath: string
+): Promise<{ success: boolean; error?: string }> {
+  if (!tenantId || !urlOrPath || typeof urlOrPath !== 'string') {
+    return { success: true };
+  }
+
+  const cleanTenantId = tenantId.trim();
+  const targetPath =
+    extractStoragePathFromProductUrl(urlOrPath, cleanTenantId) ||
+    (urlOrPath.startsWith(`${cleanTenantId}/`) ? urlOrPath : null);
+
+  // Si no pertenece a product-images de este tenant, omitir
+  if (!targetPath) {
+    return { success: true };
+  }
+
+  try {
+    const { error } = await supabase.storage
+      .from('product-images')
+      .remove([targetPath]);
+
+    if (error) {
+      console.warn('[deleteProductImage] Error al eliminar imagen de Storage:', error.message);
+      return { success: false, error: error.message };
+    }
+    return { success: true };
+  } catch (err: any) {
+    console.warn('[deleteProductImage] Excepción al eliminar imagen de Storage:', err);
+    return { success: false, error: err?.message };
+  }
+}
+
+// ----------------------------------------------------------------------------
 // 3. APARIENCIA Y PLAN (Basic vs Pro)
 // ----------------------------------------------------------------------------
 export function getDefaultStoreHighlights(tenantId: string): StoreHighlightItem[] {
@@ -3787,6 +3994,11 @@ export async function createStoreProduct(
       tenantId
     )?.attributes || {};
 
+  const targetId =
+    productInput.id && isValidUUID(productInput.id)
+      ? productInput.id.trim()
+      : undefined;
+
   const payload: Record<string, unknown> = {
     tenant_id: tenantId,
     category_id: validCategoryId,
@@ -3804,6 +4016,10 @@ export async function createStoreProduct(
     status: validStatus,
     attributes: cleanAttrs,
   };
+
+  if (targetId) {
+    payload.id = targetId;
+  }
 
   try {
     const { data, error } = await supabase
@@ -3997,6 +4213,15 @@ export async function deleteStoreProduct(
   }
 
   try {
+    // Si el producto poseía una imagen en el bucket product-images, eliminarla de Storage de forma no bloqueante
+    const existingCached = getCachedStoreProducts(tenantId);
+    const existingProd = existingCached.find((p) => p.id === productId);
+    if (existingProd?.image_url) {
+      deleteProductImage(tenantId, existingProd.image_url).catch((cleanupErr) =>
+        console.warn('[deleteStoreProduct] Advertencia al limpiar imagen de Storage:', cleanupErr)
+      );
+    }
+
     const { error } = await supabase
       .from('products')
       .delete()
@@ -4316,6 +4541,68 @@ export async function fetchStorePromotions(tenantId: string): Promise<PromotionC
   }
 
   return getCachedStorePromotions(tenantId);
+}
+
+/**
+ * Consulta canónica de promociones activas y vigentes para la tienda pública.
+ * Fuente de verdad canónica: public.promotions.
+ * Solo retorna promociones con is_active = true y dentro del rango de vigencia por fecha.
+ * Actualiza la caché local no-autoritativa y nunca inyecta cupones demo o ficticios.
+ */
+export async function fetchPublicActivePromotions(tenantId: string): Promise<PromotionCode[]> {
+  if (!tenantId || !isValidTenantId(tenantId)) {
+    return [];
+  }
+
+  const todayStr = new Date().toISOString().split('T')[0];
+  const baseUrl =
+    typeof window !== 'undefined' && window.location?.origin
+      ? ''
+      : 'http://127.0.0.1:3000';
+
+  // 1. Intentar consulta vía endpoint público seguro respaldado por el backend
+  try {
+    const res = await fetch(`${baseUrl}/api/promotions/active?tenantId=${encodeURIComponent(tenantId)}`);
+    if (res.ok) {
+      const json = await res.json().catch(() => null);
+      if (json?.success && Array.isArray(json.promotions)) {
+        const activePromos: PromotionCode[] = json.promotions;
+        saveStorePromotions(tenantId, activePromos);
+        return activePromos;
+      }
+    }
+  } catch (err) {
+    console.warn('[CentralBo PublicStore] Aviso al consultar endpoint de promociones activas:', err);
+  }
+
+  // 2. Consulta directa a Supabase (anon client según RLS de 16_add_promotions_public_rls.sql)
+  try {
+    const { data, error } = await supabase
+      .from('promotions')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .eq('is_active', true)
+      .lte('start_date', todayStr)
+      .gte('end_date', todayStr)
+      .order('discount_value', { ascending: false });
+
+    if (!error && Array.isArray(data)) {
+      const canonicalPromotions = data.map(mapDbRowToPromotion);
+      saveStorePromotions(tenantId, canonicalPromotions);
+      return canonicalPromotions;
+    }
+  } catch (err) {
+    console.warn('[CentralBo PublicStore] Excepción al consultar promociones en Supabase:', err);
+  }
+
+  // 3. Fallback no-autoritativo a caché local (exclusivamente activas y vigentes por fecha)
+  const cached = getCachedStorePromotions(tenantId);
+  return cached.filter(
+    (p) =>
+      p.isActive &&
+      (!p.startDate || p.startDate <= todayStr) &&
+      (!p.endDate || p.endDate >= todayStr)
+  );
 }
 
 /**

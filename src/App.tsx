@@ -9,7 +9,6 @@ import { OfflineIndicator } from './components/OfflineIndicator';
 import { PortalHome } from './components/PortalHome';
 import { LoginView } from './components/LoginView';
 import { PublicStoreView } from './components/PublicStoreView';
-import { ActivateOwnerView } from './components/ActivateOwnerView';
 import { SuperAdminArea } from './components/SuperAdminArea';
 import { StoreAdminArea } from './components/StoreAdminArea';
 import { UnauthorizedView } from './components/UnauthorizedView';
@@ -44,10 +43,6 @@ function AppContent() {
 
         {currentRoute.type === 'login' && (
           <LoginView redirectPath={currentRoute.redirect} />
-        )}
-
-        {currentRoute.type === 'activar' && (
-          <ActivateOwnerView token={currentRoute.token} />
         )}
 
         {currentRoute.type === 'public_store' && (

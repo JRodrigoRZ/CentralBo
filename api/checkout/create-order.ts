@@ -68,6 +68,8 @@ export default async function handler(req: any, res: any) {
     total,
     status,
     items,
+    promoCode,
+    shippingCost,
   } = body;
 
   // FASE 4: Validaciones básicas de estructura
@@ -100,6 +102,12 @@ export default async function handler(req: any, res: any) {
     });
   }
 
+  // Normalización estricta de promoCode (opcional)
+  let cleanPromoCode: string | null = null;
+  if (typeof promoCode === 'string' && promoCode.trim().length > 0) {
+    cleanPromoCode = promoCode.trim().toUpperCase();
+  }
+
   const cleanCustomerName = typeof customerName === 'string' ? customerName.trim() : '';
   if (!cleanCustomerName || cleanCustomerName.length > 100) {
     return res.status(400).json({
@@ -129,7 +137,6 @@ export default async function handler(req: any, res: any) {
     const it = items[i];
     const pid = it.productId || it.product_id;
     const qty = Number(it.quantity);
-    const price = Number(it.unitPrice ?? it.unit_price ?? it.price);
 
     if (!isValidUUID(pid)) {
       return res.status(400).json({
@@ -142,13 +149,6 @@ export default async function handler(req: any, res: any) {
       return res.status(400).json({
         success: false,
         error: `La cantidad del producto en posición ${i + 1} debe ser un número entero mayor a 0.`,
-      });
-    }
-
-    if (isNaN(price) || !Number.isFinite(price) || price < 0) {
-      return res.status(400).json({
-        success: false,
-        error: `El precio unitario del producto en posición ${i + 1} debe ser un número mayor o igual a 0.`,
       });
     }
   }
@@ -180,14 +180,14 @@ export default async function handler(req: any, res: any) {
       });
     }
 
-    // FASE 5 & 16: Validación estricta de productos pertenecientes al tenant
+    // FASE 5 & 16: Validación estricta de productos pertenecientes al tenant y obtención de precio canónico
     const uniqueProductIds = Array.from(
       new Set(items.map((it: any) => String(it.productId || it.product_id).trim()))
     );
 
     const { data: dbProducts, error: prodsError } = await supabase
       .from('products')
-      .select('id, tenant_id, name, status')
+      .select('id, tenant_id, name, status, price')
       .eq('tenant_id', tenantId)
       .in('id', uniqueProductIds);
 
@@ -209,6 +209,107 @@ export default async function handler(req: any, res: any) {
       });
     }
 
+    // Cálculo canónico del subtotal server-side basado exclusivamente en public.products.price
+    let serverItemsSubtotal = 0;
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i];
+      const pid = String(it.productId || it.product_id).trim();
+      const qty = Math.floor(Number(it.quantity));
+      const dbProd = foundProductMap.get(pid);
+      const canonicalPrice = Number(Number(dbProd.price).toFixed(2));
+      serverItemsSubtotal += qty * canonicalPrice;
+    }
+    serverItemsSubtotal = Number(serverItemsSubtotal.toFixed(2));
+
+    // FASE PROMOCIONES: Validación server-side y aplicación real del descuento (Parte 3)
+    let discountAmount = 0;
+    let promoRecord: any = null;
+
+    if (cleanPromoCode) {
+      // 1. Consultar public.promotions restringida simultáneamente por tenant_id y code
+      const { data: promoData, error: promoError } = await supabase
+        .from('promotions')
+        .select('*')
+        .eq('tenant_id', tenantId)
+        .eq('code', cleanPromoCode)
+        .maybeSingle();
+
+      if (promoError) {
+        console.error('[CentralBo Checkout API] Error al consultar promoción:', promoError);
+        return res.status(500).json({
+          success: false,
+          error: 'Error al verificar el cupón de descuento en el comercio.',
+        });
+      }
+
+      // Si no existe la promoción para este comercio
+      if (!promoData) {
+        return res.status(400).json({
+          success: false,
+          error: 'El cupón no es válido para este comercio.',
+        });
+      }
+
+      // 2. Validar que la promoción esté activa
+      if (!promoData.is_active) {
+        return res.status(400).json({
+          success: false,
+          error: 'La promoción ya no se encuentra activa.',
+        });
+      }
+
+      // 3. Validar vigencia de fechas (formato YYYY-MM-DD en hora de Bolivia / UTC)
+      const now = new Date();
+      const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/La_Paz' }).format(now);
+
+      if (promoData.start_date && todayStr < promoData.start_date) {
+        return res.status(400).json({
+          success: false,
+          error: 'La promoción todavía no ha iniciado.',
+        });
+      }
+
+      if (promoData.end_date && todayStr > promoData.end_date) {
+        return res.status(400).json({
+          success: false,
+          error: 'La promoción ha expirado.',
+        });
+      }
+
+      // 4. Validar compra mínima requerida (min_purchase) contra subtotal del servidor
+      const minPurchase = Number(promoData.min_purchase || 0);
+      if (minPurchase > 0 && serverItemsSubtotal < minPurchase) {
+        return res.status(400).json({
+          success: false,
+          error: `El pedido no alcanza la compra mínima de Bs ${minPurchase.toFixed(2)} requerida para este cupón.`,
+        });
+      }
+
+      // 5. Calcular discountAmount de forma autoritativa en servidor
+      const discountVal = Number(promoData.discount_value || 0);
+      if (promoData.discount_type === 'percentage') {
+        discountAmount = (serverItemsSubtotal * discountVal) / 100;
+      } else if (promoData.discount_type === 'fixed') {
+        discountAmount = discountVal;
+      }
+
+      // Limitar descuento a no exceder el subtotal de productos ni ser negativo
+      discountAmount = Math.max(0, Math.min(discountAmount, serverItemsSubtotal));
+      discountAmount = Number(discountAmount.toFixed(2));
+      promoRecord = promoData;
+    }
+
+    // Costo de envío informado
+    const cleanShippingCost =
+      typeof shippingCost === 'number' && !isNaN(shippingCost) && shippingCost >= 0
+        ? Number(Number(shippingCost).toFixed(2))
+        : 0;
+
+    // Determinación autoritativa del total confirmado basado estrictamente en el subtotal canónico
+    const confirmedTotal = Number(
+      Math.max(0, serverItemsSubtotal - discountAmount + cleanShippingCost).toFixed(2)
+    );
+
     // FASE 6: Creación del registro en public.orders
     const cleanOrderId = String(orderId).trim();
     const cleanTenantId = String(tenantId).trim();
@@ -223,7 +324,7 @@ export default async function handler(req: any, res: any) {
         customer_email: cleanCustomerEmail,
         customer_phone: cleanCustomerPhone.slice(0, 25),
         status: cleanStatus,
-        total: Number(cleanTotal.toFixed(2)),
+        total: confirmedTotal,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
@@ -238,14 +339,19 @@ export default async function handler(req: any, res: any) {
       });
     }
 
-    // FASE 7: Creación en lote (batch) de public.order_items
-    const orderItemsPayload = items.map((it: any) => ({
-      tenant_id: cleanTenantId,
-      order_id: cleanOrderId,
-      product_id: String(it.productId || it.product_id).trim(),
-      quantity: Math.floor(Number(it.quantity)),
-      unit_price: Number(Number(it.unitPrice ?? it.unit_price ?? it.price).toFixed(2)),
-    }));
+    // FASE 7: Creación en lote (batch) de public.order_items utilizando el precio canónico de public.products.price
+    const orderItemsPayload = items.map((it: any) => {
+      const pid = String(it.productId || it.product_id).trim();
+      const dbProd = foundProductMap.get(pid);
+      const canonicalUnitPrice = Number(Number(dbProd.price).toFixed(2));
+      return {
+        tenant_id: cleanTenantId,
+        order_id: cleanOrderId,
+        product_id: pid,
+        quantity: Math.floor(Number(it.quantity)),
+        unit_price: canonicalUnitPrice,
+      };
+    });
 
     const { error: itemsInsertError } = await supabase
       .from('order_items')
@@ -301,12 +407,24 @@ export default async function handler(req: any, res: any) {
       }
     }
 
-    // FASE 9: Respuesta exitosa estructurada
+    // FASE 9: Respuesta exitosa estructurada con montos confirmados autoritativamente
     return res.status(200).json({
       success: true,
       message: 'Pedido registrado con éxito',
       orderId: cleanOrderId,
       order: orderData,
+      confirmedSubtotal: Number(serverItemsSubtotal.toFixed(2)),
+      discountAmount: Number(discountAmount.toFixed(2)),
+      confirmedTotal: confirmedTotal,
+      appliedPromotion: promoRecord
+        ? {
+            id: promoRecord.id,
+            code: promoRecord.code,
+            discountType: promoRecord.discount_type,
+            discountValue: Number(promoRecord.discount_value),
+            minPurchase: Number(promoRecord.min_purchase || 0),
+          }
+        : null,
     });
   } catch (error: any) {
     console.error('[CentralBo Checkout API] Excepción no controlada en endpoint checkout:', error);

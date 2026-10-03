@@ -7,6 +7,7 @@ import createStoreOwnerHandler from './api/superadmin/create-store-owner.js';
 import createOrderHandler from './api/checkout/create-order.js';
 import createAppointmentHandler from './api/appointments/create-appointment.js';
 import appointmentAvailabilityHandler from './api/appointments/availability.js';
+import activePromotionsHandler from './api/promotions/active.js';
 
 dotenv.config();
 
@@ -42,6 +43,11 @@ app.all('/api/appointments/create-appointment', (req: Request, res: Response) =>
 // 5. Consulta Pública Segura de Disponibilidad (Privacidad Estricta H-02)
 app.all('/api/appointments/availability', (req: Request, res: Response) => {
   appointmentAvailabilityHandler(req as any, res as any);
+});
+
+// 6. Consulta Pública Segura de Promociones y Cupones Activos (Fase 2 Parte 2)
+app.all('/api/promotions/active', (req: Request, res: Response) => {
+  activePromotionsHandler(req as any, res as any);
 });
 
 // ----------------------------------------------------------------------------

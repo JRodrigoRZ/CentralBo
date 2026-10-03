@@ -48,14 +48,8 @@ import {
   StoreStatus,
   SubscriptionStatus,
   PlanId,
-  StoreOwnerInvitation,
-} from '../../types';
-import {
-  getStoreOwnerInvitations,
-  getOrCreateStoreOwnerInvitation,
-  registerDirectStoreOwnerAccess,
   DirectStoreOwnerCredentials,
-} from '../../lib/storeOwnerActivationService';
+} from '../../types';
 import { useRouter } from '../../context/RouterContext';
 import { useAuth } from '../../context/AuthContext';
 
@@ -138,7 +132,6 @@ export const SuperAdminStores: React.FC = () => {
   const [editingStore, setEditingStore] = useState<SuperAdminStoreRecord | null>(null);
 
   // Estados del flujo de Credenciales Iniciales del Dueño de Comercio
-  const [invitations, setInvitations] = useState<StoreOwnerInvitation[]>(() => getStoreOwnerInvitations());
   const [createdCredentials, setCreatedCredentials] = useState<DirectStoreOwnerCredentials | null>(null);
   const [isSubmittingCreate, setIsSubmittingCreate] = useState<boolean>(false);
   const [copiedEmailFeedback, setCopiedEmailFeedback] = useState<boolean>(false);
@@ -197,18 +190,11 @@ export const SuperAdminStores: React.FC = () => {
   useEffect(() => {
     const handleStoresChanged = () => {
       refreshStores();
-      setInvitations(getStoreOwnerInvitations());
-    };
-
-    const handleInvitationsChanged = () => {
-      setInvitations(getStoreOwnerInvitations());
     };
 
     window.addEventListener('centralbo:superadmin_stores_changed', handleStoresChanged);
-    window.addEventListener('centralbo:store_owner_invitation_changed', handleInvitationsChanged);
     return () => {
       window.removeEventListener('centralbo:superadmin_stores_changed', handleStoresChanged);
-      window.removeEventListener('centralbo:store_owner_invitation_changed', handleInvitationsChanged);
     };
   }, [selectedStore]);
 
@@ -308,19 +294,7 @@ export const SuperAdminStores: React.FC = () => {
     try {
       const { store: created, credentials } = await createSuperAdminStore(newStoreForm);
 
-      // Flujo de Registro Directo: Sincronizar invitación en caché local para consistencia
-      registerDirectStoreOwnerAccess({
-        storeId: created.id,
-        storeName: created.name,
-        storeSlug: created.slug || '',
-        ownerName: created.owner.name,
-        ownerEmail: created.owner.email,
-        ownerPhone: created.owner.phone,
-        initialPassword: credentials.initialPassword,
-      });
-
       await refreshStores();
-      setInvitations(getStoreOwnerInvitations());
       setIsCreateModalOpen(false);
       showToast(`Comercio "${created.name}" y dueño creados exitosamente en Supabase`, 'success');
       // Abrir modal de confirmación con credenciales iniciales generadas solo tras éxito confirmado
@@ -963,8 +937,7 @@ export const SuperAdminStores: React.FC = () => {
                   </span>
                 </div>
                 <p className="text-xs text-slate-400 leading-relaxed">
-                  El dueño quedará asociado exclusivamente a este comercio. Se generará su acceso con estado{' '}
-                  <strong className="text-amber-300 font-semibold">Invitación pendiente</strong> y un enlace único de activación para enviárselo por WhatsApp. El SuperAdmin no establece contraseñas.
+                  El dueño quedará asociado exclusivamente a este comercio. Se creará su cuenta de acceso en Supabase Auth y se generarán sus credenciales iniciales para compartir con el administrador.
                 </p>
 
                 <div>

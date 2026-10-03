@@ -144,7 +144,6 @@ export interface AuthenticatedUser {
 export type AppRoute =
   | { type: 'home' }
   | { type: 'login'; redirect?: string }
-  | { type: 'activar'; token: string }
   | { type: 'public_store'; slug: string }
   | { type: 'superadmin' }
   | { type: 'store_admin'; tenantId?: string }
@@ -157,22 +156,16 @@ export type AppRoute =
       targetTenantId?: string | null;
     };
 
-// Estados oficiales de la invitación (únicamente estos dos)
-export type InvitationStatus = 'Invitación pendiente' | 'Acceso activado';
-
-export interface StoreOwnerInvitation {
-  id: string;
-  token: string;
+// Credenciales iniciales del dueño de comercio generadas por SuperAdmin
+export interface DirectStoreOwnerCredentials {
   storeId: string;
   storeName: string;
   storeSlug: string;
   ownerName: string;
   ownerEmail: string;
   ownerPhone: string;
-  status: InvitationStatus;
+  initialPassword: string;
   createdAt: string;
-  activatedAt?: string;
-  passwordHash?: string;
 }
 
 // ----------------------------------------------------------------------------

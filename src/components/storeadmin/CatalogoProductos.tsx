@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Package,
   Plus,
@@ -22,6 +22,8 @@ import {
   Scissors,
   Utensils,
   X,
+  UploadCloud,
+  Link as LinkIcon,
 } from 'lucide-react';
 import { Store, Product, Category, ProductStatus, ProfessionalItem } from '../../types';
 import {
@@ -36,6 +38,10 @@ import {
   getStoreProfessionals,
   fetchStoreProfessionals,
   isValidUUID,
+  uploadProductImage,
+  deleteProductImage,
+  ALLOWED_PRODUCT_IMAGE_MIME_TYPES,
+  MAX_PRODUCT_IMAGE_SIZE_BYTES,
 } from '../../lib/storeAdminService';
 
 interface CatalogoProductosProps {
@@ -97,6 +103,144 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [notification, setNotification] = useState<string | null>(null);
 
+  // Estados para subida y preview de imagen nativa de producto
+  const imageFileInputRef = useRef<HTMLInputElement | null>(null);
+  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState<boolean>(false);
+  const [imageUploadError, setImageUploadError] = useState<string | null>(null);
+
+  // Limpieza segura de URLs blob temporales
+  const resetImageState = () => {
+    if (imagePreviewUrl && imagePreviewUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(imagePreviewUrl);
+    }
+    setSelectedImageFile(null);
+    setImagePreviewUrl(null);
+    setIsUploadingImage(false);
+    setImageUploadError(null);
+    if (imageFileInputRef.current) {
+      imageFileInputRef.current.value = '';
+    }
+  };
+
+  const handleCloseModal = () => {
+    resetImageState();
+    setIsEditing(false);
+    setCurrentProduct(null);
+  };
+
+  // Limpieza automática al desmontar o cambiar preview blob
+  useEffect(() => {
+    return () => {
+      if (imagePreviewUrl && imagePreviewUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(imagePreviewUrl);
+      }
+    };
+  }, [imagePreviewUrl]);
+
+  // Selección de archivo nativa desde el dispositivo
+  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setImageUploadError(null);
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > MAX_PRODUCT_IMAGE_SIZE_BYTES) {
+      setImageUploadError('La imagen supera el tamaño máximo permitido de 5 MB.');
+      if (imageFileInputRef.current) imageFileInputRef.current.value = '';
+      return;
+    }
+
+    const normalizedType = file.type?.toLowerCase() || '';
+    if (!ALLOWED_PRODUCT_IMAGE_MIME_TYPES.includes(normalizedType)) {
+      setImageUploadError('Formato no permitido. Solo se aceptan imágenes en formato PNG, JPEG/JPG o WEBP.');
+      if (imageFileInputRef.current) imageFileInputRef.current.value = '';
+      return;
+    }
+
+    if (imagePreviewUrl && imagePreviewUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(imagePreviewUrl);
+    }
+
+    const objectUrl = URL.createObjectURL(file);
+    setSelectedImageFile(file);
+    setImagePreviewUrl(objectUrl);
+    setImageUploadError(null);
+  };
+
+  // Descartar archivo seleccionado y volver al estado previo
+  const handleDiscardSelectedFile = () => {
+    if (imagePreviewUrl && imagePreviewUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(imagePreviewUrl);
+    }
+    setSelectedImageFile(null);
+    setImageUploadError(null);
+    if (imageFileInputRef.current) {
+      imageFileInputRef.current.value = '';
+    }
+    if (currentProduct?.image_url) {
+      setImagePreviewUrl(currentProduct.image_url);
+    } else {
+      setImagePreviewUrl(null);
+    }
+  };
+
+  // Eliminar imagen del producto (Storage + campo image_url)
+  const handleRemoveProductImage = () => {
+    if (imagePreviewUrl && imagePreviewUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(imagePreviewUrl);
+    }
+    setSelectedImageFile(null);
+    setImagePreviewUrl(null);
+    setImageUploadError(null);
+    if (imageFileInputRef.current) {
+      imageFileInputRef.current.value = '';
+    }
+
+    if (currentProduct) {
+      const prevUrl = currentProduct.image_url;
+      setCurrentProduct({ ...currentProduct, image_url: '' });
+
+      // Si es un producto ya guardado y la imagen pertenecía a Storage, limpiarla
+      if (currentProduct.id && isValidUUID(currentProduct.id) && prevUrl) {
+        deleteProductImage(store.id, prevUrl).catch((err) =>
+          console.warn('[CatalogoProductos] Error no bloqueante al limpiar imagen:', err)
+        );
+      }
+    }
+  };
+
+  // Subida inmediata opcional cuando se edita un producto existente
+  const handleUploadImageNow = async () => {
+    if (!currentProduct?.id || !selectedImageFile || isUploadingImage) return;
+    setIsUploadingImage(true);
+    setImageUploadError(null);
+    const uploadRes = await uploadProductImage(store.id, currentProduct.id, selectedImageFile);
+    if (!uploadRes.success || !uploadRes.publicUrl) {
+      setIsUploadingImage(false);
+      setImageUploadError(uploadRes.error || 'Error al subir la imagen.');
+      return;
+    }
+
+    const updateRes = await updateStoreProduct(store.id, currentProduct.id, {
+      image_url: uploadRes.publicUrl,
+    });
+    setIsUploadingImage(false);
+
+    if (updateRes.success && updateRes.product) {
+      setProducts((prev) =>
+        prev.map((p) => (p.id === updateRes.product!.id ? updateRes.product! : p))
+      );
+      setCurrentProduct((prev) => (prev ? { ...prev, image_url: uploadRes.publicUrl } : null));
+      setImagePreviewUrl(uploadRes.publicUrl);
+      setSelectedImageFile(null);
+      if (imageFileInputRef.current) imageFileInputRef.current.value = '';
+      showNotification('Imagen de producto actualizada correctamente en Supabase.');
+    } else {
+      setImageUploadError(updateRes.error || 'Error al asociar la imagen al producto.');
+    }
+  };
+
   // Inputs temporales para adición de atributos verticales
   const [newSizeInput, setNewSizeInput] = useState<string>('');
   const [newColorName, setNewColorName] = useState<string>('');
@@ -117,6 +261,7 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
   });
 
   const handleOpenCreate = () => {
+    resetImageState();
     setNewSizeInput('');
     setNewColorName('');
     setNewColorHex('#000000');
@@ -156,6 +301,10 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
   };
 
   const handleOpenEdit = (p: Product) => {
+    resetImageState();
+    if (p.image_url) {
+      setImagePreviewUrl(p.image_url);
+    }
     setNewSizeInput('');
     setNewColorName('');
     setNewColorHex('#000000');
@@ -312,6 +461,35 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
 
     setIsSaving(true);
 
+    let finalImageUrl: string | null =
+      typeof currentProduct.image_url === 'string' && currentProduct.image_url.trim()
+        ? currentProduct.image_url.trim()
+        : null;
+
+    let assignedProductId: string | undefined = isEditMode ? currentProduct.id : undefined;
+
+    // Si el usuario seleccionó un archivo local, subirlo a Supabase Storage con aislamiento por tenant
+    if (selectedImageFile) {
+      setIsUploadingImage(true);
+      const targetProductId =
+        isEditMode && currentProduct.id && isValidUUID(currentProduct.id)
+          ? currentProduct.id
+          : crypto.randomUUID();
+
+      const uploadRes = await uploadProductImage(store.id, targetProductId, selectedImageFile);
+      setIsUploadingImage(false);
+
+      if (!uploadRes.success || !uploadRes.publicUrl) {
+        setIsSaving(false);
+        setImageUploadError(uploadRes.error || 'Error al subir la imagen del producto a Storage.');
+        showNotification(uploadRes.error || 'Error al subir la imagen del producto.');
+        return;
+      }
+
+      finalImageUrl = uploadRes.publicUrl;
+      assignedProductId = targetProductId;
+    }
+
     if (isEditMode && currentProduct.id) {
       const res = await updateStoreProduct(store.id, currentProduct.id, {
         name: cleanName,
@@ -319,10 +497,7 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
         description: cleanDescription,
         category_id: validCategoryId,
         is_available: currentProduct.is_available ?? true,
-        image_url:
-          typeof currentProduct.image_url === 'string' && currentProduct.image_url.trim()
-            ? currentProduct.image_url.trim()
-            : null,
+        image_url: finalImageUrl,
         status:
           currentProduct.status === 'inactivo' || currentProduct.status === 'borrador'
             ? currentProduct.status
@@ -335,34 +510,39 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
       if (res.success && res.product) {
         setProducts((prev) => prev.map((p) => (p.id === res.product!.id ? res.product! : p)));
         showNotification('Producto actualizado exitosamente en Supabase.');
+        resetImageState();
         setIsEditing(false);
         setCurrentProduct(null);
       } else {
         showNotification(res.error || 'Error al actualizar el producto en el servidor.');
       }
     } else {
-      const res = await createStoreProduct(store.id, {
+      const newProdPayload: Partial<Product> = {
         name: cleanName,
         price: numPrice,
         description: cleanDescription,
         category_id: validCategoryId,
         is_available: currentProduct.is_available ?? true,
-        image_url:
-          typeof currentProduct.image_url === 'string' && currentProduct.image_url.trim()
-            ? currentProduct.image_url.trim()
-            : null,
+        image_url: finalImageUrl,
         status:
           currentProduct.status === 'inactivo' || currentProduct.status === 'borrador'
             ? currentProduct.status
             : 'activo',
         attributes: cleanAttributes,
-      });
+      };
+
+      if (assignedProductId) {
+        newProdPayload.id = assignedProductId;
+      }
+
+      const res = await createStoreProduct(store.id, newProdPayload);
 
       setIsSaving(false);
 
       if (res.success && res.product) {
         setProducts((prev) => [res.product!, ...prev.filter((p) => p.id !== res.product!.id)]);
         showNotification('Nuevo producto añadido al catálogo en Supabase.');
+        resetImageState();
         setIsEditing(false);
         setCurrentProduct(null);
       } else {
@@ -659,9 +839,10 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
 
       {/* Modal / Formulario de Creación / Edición */}
       {isEditing && currentProduct && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-slate-950 border border-slate-800 rounded-2xl w-full max-w-2xl p-6 space-y-5 my-8">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 md:p-6 overflow-hidden">
+          <div className="bg-slate-950 border border-slate-800 rounded-2xl w-full max-w-2xl max-h-[92vh] sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-150">
+            {/* Cabecera visualmente estable */}
+            <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-slate-800 bg-slate-950 shrink-0">
               <h3 className="text-base font-bold text-white flex items-center gap-2">
                 <Package className="w-4 h-4 text-indigo-400" />
                 <span>
@@ -672,15 +853,17 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
               </h3>
               <button
                 type="button"
-                onClick={() => setIsEditing(false)}
-                className="text-slate-400 hover:text-white text-xs font-bold"
+                onClick={handleCloseModal}
+                className="px-2 py-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-900 text-xs font-bold transition cursor-pointer"
               >
                 ✕ Cerrar
               </button>
             </div>
 
-            <form onSubmit={handleSaveProduct} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <form onSubmit={handleSaveProduct} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+              {/* Contenido desplazable internamente */}
+              <div className="flex-1 overflow-y-auto px-5 sm:px-6 py-4 space-y-4 overscroll-contain">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-slate-300 mb-1">
                     Nombre del Producto *
@@ -1261,20 +1444,192 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
                 </div>
               )}
 
-              {/* URL de Imagen */}
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">
-                  URL de Imagen Principal
-                </label>
+              {/* Sección de Imagen Principal del Producto (Nativa y Mobile-friendly) */}
+              <div className="space-y-3 pt-2 border-t border-slate-800">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <label className="block text-xs font-semibold text-white">
+                      Imagen Principal del Producto
+                    </label>
+                    <p className="text-[11px] text-slate-400">
+                      Sube una fotografía desde tu dispositivo (PNG, JPG, WEBP hasta 5 MB).
+                    </p>
+                  </div>
+                  {imagePreviewUrl && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-emerald-950/60 text-emerald-400 border border-emerald-800/60 flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3" />
+                      {selectedImageFile ? 'Archivo seleccionado' : 'Imagen activa'}
+                    </span>
+                  )}
+                </div>
+
+                {/* Input file nativo oculto */}
                 <input
-                  type="url"
-                  value={currentProduct.image_url || ''}
-                  onChange={(e) =>
-                    setCurrentProduct({ ...currentProduct, image_url: e.target.value })
-                  }
-                  className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-indigo-500"
-                  placeholder="https://images.unsplash.com/..."
+                  type="file"
+                  id="input-product-image-file"
+                  ref={imageFileInputRef}
+                  accept="image/png,image/jpeg,image/webp"
+                  onChange={handleImageFileChange}
+                  disabled={isUploadingImage || isSaving}
+                  className="hidden"
                 />
+
+                {/* Mensaje de error si la validación falla */}
+                {imageUploadError && (
+                  <div className="p-2.5 rounded-xl bg-rose-950/40 border border-rose-800/80 text-rose-300 text-xs flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 flex-shrink-0 text-rose-400" />
+                    <span>{imageUploadError}</span>
+                  </div>
+                )}
+
+                {/* Previsualización de Imagen */}
+                {imagePreviewUrl ? (
+                  <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 space-y-3">
+                    <div className="flex flex-col sm:flex-row items-center gap-4">
+                      <div className="relative w-full sm:w-44 h-36 rounded-xl overflow-hidden bg-slate-950 border border-slate-700/80 flex-shrink-0 group">
+                        <img
+                          src={imagePreviewUrl}
+                          alt="Previsualización del producto"
+                          className="w-full h-full object-cover"
+                          onError={() => {
+                            setImageUploadError('No se pudo cargar la previsualización de la imagen.');
+                          }}
+                        />
+                        {isUploadingImage && (
+                          <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center gap-1.5 text-white text-xs">
+                            <Loader2 className="w-5 h-5 animate-spin text-indigo-400" />
+                            <span>Subiendo imagen...</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex-1 space-y-2 text-left w-full">
+                        {selectedImageFile ? (
+                          <div>
+                            <span className="text-xs font-semibold text-indigo-300 block truncate">
+                              {selectedImageFile.name}
+                            </span>
+                            <span className="text-[11px] text-slate-400 block">
+                              Tamaño: {(selectedImageFile.size / 1024).toFixed(1)} KB • Formato: {selectedImageFile.type.replace('image/', '').toUpperCase()}
+                            </span>
+                            <span className="text-[10px] text-amber-400 mt-1 inline-block">
+                              ⚠️ Se subirá y guardará al presionar "Guardar Producto"
+                            </span>
+                          </div>
+                        ) : (
+                          <div>
+                            <span className="text-xs font-semibold text-slate-200 block truncate">
+                              Imagen actual del producto
+                            </span>
+                            <span className="text-[11px] text-slate-400 block break-all line-clamp-2">
+                              {currentProduct.image_url}
+                            </span>
+                          </div>
+                        )}
+
+                        <div className="flex flex-wrap items-center gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => imageFileInputRef.current?.click()}
+                            disabled={isUploadingImage || isSaving}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition cursor-pointer"
+                          >
+                            <UploadCloud className="w-3.5 h-3.5 text-indigo-400" />
+                            <span>Cambiar imagen</span>
+                          </button>
+
+                          {selectedImageFile && currentProduct.id && isValidUUID(currentProduct.id) && (
+                            <button
+                              type="button"
+                              onClick={handleUploadImageNow}
+                              disabled={isUploadingImage || isSaving}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-medium shadow transition cursor-pointer"
+                            >
+                              {isUploadingImage ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                              )}
+                              <span>Subir ahora</span>
+                            </button>
+                          )}
+
+                          {selectedImageFile && (
+                            <button
+                              type="button"
+                              onClick={handleDiscardSelectedFile}
+                              disabled={isUploadingImage || isSaving}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white text-xs transition cursor-pointer"
+                              title="Descartar archivo seleccionado"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                              <span>Descartar archivo</span>
+                            </button>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={handleRemoveProductImage}
+                            disabled={isUploadingImage || isSaving}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-rose-950/40 hover:bg-rose-950/60 border border-rose-800/60 text-rose-300 text-xs font-medium transition cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Eliminar imagen</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  /* Zona de arrastrar / seleccionar cuando no hay imagen */
+                  <div
+                    onClick={() => imageFileInputRef.current?.click()}
+                    className="border-2 border-dashed border-slate-700 hover:border-indigo-500/80 bg-slate-900/40 hover:bg-slate-900/70 rounded-2xl p-5 text-center cursor-pointer transition flex flex-col items-center justify-center gap-2 group"
+                  >
+                    <div className="w-12 h-12 rounded-xl bg-slate-800 group-hover:bg-indigo-950/50 border border-slate-700 group-hover:border-indigo-500/50 flex items-center justify-center text-slate-400 group-hover:text-indigo-400 transition">
+                      <UploadCloud className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <span className="text-xs font-semibold text-slate-200 group-hover:text-white block">
+                        Toca aquí o haz clic para subir imagen desde tu dispositivo
+                      </span>
+                      <span className="text-[11px] text-slate-400 block mt-0.5">
+                        Formatos soportados: PNG, JPG o WEBP (máximo 5 MB)
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      className="mt-1 px-3 py-1.5 rounded-xl bg-slate-800 group-hover:bg-indigo-600 text-slate-200 group-hover:text-white text-xs font-medium border border-slate-700 group-hover:border-indigo-500 transition cursor-pointer"
+                    >
+                      Seleccionar Archivo
+                    </button>
+                  </div>
+                )}
+
+                {/* Opción Manual de Enlace Externo (Preservación y flexibilidad) */}
+                <details className="group pt-1">
+                  <summary className="text-[11px] text-slate-400 hover:text-slate-300 cursor-pointer flex items-center gap-1 select-none">
+                    <LinkIcon className="w-3 h-3 text-slate-400" />
+                    <span>¿Prefieres enlazar una URL de imagen externa? (Opcional)</span>
+                  </summary>
+                  <div className="pt-2 pl-4">
+                    <input
+                      type="url"
+                      value={currentProduct.image_url || ''}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setCurrentProduct({ ...currentProduct, image_url: val });
+                        if (val && !selectedImageFile) {
+                          setImagePreviewUrl(val);
+                        } else if (!val && !selectedImageFile) {
+                          setImagePreviewUrl(null);
+                        }
+                      }}
+                      className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-indigo-500"
+                      placeholder="https://images.unsplash.com/..."
+                    />
+                  </div>
+                </details>
               </div>
 
               {/* Estado y Opciones */}
@@ -1341,20 +1696,21 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
                   </label>
                 </div>
               </div>
+              </div>
 
-              {/* Botones de acción del modal */}
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+              {/* Botones de acción del modal (Fijados y siempre accesibles) */}
+              <div className="flex items-center justify-end gap-3 px-5 sm:px-6 py-3.5 border-t border-slate-800 bg-slate-950/95 shrink-0">
                 <button
                   type="button"
-                  onClick={() => setIsEditing(false)}
-                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold cursor-pointer"
+                  onClick={handleCloseModal}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold cursor-pointer transition"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={isSaving}
-                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-semibold cursor-pointer flex items-center gap-1.5"
+                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-semibold cursor-pointer flex items-center gap-1.5 transition shadow-sm"
                 >
                   {isSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                   <span>{isSaving ? 'Guardando...' : 'Guardar Producto'}</span>

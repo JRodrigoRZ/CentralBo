@@ -13,9 +13,9 @@ import {
   StoreStatus,
   StoreType,
   PlanId,
+  DirectStoreOwnerCredentials,
 } from '../types';
 import { supabase } from './supabase';
-import { DirectStoreOwnerCredentials } from './storeOwnerActivationService';
 
 // ----------------------------------------------------------------------------
 // 4. PLANES OFICIALES DE CENTRALBO
@@ -457,16 +457,10 @@ export function deleteSuperAdminStorePermanently(id: string): boolean {
       }
       keysToRemove.forEach((k) => localStorage.removeItem(k));
 
-      // Limpiar invitaciones asociadas al comercio eliminado para evitar registros huérfanos
-      const rawInv = localStorage.getItem('centralbo_store_owner_invitations_v1');
-      if (rawInv) {
-        const parsedInv = JSON.parse(rawInv);
-        if (Array.isArray(parsedInv)) {
-          const remainingInv = parsedInv.filter((inv: { storeId?: string }) => inv.storeId !== id);
-          localStorage.setItem('centralbo_store_owner_invitations_v1', JSON.stringify(remainingInv));
-          window.dispatchEvent(new CustomEvent('centralbo:store_owner_invitation_changed'));
-        }
-      }
+      // Limpiar residuo legacy de invitaciones si existiera localmente
+      try {
+        localStorage.removeItem('centralbo_store_owner_invitations_v1');
+      } catch {}
     }
   } catch {
     // Ignorar fallos menores de limpieza local

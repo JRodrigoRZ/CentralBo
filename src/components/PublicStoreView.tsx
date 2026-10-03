@@ -21,6 +21,7 @@ import {
   FashionSettings,
   GeneralSettings,
   RestaurantSettings,
+  PromotionCode,
 } from '../types';
 import { resolveStoreBySlug } from '../lib/multiTenantService';
 import {
@@ -54,6 +55,8 @@ import {
   fetchGeneralSettings,
   getRestaurantSettings,
   fetchRestaurantSettings,
+  fetchPublicActivePromotions,
+  getCachedStorePromotions,
 } from '../lib/storeAdminService';
 import { useRouter } from '../context/RouterContext';
 import { useAuth } from '../context/AuthContext';
@@ -80,6 +83,7 @@ import { ThemeToggle } from './ThemeToggle';
 import { PriceDisplay } from './common/PriceDisplay';
 import { StorePWAInstallButton } from './publicStore/StorePWAInstallButton';
 import { StoreHighlights } from './publicStore/StoreHighlights';
+import { PublicStorePromotions } from './publicStore/PublicStorePromotions';
 
 interface PublicStoreViewProps {
   slug: string;
@@ -103,6 +107,10 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
   const [fashionSettings, setFashionSettings] = useState<FashionSettings | null>(null);
   const [generalSettings, setGeneralSettings] = useState<GeneralSettings | null>(null);
   const [restaurantSettings, setRestaurantSettings] = useState<RestaurantSettings | null>(null);
+
+  // Estados de Promociones y Cupones Activos (Fase 2 Parte 2)
+  const [promotions, setPromotions] = useState<PromotionCode[]>([]);
+  const [selectedPromo, setSelectedPromo] = useState<PromotionCode | null>(null);
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [notFound, setNotFound] = useState<boolean>(false);
@@ -171,6 +179,8 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
     setGeneralSettings(null);
     setRestaurantSettings(null);
     setCartItems([]);
+    setPromotions([]);
+    setSelectedPromo(null);
     setSelectedProduct(null);
     setIsBookingOpen(false);
     setIsOrdersHistoryOpen(false);
@@ -298,6 +308,13 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
             }
           });
 
+          // Sincronizar promociones y cupones oficiales desde Supabase (Fase 2 Parte 2)
+          fetchPublicActivePromotions(tenantId).then((remotePromos) => {
+            if (mounted && Array.isArray(remotePromos)) {
+              setPromotions(remotePromos);
+            }
+          });
+
           // Cargar carrito local del tenant
           const savedCart = getTenantCart(tenantId);
           setCartItems(savedCart);
@@ -410,8 +427,17 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
     setIsCheckoutOpen(true);
   };
 
+  const handleSelectPromo = (promo: PromotionCode) => {
+    setSelectedPromo(promo);
+  };
+
+  const handleRemovePromo = () => {
+    setSelectedPromo(null);
+  };
+
   const handleOrderCompleted = () => {
     setCartItems([]);
+    setSelectedPromo(null);
   };
 
   const handleRequestAppointment = (serviceId?: string) => {
@@ -662,6 +688,16 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
           brandPrimaryColor={primaryColor}
           brandSecondaryColor={appearance?.brandSecondaryColor}
           brandAccentColor={appearance?.brandAccentColor}
+          storeType={store.store_type}
+        />
+
+        {/* PROMOCIONES & CUPONES ACTIVOS (Fase 2 Parte 2) */}
+        <PublicStorePromotions
+          promotions={promotions}
+          selectedPromo={selectedPromo}
+          onSelectPromo={handleSelectPromo}
+          onRemovePromo={handleRemovePromo}
+          primaryColor={primaryColor}
           storeType={store.store_type}
         />
 
@@ -950,6 +986,10 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
         onProceedToCheckout={handleProceedToCheckout}
         primaryColor={primaryColor}
         storeName={profile.name || store.name}
+        selectedPromo={selectedPromo}
+        onSelectPromo={handleSelectPromo}
+        onRemovePromo={handleRemovePromo}
+        activePromotions={promotions}
       />
 
       {/* MODAL: CHECKOUT DE PEDIDO */}
@@ -964,6 +1004,10 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
           onClose={() => setIsCheckoutOpen(false)}
           onOrderCompleted={handleOrderCompleted}
           primaryColor={primaryColor}
+          initialPromotion={selectedPromo}
+          activePromotions={promotions}
+          onSelectPromo={handleSelectPromo}
+          onRemovePromo={handleRemovePromo}
         />
       )}
 

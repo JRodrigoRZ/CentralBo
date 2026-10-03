@@ -59,6 +59,10 @@ interface CheckoutModalProps {
   onClose: () => void;
   onOrderCompleted: () => void;
   primaryColor?: string;
+  initialPromotion?: PromotionCode | null;
+  activePromotions?: PromotionCode[];
+  onSelectPromo?: (promo: PromotionCode) => void;
+  onRemovePromo?: () => void;
 }
 
 // SEC-14A-02: Rate Limiting & Cooldown para Checkout y Creación de Pedidos
@@ -130,6 +134,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   onClose,
   onOrderCompleted,
   primaryColor = '#2563eb',
+  initialPromotion = null,
+  activePromotions = [],
+  onSelectPromo,
+  onRemovePromo,
 }) => {
   const shouldReduceMotion = useReducedMotion();
   const contrastColor = getContrastColor(primaryColor);
@@ -216,10 +224,36 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   ]);
 
   // Promociones
-  const [promoCodeInput, setPromoCodeInput] = useState('');
-  const [appliedPromo, setAppliedPromo] = useState<PromotionCode | null>(null);
+  const [promoCodeInput, setPromoCodeInput] = useState(() => initialPromotion?.code || '');
+  const [appliedPromo, setAppliedPromo] = useState<PromotionCode | null>(() => {
+    if (initialPromotion && initialPromotion.isActive) {
+      return initialPromotion;
+    }
+    return null;
+  });
   const [promoError, setPromoError] = useState<string | null>(null);
-  const [promoSuccessMsg, setPromoSuccessMsg] = useState<string | null>(null);
+  const [promoSuccessMsg, setPromoSuccessMsg] = useState<string | null>(() => {
+    if (initialPromotion && initialPromotion.isActive) {
+      return initialPromotion.discountType === 'percentage'
+        ? `¡Descuento del ${initialPromotion.discountValue}% aplicado con éxito!`
+        : `¡Descuento de Bs ${initialPromotion.discountValue.toFixed(2)} aplicado con éxito!`;
+    }
+    return null;
+  });
+
+  // Sincronizar reactivamente si cambia la promoción seleccionada externamente
+  useEffect(() => {
+    if (initialPromotion && initialPromotion.isActive) {
+      setAppliedPromo(initialPromotion);
+      setPromoCodeInput(initialPromotion.code);
+      setPromoSuccessMsg(
+        initialPromotion.discountType === 'percentage'
+          ? `¡Descuento del ${initialPromotion.discountValue}% aplicado con éxito!`
+          : `¡Descuento de Bs ${initialPromotion.discountValue.toFixed(2)} aplicado con éxito!`
+      );
+      setPromoError(null);
+    }
+  }, [initialPromotion]);
 
   // Notas adicionales
   const [generalNotes, setGeneralNotes] = useState('');
@@ -299,8 +333,14 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       return;
     }
 
-    const promos = getStorePromotions(store.id);
-    const found = promos.find((p) => p.code.toUpperCase() === code && p.isActive);
+    // 1. Buscar prioritariamente en las promociones activas canónicas provistas desde Supabase
+    let found = (activePromotions || []).find((p) => p.code.toUpperCase() === code && p.isActive);
+
+    // 2. Si no está en el listado provisto, buscar en la caché local
+    if (!found) {
+      const promos = getStorePromotions(store.id);
+      found = promos.find((p) => p.code.toUpperCase() === code && p.isActive);
+    }
 
     if (!found) {
       setPromoError('El código promocional no existe o ya no está activo.');
@@ -323,6 +363,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     }
 
     setAppliedPromo(found);
+    if (onSelectPromo) {
+      onSelectPromo(found);
+    }
     setPromoSuccessMsg(
       found.discountType === 'percentage'
         ? `¡Descuento del ${found.discountValue}% aplicado con éxito!`
@@ -335,6 +378,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     setPromoCodeInput('');
     setPromoError(null);
     setPromoSuccessMsg(null);
+    if (onRemovePromo) {
+      onRemovePromo();
+    }
   };
 
   // Confirmar y registrar pedido
@@ -451,7 +497,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       return;
     }
 
-    // 1. Persistencia atómica y segura mediante endpoint server-side (H-01)
+    // 1. Persistencia atómica y segura mediante endpoint server-side (H-01 & Promociones Parte 3)
+    let serverResult: any = null;
     try {
       const orderPayload = {
         orderId,
@@ -462,6 +509,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         customerEmail: email.trim().slice(0, 120) || null,
         status: 'pendiente',
         total: Number(finalTotal.toFixed(2)),
+        shippingCost: deliveryMethod === 'delivery' ? Number(shippingCost.toFixed(2)) : 0,
+        promoCode: appliedPromo?.code ? appliedPromo.code.trim() : undefined,
         items: payloadItems.map((it) => ({
           productId: it.product_id,
           quantity: it.quantity,
@@ -487,6 +536,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         );
         return;
       }
+      serverResult = result;
     } catch (err: any) {
       console.error('[CentralBo Checkout] Excepción de red al procesar pedido:', err);
       setIsProcessing(false);
@@ -494,7 +544,21 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       return;
     }
 
-    // 2. Crear registro en la persistencia del tenant
+    // Montos confirmados autoritativamente por el servidor
+    const confirmedTotal =
+      serverResult && typeof serverResult.confirmedTotal === 'number'
+        ? serverResult.confirmedTotal
+        : Number(finalTotal.toFixed(2));
+    const confirmedDiscount =
+      serverResult && typeof serverResult.discountAmount === 'number'
+        ? serverResult.discountAmount
+        : Number(discountAmount.toFixed(2));
+    const confirmedSubtotal =
+      serverResult && typeof serverResult.confirmedSubtotal === 'number'
+        ? serverResult.confirmedSubtotal
+        : Number(subtotal.toFixed(2));
+
+    // 2. Crear registro en la persistencia del tenant con valores confirmados
     const newTenantOrder: Order = {
       id: orderId,
       tenant_id: store.id,
@@ -503,7 +567,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       customer_email: email.trim().slice(0, 120) || null,
       customer_phone: trimmedPhone.slice(0, 25),
       status: 'pendiente' as OrderStatus,
-      total: Number(finalTotal.toFixed(2)),
+      total: confirmedTotal,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
@@ -511,7 +575,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     const existingOrders = getStoreOrders(store.id);
     saveStoreOrders(store.id, [newTenantOrder, ...existingOrders.filter((o) => o.id !== orderId)]);
 
-    // Crear registro completo para el cliente local
+    // Crear registro completo para el cliente local con valores confirmados
     const clientOrderRecord: PlacedOrderRecord = {
       id: orderId,
       orderNumber: orderNumber,
@@ -521,10 +585,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       storePhone: profile.phone || '',
       storeWhatsapp: profile.whatsapp || profile.phone || '',
       items: items,
-      subtotal: Number(subtotal.toFixed(2)),
-      discount: Number(discountAmount.toFixed(2)),
+      subtotal: confirmedSubtotal,
+      discount: confirmedDiscount,
       shippingCost: Number(shippingCost.toFixed(2)),
-      total: Number(finalTotal.toFixed(2)),
+      total: confirmedTotal,
       deliveryMethod: deliveryMethod,
       deliveryAddress: trimmedAddress || undefined,
       deliveryReference: deliveryReference.trim().slice(0, 200) || undefined,

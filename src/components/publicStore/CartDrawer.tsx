@@ -11,9 +11,13 @@ import {
   Shirt,
   Briefcase,
   Store as StoreIcon,
+  Tag,
+  Percent,
+  Check,
 } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import { CartItem } from './types';
+import { PromotionCode } from '../../types';
 
 export interface CartDrawerProps {
   isOpen: boolean;
@@ -25,6 +29,10 @@ export interface CartDrawerProps {
   onProceedToCheckout: () => void;
   primaryColor?: string;
   storeName?: string;
+  selectedPromo?: PromotionCode | null;
+  onSelectPromo?: (promo: PromotionCode) => void;
+  onRemovePromo?: () => void;
+  activePromotions?: PromotionCode[];
 }
 
 // Cálculo de contraste WCAG AA para botones o fondos con color de marca
@@ -50,6 +58,10 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   onProceedToCheckout,
   primaryColor = '#2563eb',
   storeName,
+  selectedPromo,
+  onSelectPromo,
+  onRemovePromo,
+  activePromotions = [],
 }) => {
   const shouldReduceMotion = useReducedMotion();
 
@@ -58,6 +70,23 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   const subtotal = items.reduce((acc, it) => acc + it.price * it.quantity, 0);
   const totalItemCount = items.reduce((acc, it) => acc + it.quantity, 0);
   const contrastColor = getContrastColor(primaryColor);
+
+  // Cálculo de descuento si hay cupón seleccionado y se cumple la compra mínima
+  let discountAmount = 0;
+  const isPromoApplicable = Boolean(
+    selectedPromo &&
+      selectedPromo.isActive &&
+      (!selectedPromo.minPurchase || selectedPromo.minPurchase <= 0 || subtotal >= selectedPromo.minPurchase)
+  );
+
+  if (isPromoApplicable && selectedPromo) {
+    if (selectedPromo.discountType === 'percentage') {
+      discountAmount = (subtotal * selectedPromo.discountValue) / 100;
+    } else {
+      discountAmount = Math.min(selectedPromo.discountValue, subtotal);
+    }
+  }
+  const estimatedTotal = Math.max(0, subtotal - discountAmount);
 
   return (
     <div
@@ -329,8 +358,80 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                     Bs {subtotal.toFixed(2)}
                   </span>
                 </div>
+
+                {/* Cupón de descuento aplicado si cumple compra mínima */}
+                {isPromoApplicable && selectedPromo && discountAmount > 0 && (
+                  <div className="flex justify-between items-center text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 p-2 rounded-xl border border-emerald-200 dark:border-emerald-800/40">
+                    <div className="flex items-center gap-1.5">
+                      <Tag className="w-3.5 h-3.5" />
+                      <span>Cupón {selectedPromo.code}:</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-bold">-Bs {discountAmount.toFixed(2)}</span>
+                      {onRemovePromo && (
+                        <button
+                          type="button"
+                          onClick={onRemovePromo}
+                          className="text-stone-400 hover:text-stone-600 dark:hover:text-stone-200 text-[10px] ml-1 cursor-pointer underline"
+                          title="Quitar cupón"
+                        >
+                          Quitar
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Cupón seleccionado pero no alcanza la compra mínima */}
+                {selectedPromo && selectedPromo.isActive && !isPromoApplicable && (
+                  <div className="flex justify-between items-center text-xs text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 p-2 rounded-xl border border-amber-200 dark:border-amber-800/40">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <Tag className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                      <span className="truncate">
+                        Cupón <strong>{selectedPromo.code}</strong> (mín. Bs {selectedPromo.minPurchase.toFixed(2)})
+                      </span>
+                    </div>
+                    {onRemovePromo && (
+                      <button
+                        type="button"
+                        onClick={onRemovePromo}
+                        className="text-stone-400 hover:text-stone-600 dark:hover:text-stone-200 text-[10px] ml-1 shrink-0 cursor-pointer underline"
+                        title="Quitar cupón"
+                      >
+                        Quitar
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {isPromoApplicable && discountAmount > 0 && (
+                  <div className="flex justify-between items-center text-sm font-black pt-1 text-stone-900 dark:text-white">
+                    <span>Total Estimado:</span>
+                    <span className="text-base tracking-tight text-emerald-600 dark:text-emerald-400">
+                      Bs {estimatedTotal.toFixed(2)}
+                    </span>
+                  </div>
+                )}
+
+                {!selectedPromo && activePromotions.length > 0 && onSelectPromo && (
+                  <div className="p-2 rounded-xl bg-stone-100 dark:bg-stone-800/70 border border-stone-200/80 dark:border-stone-700/60 flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-1.5 text-stone-600 dark:text-stone-300">
+                      <Tag className="w-3.5 h-3.5 text-stone-500" />
+                      <span className="truncate">¿Tienes cupón? Usa <strong>{activePromotions[0].code}</strong></span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => onSelectPromo(activePromotions[0])}
+                      className="text-[11px] font-bold px-2 py-0.5 rounded-lg text-white shrink-0 cursor-pointer shadow-2xs hover:brightness-105"
+                      style={{ backgroundColor: primaryColor }}
+                    >
+                      Aplicar
+                    </button>
+                  </div>
+                )}
+
                 <p className="text-[11px] text-stone-400 dark:text-stone-500 pt-0.5 leading-relaxed">
-                  * El costo de envío (si aplica delivery) y cupones de descuento se calculan en el siguiente paso.
+                  * El costo de envío (si aplica delivery) se confirmará en el siguiente paso.
                 </p>
               </div>
 
@@ -342,7 +443,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                 style={{ backgroundColor: primaryColor, color: contrastColor }}
                 className="w-full py-3.5 px-4 rounded-2xl font-bold text-xs shadow-sm flex items-center justify-center gap-2 transition-all duration-200 hover:brightness-105 active:scale-[0.98] cursor-pointer"
               >
-                <span>Continuar al Cierre • Bs {subtotal.toFixed(2)}</span>
+                <span>Continuar al Cierre • Bs {estimatedTotal.toFixed(2)}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
 

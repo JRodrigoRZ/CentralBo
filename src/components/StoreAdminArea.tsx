@@ -22,6 +22,7 @@ import {
   Menu,
   X,
   ChevronRight,
+  Key,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useRouter } from '../context/RouterContext';
@@ -30,6 +31,7 @@ import { resolveStoreById } from '../lib/multiTenantService';
 import { getStorePlan } from '../lib/storeAdminService';
 
 // Subcomponentes del Panel Admin de Tienda (Módulo 4)
+import { ChangePasswordModal } from './storeadmin/ChangePasswordModal';
 import { InicioResumen } from './storeadmin/InicioResumen';
 import { MiTiendaPerfil } from './storeadmin/MiTiendaPerfil';
 import { MiTiendaApariencia } from './storeadmin/MiTiendaApariencia';
@@ -66,6 +68,7 @@ export const StoreAdminArea: React.FC<StoreAdminAreaProps> = ({
   const [store, setStore] = useState<Store | null>(initialStore || user?.store || null);
   const [loading, setLoading] = useState<boolean>(!initialStore && !user?.store);
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState<boolean>(false);
 
   // Para store_admin, se fuerza estrictamente su propio tenantId autorizado; sólo superadmin puede alternar tenantId arbitrario
   const activeTenantId =
@@ -399,6 +402,19 @@ export const StoreAdminArea: React.FC<StoreAdminAreaProps> = ({
 
         <button
           type="button"
+          id="btn-sidebar-cambiar-password"
+          onClick={() => {
+            setIsChangePasswordOpen(true);
+            setMobileMenuOpen(false);
+          }}
+          className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:text-amber-400 hover:bg-slate-800/60 transition cursor-pointer"
+        >
+          <Key className="w-3.5 h-3.5 text-amber-500" />
+          <span>Cambiar Contraseña</span>
+        </button>
+
+        <button
+          type="button"
           onClick={() => signOut()}
           className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-rose-400 hover:bg-rose-950/20 transition cursor-pointer"
         >
@@ -494,6 +510,17 @@ export const StoreAdminArea: React.FC<StoreAdminAreaProps> = ({
                 <span className="hidden sm:inline">Ver Tienda</span>
               </button>
             )}
+
+            <button
+              type="button"
+              id="btn-header-cambiar-password"
+              onClick={() => setIsChangePasswordOpen(true)}
+              className="inline-flex items-center gap-1 sm:gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-750 dark:text-slate-300 hover:text-amber-600 dark:hover:text-amber-400 border border-slate-200 dark:border-slate-700 text-xs font-medium transition cursor-pointer"
+              title="Cambiar contraseña de acceso"
+            >
+              <Key className="w-3.5 h-3.5 text-amber-500" />
+              <span className="hidden md:inline">Contraseña</span>
+            </button>
 
             <button
               type="button"
@@ -737,6 +764,12 @@ export const StoreAdminArea: React.FC<StoreAdminAreaProps> = ({
             {activeTab === 'estadisticas' && <StoreAdminEstadisticas store={currentStore} />}
           </div>
         </main>
+
+        {/* Modal de Cambio Seguro de Contraseña */}
+        <ChangePasswordModal
+          isOpen={isChangePasswordOpen}
+          onClose={() => setIsChangePasswordOpen(false)}
+        />
       </div>
     </div>
   );
