@@ -122,7 +122,7 @@ export const SUPERADMIN_STORES: SuperAdminStoreRecord[] = loadStoresFromStorage(
 
 /**
  * Consulta la base de datos Supabase para cargar los comercios reales existentes
- * y los combina con la configuración local sin inyectar datos ficticios.
+ * y los combina con los datos canónicos de store_users sin inyectar datos ficticios.
  */
 export async function fetchSuperAdminStores(): Promise<SuperAdminStoreRecord[]> {
   try {
@@ -141,11 +141,66 @@ export async function fetchSuperAdminStores(): Promise<SuperAdminStoreRecord[]> 
       return [];
     }
 
+    // Consulta canónica de usuarios administradores en store_users
+    const { data: storeUsersData, error: storeUsersError } = await supabase
+      .from('store_users')
+      .select('tenant_id, full_name, email, role, is_active')
+      .eq('is_active', true);
+
+    if (storeUsersError) {
+      console.warn('[CentralBo SuperAdmin] Advertencia al consultar store_users en Supabase:', storeUsersError);
+    }
+
+    // Mapeo canónico de dueño por tenant_id (priorizando rol 'admin')
+    const ownerByTenant = new Map<string, { name: string; email: string }>();
+    if (storeUsersData && storeUsersData.length > 0) {
+      for (const su of storeUsersData) {
+        if (!su.tenant_id) continue;
+        if (!ownerByTenant.has(su.tenant_id) || su.role === 'admin') {
+          ownerByTenant.set(su.tenant_id, {
+            name: su.full_name?.trim() || '',
+            email: su.email?.trim() || '',
+          });
+        }
+      }
+    }
+
     const localStores = loadStoresFromStorage();
     const localMap = new Map(localStores.map((s) => [s.id, s]));
 
+    const isPlaceholderName = (n?: string) => !n || n === 'Dueño de Comercio';
+    const isPlaceholderEmail = (e?: string) => !e || e === 'contacto@centralbo.com';
+
     const merged: SuperAdminStoreRecord[] = data.map((st) => {
       const existing = localMap.get(st.id);
+      const canonicalOwner = ownerByTenant.get(st.id);
+
+      // Prioridad canónica de datos del dueño:
+      // 1. Supabase public.store_users (fuente de verdad oficial)
+      // 2. Caché local previo si contenía un valor real y no genérico
+      // 3. Fallback neutro y transparente (sin datos ficticios inventados)
+      const ownerName =
+        canonicalOwner?.name ||
+        (!isPlaceholderName(existing?.owner?.name) ? existing?.owner?.name : '') ||
+        'Propietario no asignado';
+
+      const ownerEmail =
+        canonicalOwner?.email ||
+        (!isPlaceholderEmail(existing?.owner?.email) ? existing?.owner?.email : '') ||
+        'Sin correo registrado';
+
+      const ownerPhone =
+        existing?.owner?.phone && existing.owner.phone !== '+591 70000000'
+          ? existing.owner.phone
+          : (existing?.owner?.phone || '+591 70000000');
+
+      const ownerObj = {
+        name: ownerName,
+        email: ownerEmail,
+        phone: ownerPhone,
+        ...(existing?.owner?.socials ? { socials: existing.owner.socials } : {}),
+      };
+
       if (existing) {
         return {
           ...st,
@@ -156,7 +211,7 @@ export async function fetchSuperAdminStores(): Promise<SuperAdminStoreRecord[]> 
           logo_url: st.logo_url,
           created_at: st.created_at,
           updated_at: st.updated_at,
-          owner: existing.owner,
+          owner: ownerObj,
           subscription: existing.subscription,
           activity: existing.activity,
         };
@@ -170,11 +225,7 @@ export async function fetchSuperAdminStores(): Promise<SuperAdminStoreRecord[]> 
         logo_url: st.logo_url,
         created_at: st.created_at,
         updated_at: st.updated_at,
-        owner: {
-          name: 'Dueño de Comercio',
-          email: 'contacto@centralbo.com',
-          phone: '+591 70000000',
-        },
+        owner: ownerObj,
         subscription: {
           planId: 'basic',
           planName: 'Basic',
@@ -211,20 +262,6 @@ export interface CreateStoreInput {
   planId: PlanId;
   status: StoreStatus;
   slug?: string;
-}
-
-export interface UpdateStoreInput {
-  name?: string;
-  store_type?: StoreType;
-  planId?: PlanId;
-  ownerName?: string;
-  ownerEmail?: string;
-  ownerPhone?: string;
-  socials?: {
-    whatsapp?: string;
-    instagram?: string;
-    facebook?: string;
-  };
 }
 
 export function getSuperAdminStores(): SuperAdminStoreRecord[] {
@@ -354,60 +391,56 @@ export async function createSuperAdminStore(input: CreateStoreInput): Promise<{
   }
 }
 
-export function updateSuperAdminStore(id: string, updates: UpdateStoreInput): SuperAdminStoreRecord {
+export async function setStoreStatus(
+  id: string,
+  newStatus: StoreStatus
+): Promise<SuperAdminStoreRecord> {
   const current = getSuperAdminStores();
-  const index = current.findIndex((s) => s.id === id);
-  if (index === -1) {
-    throw new Error(`Comercio con id ${id} no encontrado`);
+  const existing = current.find((s) => s.id === id);
+  if (!existing) {
+    throw new Error(`Comercio con id ${id} no encontrado en la lista local`);
   }
 
-  const existing = current[index];
-  const now = new Date().toISOString();
+  // 1. Obtener token Bearer de la sesión actual de Supabase
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  const token = session?.access_token;
 
-  const updatedSubscription = { ...existing.subscription };
-  if (updates.planId && updates.planId !== existing.subscription.planId) {
-    const planName = updates.planId === 'pro' ? 'Pro' : 'Basic';
-    updatedSubscription.planId = updates.planId;
-    updatedSubscription.planName =
-      existing.status === 'prueba' ? `${planName} (Prueba)` : planName;
+  if (!token) {
+    throw new Error('No hay una sesión activa de SuperAdmin. Inicia sesión para continuar.');
   }
 
-  const updatedStore: SuperAdminStoreRecord = {
-    ...existing,
-    name: updates.name ? updates.name.trim() : existing.name,
-    store_type: updates.store_type || existing.store_type,
-    updated_at: now,
-    owner: {
-      ...existing.owner,
-      name: updates.ownerName ? updates.ownerName.trim() : existing.owner.name,
-      email: updates.ownerEmail ? updates.ownerEmail.trim().toLowerCase() : existing.owner.email,
-      phone: updates.ownerPhone ? updates.ownerPhone.trim() : existing.owner.phone,
-      socials: {
-        ...existing.owner.socials,
-        ...(updates.socials || {}),
-      },
+  // 2. Ejecutar petición al endpoint seguro de servidor
+  const response = await fetch('/api/superadmin/update-store-status', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
     },
-    subscription: updatedSubscription,
-  };
+    body: JSON.stringify({
+      storeId: id,
+      newStatus,
+    }),
+  });
 
-  current[index] = updatedStore;
-  persistStores(current);
-  return updatedStore;
-}
+  const result = await response.json().catch(() => null);
 
-export function setStoreStatus(id: string, newStatus: StoreStatus): SuperAdminStoreRecord {
-  const current = getSuperAdminStores();
-  const index = current.findIndex((s) => s.id === id);
-  if (index === -1) {
-    throw new Error(`Comercio con id ${id} no encontrado`);
+  if (!response.ok || !result || !result.success) {
+    const errorMsg =
+      result?.error || `Error del servidor al actualizar estado (HTTP ${response.status})`;
+    throw new Error(errorMsg);
   }
 
-  const existing = current[index];
-  const now = new Date().toISOString();
+  // 3. ÚNICAMENTE tras confirmación exitosa de Supabase, actualizar cache local
+  const confirmedStore = result.store;
+  const now = confirmedStore?.updated_at || new Date().toISOString();
 
   let subStatus = existing.subscription.status;
   if (newStatus === 'activo' && (subStatus === 'cancelada' || subStatus === 'vencida')) {
     subStatus = 'activa';
+  } else if (newStatus === 'inactivo' || newStatus === 'suspendido') {
+    if (subStatus === 'activa') subStatus = 'cancelada';
   }
 
   const updatedStore: SuperAdminStoreRecord = {
@@ -420,53 +453,21 @@ export function setStoreStatus(id: string, newStatus: StoreStatus): SuperAdminSt
     },
   };
 
-  current[index] = updatedStore;
-  persistStores(current);
+  const updatedList = current.map((s) => (s.id === id ? updatedStore : s));
+  persistStores(updatedList);
   return updatedStore;
 }
 
-export function activateStore(id: string): SuperAdminStoreRecord {
+export async function activateStore(id: string): Promise<SuperAdminStoreRecord> {
   return setStoreStatus(id, 'activo');
 }
 
-export function deactivateStore(id: string): SuperAdminStoreRecord {
+export async function deactivateStore(id: string): Promise<SuperAdminStoreRecord> {
   return setStoreStatus(id, 'inactivo');
 }
 
-export function suspendStore(id: string): SuperAdminStoreRecord {
+export async function suspendStore(id: string): Promise<SuperAdminStoreRecord> {
   return setStoreStatus(id, 'suspendido');
-}
-
-export function deleteSuperAdminStorePermanently(id: string): boolean {
-  const current = getSuperAdminStores();
-  const filtered = current.filter((s) => s.id !== id);
-  if (filtered.length === current.length) {
-    return false;
-  }
-  persistStores(filtered);
-
-  // Limpiar almacenamiento del comercio si existía
-  try {
-    if (typeof window !== 'undefined') {
-      const keysToRemove: string[] = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.includes(id)) {
-          keysToRemove.push(key);
-        }
-      }
-      keysToRemove.forEach((k) => localStorage.removeItem(k));
-
-      // Limpiar residuo legacy de invitaciones si existiera localmente
-      try {
-        localStorage.removeItem('centralbo_store_owner_invitations_v1');
-      } catch {}
-    }
-  } catch {
-    // Ignorar fallos menores de limpieza local
-  }
-
-  return true;
 }
 
 // ----------------------------------------------------------------------------

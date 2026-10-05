@@ -19,8 +19,6 @@ import {
   Ban,
   Plus,
   Search,
-  Edit2,
-  Trash2,
   AlertTriangle,
   ShieldAlert,
   ShieldCheck,
@@ -29,18 +27,16 @@ import {
   MessageCircle,
   Copy,
   Check,
+  Loader2,
 } from 'lucide-react';
 import {
   getSuperAdminStores,
   createSuperAdminStore,
-  updateSuperAdminStore,
   activateStore,
   deactivateStore,
   suspendStore,
-  deleteSuperAdminStorePermanently,
   fetchSuperAdminStores,
   CreateStoreInput,
-  UpdateStoreInput,
 } from '../../lib/superadminService';
 import {
   SuperAdminStoreRecord,
@@ -129,7 +125,6 @@ export const SuperAdminStores: React.FC = () => {
   // Modales y estados de interacción
   const [selectedStore, setSelectedStore] = useState<SuperAdminStoreRecord | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState<boolean>(false);
-  const [editingStore, setEditingStore] = useState<SuperAdminStoreRecord | null>(null);
 
   // Estados del flujo de Credenciales Iniciales del Dueño de Comercio
   const [createdCredentials, setCreatedCredentials] = useState<DirectStoreOwnerCredentials | null>(null);
@@ -138,11 +133,13 @@ export const SuperAdminStores: React.FC = () => {
   const [copiedPasswordFeedback, setCopiedPasswordFeedback] = useState<boolean>(false);
   const [copiedAllFeedback, setCopiedAllFeedback] = useState<boolean>(false);
 
-  // Modales de confirmación de ciclo de vida
+  // Modales de confirmación de ciclo de vida (P1-SA-01)
   const [deactivatingStore, setDeactivatingStore] = useState<SuperAdminStoreRecord | null>(null);
   const [suspendingStore, setSuspendingStore] = useState<SuperAdminStoreRecord | null>(null);
-  const [deletingStore, setDeletingStore] = useState<SuperAdminStoreRecord | null>(null);
-  const [deleteConfirmationText, setDeleteConfirmationText] = useState<string>('');
+
+  // Estados de carga para operaciones canónicas de ciclo de vida de tienda
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState<boolean>(false);
+  const [updatingStoreId, setUpdatingStoreId] = useState<string | null>(null);
 
   // Notificaciones visuales (Toasts)
   const [toast, setToast] = useState<ToastNotification | null>(null);
@@ -159,10 +156,6 @@ export const SuperAdminStores: React.FC = () => {
     slug: '',
   });
   const [createFormErrors, setCreateFormErrors] = useState<Record<string, string>>({});
-
-  // Formulario de edición
-  const [editForm, setEditForm] = useState<UpdateStoreInput>({});
-  const [editFormErrors, setEditFormErrors] = useState<Record<string, string>>({});
 
   // Sincronización reactiva con almacenamiento y cambios globales
   const refreshStores = () => {
@@ -311,140 +304,77 @@ export const SuperAdminStores: React.FC = () => {
     }
   };
 
-  // Manejo de Edición de Comercio
-  const handleOpenEditModal = (store: SuperAdminStoreRecord) => {
-    setEditingStore(store);
-    setEditForm({
-      name: store.name,
-      store_type: store.store_type,
-      planId: store.subscription.planId,
-      ownerName: store.owner.name,
-      ownerEmail: store.owner.email,
-      ownerPhone: store.owner.phone,
-      socials: {
-        whatsapp: store.owner.socials?.whatsapp || '',
-        instagram: store.owner.socials?.instagram || '',
-        facebook: store.owner.socials?.facebook || '',
-      },
-    });
-    setEditFormErrors({});
-  };
-
-  const handleEditSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingStore) return;
-
-    const errors: Record<string, string> = {};
-    if (!editForm.name?.trim()) {
-      errors.name = 'El nombre del comercio es requerido';
-    }
-    if (!editForm.ownerName?.trim()) {
-      errors.ownerName = 'El nombre del propietario es requerido';
-    }
-    if (!editForm.ownerEmail?.trim()) {
-      errors.ownerEmail = 'El correo electrónico es requerido';
-    } else if (!editForm.ownerEmail.includes('@')) {
-      errors.ownerEmail = 'Ingresa un correo electrónico válido';
-    }
-    if (!editForm.ownerPhone?.trim()) {
-      errors.ownerPhone = 'El teléfono de contacto es requerido';
-    }
-
-    if (Object.keys(errors).length > 0) {
-      setEditFormErrors(errors);
-      return;
-    }
-
+  // Manejo de Activación (Canónico Supabase)
+  const handleActivate = async (store: SuperAdminStoreRecord) => {
+    if (isUpdatingStatus) return;
+    setIsUpdatingStatus(true);
+    setUpdatingStoreId(store.id);
     try {
-      const updated = updateSuperAdminStore(editingStore.id, editForm);
+      const updated = await activateStore(store.id);
       refreshStores();
-      setEditingStore(null);
       if (selectedStore && selectedStore.id === updated.id) {
         setSelectedStore(updated);
       }
-      showToast(`Información de "${updated.name}" actualizada con éxito`, 'success');
-    } catch (err) {
-      console.error('[CentralBo] Error al actualizar comercio:', err);
-      showToast('Ocurrió un error al actualizar el comercio', 'error');
-    }
-  };
-
-  // Manejo de Activación
-  const handleActivate = (store: SuperAdminStoreRecord) => {
-    try {
-      const updated = activateStore(store.id);
-      refreshStores();
       showToast(`Comercio "${updated.name}" activado exitosamente. Ahora está operativo.`, 'success');
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('[CentralBo] Error al activar comercio:', err);
-      showToast('No se pudo activar el comercio', 'error');
+      const msg = err instanceof Error ? err.message : 'No se pudo activar el comercio en Supabase';
+      showToast(msg, 'error');
+    } finally {
+      setIsUpdatingStatus(false);
+      setUpdatingStoreId(null);
     }
   };
 
-  // Manejo de Desactivación
-  const handleConfirmDeactivate = () => {
-    if (!deactivatingStore) return;
+  // Manejo de Desactivación (Canónico Supabase)
+  const handleConfirmDeactivate = async () => {
+    if (!deactivatingStore || isUpdatingStatus) return;
+    setIsUpdatingStatus(true);
+    setUpdatingStoreId(deactivatingStore.id);
     try {
-      const updated = deactivateStore(deactivatingStore.id);
+      const updated = await deactivateStore(deactivatingStore.id);
       refreshStores();
+      if (selectedStore && selectedStore.id === updated.id) {
+        setSelectedStore(updated);
+      }
       setDeactivatingStore(null);
       showToast(
         `Comercio "${updated.name}" desactivado. Ha dejado de estar operativo para clientes.`,
         'warning'
       );
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('[CentralBo] Error al desactivar comercio:', err);
-      showToast('No se pudo desactivar el comercio', 'error');
+      const msg = err instanceof Error ? err.message : 'No se pudo desactivar el comercio en Supabase';
+      showToast(msg, 'error');
+    } finally {
+      setIsUpdatingStatus(false);
+      setUpdatingStoreId(null);
     }
   };
 
-  // Manejo de Suspensión
-  const handleConfirmSuspend = () => {
-    if (!suspendingStore) return;
+  // Manejo de Suspensión (Canónico Supabase)
+  const handleConfirmSuspend = async () => {
+    if (!suspendingStore || isUpdatingStatus) return;
+    setIsUpdatingStatus(true);
+    setUpdatingStoreId(suspendingStore.id);
     try {
-      const updated = suspendStore(suspendingStore.id);
+      const updated = await suspendStore(suspendingStore.id);
       refreshStores();
+      if (selectedStore && selectedStore.id === updated.id) {
+        setSelectedStore(updated);
+      }
       setSuspendingStore(null);
       showToast(
         `Comercio "${updated.name}" suspendido. El acceso está bloqueado para clientes.`,
         'error'
       );
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('[CentralBo] Error al suspender comercio:', err);
-      showToast('No se pudo suspender el comercio', 'error');
-    }
-  };
-
-  // Manejo de Eliminación Definitiva
-  const handleOpenDeleteModal = (store: SuperAdminStoreRecord) => {
-    setDeletingStore(store);
-    setDeleteConfirmationText('');
-  };
-
-  const handleConfirmDelete = () => {
-    if (!deletingStore) return;
-    if (deleteConfirmationText.trim() !== deletingStore.name.trim()) return;
-
-    try {
-      const storeName = deletingStore.name;
-      const storeId = deletingStore.id;
-      const success = deleteSuperAdminStorePermanently(storeId);
-      if (success) {
-        if (selectedStore?.id === storeId) {
-          setSelectedStore(null);
-        }
-        refreshStores();
-        setDeletingStore(null);
-        showToast(
-          `El comercio "${storeName}" ha sido eliminado definitivamente de CentralBo.`,
-          'error'
-        );
-      } else {
-        showToast('No se pudo encontrar el comercio para eliminar', 'error');
-      }
-    } catch (err) {
-      console.error('[CentralBo] Error al eliminar comercio:', err);
-      showToast('Ocurrió un error al eliminar el comercio', 'error');
+      const msg = err instanceof Error ? err.message : 'No se pudo suspender el comercio en Supabase';
+      showToast(msg, 'error');
+    } finally {
+      setIsUpdatingStatus(false);
+      setUpdatingStoreId(null);
     }
   };
 
@@ -495,7 +425,7 @@ export const SuperAdminStores: React.FC = () => {
             </span>
           </div>
           <p className="text-xs text-slate-400 mt-0.5">
-            Ciclo de vida completo: creación, consulta, edición, activación, desactivación, suspensión y eliminación.
+            Supervisión y control: creación, consulta, administración en StoreAdmin, activación, desactivación y suspensión.
           </p>
         </div>
 
@@ -684,10 +614,17 @@ export const SuperAdminStores: React.FC = () => {
 
                               {/* Estado del Acceso del Dueño */}
                               <div className="flex items-center gap-1.5 pt-0.5">
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 uppercase">
-                                  <CheckCircle2 className="w-2.5 h-2.5" />
-                                  <span>Acceso activado (store_admin)</span>
-                                </span>
+                                {st.owner.name === 'Propietario no asignado' ? (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-500/15 text-slate-400 border border-slate-500/30 uppercase">
+                                    <AlertCircle className="w-2.5 h-2.5" />
+                                    <span>Sin acceso registrado</span>
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 uppercase">
+                                    <CheckCircle2 className="w-2.5 h-2.5" />
+                                    <span>Acceso activado (store_admin)</span>
+                                  </span>
+                                )}
                               </div>
                             </div>
                           );
@@ -697,6 +634,17 @@ export const SuperAdminStores: React.FC = () => {
                       {/* Acciones de Gestión Directas */}
                       <td className="py-3.5 px-4 text-right whitespace-nowrap">
                         <div className="inline-flex items-center gap-1.5">
+                          {/* Administrar Tienda */}
+                          <button
+                            id={`btn-administrar-${st.id}`}
+                            onClick={() => navigate(`/admin/${st.id}`)}
+                            title="Administrar comercio en StoreAdmin"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-blue-600/20 hover:bg-blue-600/35 text-blue-300 border border-blue-500/40 text-[11px] font-semibold transition cursor-pointer"
+                          >
+                            <StoreIcon className="w-3.5 h-3.5" />
+                            <span>Administrar</span>
+                          </button>
+
                           {/* Ver Detalle */}
                           <button
                             id={`btn-detalle-${st.id}`}
@@ -708,25 +656,20 @@ export const SuperAdminStores: React.FC = () => {
                             <span>Detalle</span>
                           </button>
 
-                          {/* Editar */}
-                          <button
-                            id={`btn-editar-${st.id}`}
-                            onClick={() => handleOpenEditModal(st)}
-                            title="Editar información del comercio"
-                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition cursor-pointer"
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </button>
-
                           {/* Activar (si no está activo) */}
                           {st.status !== 'activo' && (
                             <button
                               id={`btn-activar-${st.id}`}
+                              disabled={isUpdatingStatus}
                               onClick={() => handleActivate(st)}
                               title="Activar comercio (dejar operativo)"
-                              className="p-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/30 transition cursor-pointer"
+                              className="p-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/30 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              {isUpdatingStatus && updatingStoreId === st.id ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                              )}
                             </button>
                           )}
 
@@ -734,9 +677,10 @@ export const SuperAdminStores: React.FC = () => {
                           {(st.status === 'activo' || st.status === 'prueba') && (
                             <button
                               id={`btn-desactivar-${st.id}`}
+                              disabled={isUpdatingStatus}
                               onClick={() => setDeactivatingStore(st)}
                               title="Desactivar comercio"
-                              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700 transition cursor-pointer"
+                              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               <Pause className="w-3.5 h-3.5" />
                             </button>
@@ -746,23 +690,14 @@ export const SuperAdminStores: React.FC = () => {
                           {st.status !== 'suspendido' && (
                             <button
                               id={`btn-suspender-${st.id}`}
+                              disabled={isUpdatingStatus}
                               onClick={() => setSuspendingStore(st)}
                               title="Suspender comercio"
-                              className="p-1.5 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 text-rose-400 border border-rose-500/30 transition cursor-pointer"
+                              className="p-1.5 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 text-rose-400 border border-rose-500/30 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               <Ban className="w-3.5 h-3.5" />
                             </button>
                           )}
-
-                          {/* Eliminar Definitivamente */}
-                          <button
-                            id={`btn-eliminar-${st.id}`}
-                            onClick={() => handleOpenDeleteModal(st)}
-                            title="Eliminar definitivamente"
-                            className="p-1.5 rounded-lg bg-rose-950/50 hover:bg-rose-900/70 text-rose-300 hover:text-rose-100 border border-rose-800/60 transition cursor-pointer ml-1"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
                         </div>
                       </td>
                     </tr>
@@ -1099,15 +1034,6 @@ export const SuperAdminStores: React.FC = () => {
                   <StoreIcon className="w-3.5 h-3.5" />
                   <span>1. Información del Comercio</span>
                 </h4>
-                <button
-                  onClick={() => {
-                    handleOpenEditModal(selectedStore);
-                  }}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition cursor-pointer"
-                >
-                  <Edit2 className="w-3 h-3 text-indigo-400" />
-                  <span>Editar Datos</span>
-                </button>
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs">
@@ -1181,16 +1107,26 @@ export const SuperAdminStores: React.FC = () => {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-bold text-slate-300">Estado de Acceso:</span>
-                        <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase border bg-emerald-500/20 text-emerald-300 border-emerald-500/30">
-                          Acceso activado
-                        </span>
+                        {selectedStore.owner.name === 'Propietario no asignado' ? (
+                          <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase border bg-slate-500/20 text-slate-400 border-slate-500/30">
+                            Sin acceso registrado
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase border bg-emerald-500/20 text-emerald-300 border-emerald-500/30">
+                            Acceso activado
+                          </span>
+                        )}
                       </div>
                       <span className="text-[10px] text-indigo-300 font-mono">
                         Tenant ID: {selectedStore.id.slice(0, 8)}...
                       </span>
                     </div>
                     <p className="text-[11px] text-slate-400 leading-relaxed">
-                      El dueño cuenta con acceso registrado exclusivo para su comercio (perfil: <strong className="text-slate-300">store_admin</strong>). Puede iniciar sesión directamente desde <strong>/login</strong> con su correo electrónico y su contraseña inicial asignada.
+                      {selectedStore.owner.name === 'Propietario no asignado' ? (
+                        <>Este comercio no cuenta con un usuario administrador registrado en la base de datos de <strong>store_users</strong>.</>
+                      ) : (
+                        <>El dueño cuenta con acceso registrado exclusivo para su comercio (perfil: <strong className="text-slate-300">store_admin</strong>). Puede iniciar sesión directamente desde <strong>/login</strong> con su correo electrónico y su contraseña inicial asignada.</>
+                      )}
                     </p>
                   </div>
 
@@ -1337,22 +1273,31 @@ export const SuperAdminStores: React.FC = () => {
                   </button>
                 )}
 
-                {/* Editar */}
+                {/* Administrar Tienda en StoreAdmin */}
                 <button
-                  onClick={() => handleOpenEditModal(selectedStore)}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition cursor-pointer"
+                  id={`btn-administrar-drawer-${selectedStore.id}`}
+                  onClick={() => {
+                    setSelectedStore(null);
+                    navigate(`/admin/${selectedStore.id}`);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition cursor-pointer shadow-xs"
                 >
-                  <Edit2 className="w-3.5 h-3.5 text-indigo-400" />
-                  <span>Editar</span>
+                  <StoreIcon className="w-3.5 h-3.5" />
+                  <span>Administrar Tienda</span>
                 </button>
 
                 {/* Activar */}
                 {selectedStore.status !== 'activo' && (
                   <button
+                    disabled={isUpdatingStatus}
                     onClick={() => handleActivate(selectedStore)}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/40 text-xs font-bold transition cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/40 text-xs font-bold transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    {isUpdatingStatus && updatingStoreId === selectedStore.id ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                    )}
                     <span>Activar comercio</span>
                   </button>
                 )}
@@ -1360,8 +1305,9 @@ export const SuperAdminStores: React.FC = () => {
                 {/* Desactivar */}
                 {(selectedStore.status === 'activo' || selectedStore.status === 'prueba') && (
                   <button
+                    disabled={isUpdatingStatus}
                     onClick={() => setDeactivatingStore(selectedStore)}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30 text-xs font-medium transition cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30 text-xs font-medium transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Pause className="w-3.5 h-3.5" />
                     <span>Desactivar comercio</span>
@@ -1371,244 +1317,21 @@ export const SuperAdminStores: React.FC = () => {
                 {/* Suspender */}
                 {selectedStore.status !== 'suspendido' && (
                   <button
+                    disabled={isUpdatingStatus}
                     onClick={() => setSuspendingStore(selectedStore)}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-400 border border-rose-500/30 text-xs font-medium transition cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-400 border border-rose-500/30 text-xs font-medium transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Ban className="w-3.5 h-3.5" />
                     <span>Suspender comercio</span>
                   </button>
                 )}
-
-                {/* Eliminar Definitivamente */}
-                <button
-                  onClick={() => handleOpenDeleteModal(selectedStore)}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-950/60 hover:bg-rose-900/80 text-rose-300 border border-rose-800/80 text-xs font-bold transition cursor-pointer ml-auto"
-                >
-                  <Trash2 className="w-3.5 h-3.5 text-rose-400" />
-                  <span>Eliminar definitivamente</span>
-                </button>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* 4. MODAL: EDITAR INFORMACIÓN DEL COMERCIO                                 */}
-      {/* ========================================================================= */}
-      {editingStore && (
-        <div
-          id="modal-editar-comercio"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in"
-          onClick={() => setEditingStore(null)}
-        >
-          <div
-            className="w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-3xl bg-slate-900 border border-slate-700 p-6 sm:p-7 shadow-2xl space-y-5"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between pb-4 border-b border-slate-800">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-indigo-600/20 border border-indigo-500/40 flex items-center justify-center text-indigo-400">
-                  <Edit2 className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-base sm:text-lg font-bold text-white">
-                    Editar Comercio: {editingStore.name}
-                  </h3>
-                  <p className="text-xs text-slate-400">
-                    Modifica los datos del comercio, plan y datos del propietario.
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setEditingStore(null)}
-                aria-label="Cerrar modal de edición"
-                className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white transition cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
 
-            <form onSubmit={handleEditSubmit} className="space-y-4 text-xs">
-              {/* Datos del Comercio */}
-              <div className="space-y-3">
-                <span className="text-[11px] font-bold text-indigo-400 uppercase tracking-wider block">
-                  1. Información del Comercio
-                </span>
-
-                <div>
-                  <label htmlFor="edit-store-name" className="block font-semibold text-slate-300 mb-1">
-                    Nombre del Comercio *
-                  </label>
-                  <input
-                    id="edit-store-name"
-                    type="text"
-                    value={editForm.name || ''}
-                    onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                    className={`w-full px-3 py-2 rounded-xl bg-slate-950/90 border text-slate-200 focus:outline-hidden ${
-                      editFormErrors.name ? 'border-rose-500' : 'border-slate-800 focus:border-indigo-500'
-                    }`}
-                  />
-                  {editFormErrors.name && (
-                    <span className="text-rose-400 text-[11px] mt-1 block">{editFormErrors.name}</span>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label htmlFor="edit-store-type" className="block font-semibold text-slate-300 mb-1">
-                      Vertical / Tipo de Comercio *
-                    </label>
-                    <select
-                      id="edit-store-type"
-                      value={editForm.store_type || 'general'}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, store_type: e.target.value as StoreType })
-                      }
-                      className="w-full px-3 py-2 rounded-xl bg-slate-950/90 border border-slate-800 text-slate-200 focus:outline-hidden focus:border-indigo-500"
-                    >
-                      <option value="general">Comercio General</option>
-                      <option value="restaurante">Restaurante / Gastronomía</option>
-                      <option value="moda">Moda & Tendencias</option>
-                      <option value="servicios">Servicios Profesionales</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label htmlFor="edit-store-plan" className="block font-semibold text-slate-300 mb-1">
-                      Plan Asignado *
-                    </label>
-                    <select
-                      id="edit-store-plan"
-                      value={editForm.planId || 'basic'}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, planId: e.target.value as PlanId })
-                      }
-                      className="w-full px-3 py-2 rounded-xl bg-slate-950/90 border border-slate-800 text-slate-200 focus:outline-hidden focus:border-indigo-500"
-                    >
-                      <option value="basic">Plan Basic (Bs 49/mes)</option>
-                      <option value="pro">Plan Pro (Bs 99/mes)</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              {/* Datos del Propietario */}
-              <div className="space-y-3 pt-3 border-t border-slate-800">
-                <span className="text-[11px] font-bold text-cyan-400 uppercase tracking-wider block">
-                  2. Datos del Propietario
-                </span>
-
-                <div>
-                  <label htmlFor="edit-owner-name" className="block font-semibold text-slate-300 mb-1">
-                    Nombre Completo *
-                  </label>
-                  <input
-                    id="edit-owner-name"
-                    type="text"
-                    value={editForm.ownerName || ''}
-                    onChange={(e) => setEditForm({ ...editForm, ownerName: e.target.value })}
-                    className={`w-full px-3 py-2 rounded-xl bg-slate-950/90 border text-slate-200 focus:outline-hidden ${
-                      editFormErrors.ownerName ? 'border-rose-500' : 'border-slate-800 focus:border-indigo-500'
-                    }`}
-                  />
-                  {editFormErrors.ownerName && (
-                    <span className="text-rose-400 text-[11px] mt-1 block">{editFormErrors.ownerName}</span>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label htmlFor="edit-owner-email" className="block font-semibold text-slate-300 mb-1">
-                      Correo Electrónico *
-                    </label>
-                    <input
-                      id="edit-owner-email"
-                      type="email"
-                      value={editForm.ownerEmail || ''}
-                      onChange={(e) => setEditForm({ ...editForm, ownerEmail: e.target.value })}
-                      className={`w-full px-3 py-2 rounded-xl bg-slate-950/90 border text-slate-200 focus:outline-hidden ${
-                        editFormErrors.ownerEmail ? 'border-rose-500' : 'border-slate-800 focus:border-indigo-500'
-                      }`}
-                    />
-                    {editFormErrors.ownerEmail && (
-                      <span className="text-rose-400 text-[11px] mt-1 block">{editFormErrors.ownerEmail}</span>
-                    )}
-                  </div>
-
-                  <div>
-                    <label htmlFor="edit-owner-phone" className="block font-semibold text-slate-300 mb-1">
-                      Teléfono / WhatsApp *
-                    </label>
-                    <input
-                      id="edit-owner-phone"
-                      type="text"
-                      value={editForm.ownerPhone || ''}
-                      onChange={(e) => setEditForm({ ...editForm, ownerPhone: e.target.value })}
-                      className={`w-full px-3 py-2 rounded-xl bg-slate-950/90 border text-slate-200 focus:outline-hidden ${
-                        editFormErrors.ownerPhone ? 'border-rose-500' : 'border-slate-800 focus:border-indigo-500'
-                      }`}
-                    />
-                    {editFormErrors.ownerPhone && (
-                      <span className="text-rose-400 text-[11px] mt-1 block">{editFormErrors.ownerPhone}</span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Redes Sociales */}
-                <div className="space-y-2 pt-2">
-                  <span className="text-[11px] font-semibold text-slate-400 block">
-                    Redes Sociales (opcional):
-                  </span>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <input
-                      type="text"
-                      placeholder="Instagram (ej. @roma_bo)"
-                      value={editForm.socials?.instagram || ''}
-                      onChange={(e) =>
-                        setEditForm({
-                          ...editForm,
-                          socials: { ...editForm.socials, instagram: e.target.value },
-                        })
-                      }
-                      className="px-3 py-1.5 rounded-xl bg-slate-950/90 border border-slate-800 text-slate-300 text-xs focus:outline-hidden focus:border-indigo-500"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Facebook (ej. RomaGourmetBO)"
-                      value={editForm.socials?.facebook || ''}
-                      onChange={(e) =>
-                        setEditForm({
-                          ...editForm,
-                          socials: { ...editForm.socials, facebook: e.target.value },
-                        })
-                      }
-                      className="px-3 py-1.5 rounded-xl bg-slate-950/90 border border-slate-800 text-slate-300 text-xs focus:outline-hidden focus:border-indigo-500"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Botones del formulario de edición */}
-              <div className="pt-4 border-t border-slate-800 flex items-center justify-end gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => setEditingStore(null)}
-                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition cursor-pointer"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-md transition cursor-pointer"
-                >
-                  Guardar Cambios
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* ========================================================================= */}
       {/* 5. MODAL DE CONFIRMACIÓN: DESACTIVAR COMERCIO                             */}
@@ -1639,17 +1362,20 @@ export const SuperAdminStores: React.FC = () => {
 
             <div className="pt-2 flex items-center justify-center gap-3">
               <button
+                disabled={isUpdatingStatus}
                 onClick={() => setDeactivatingStore(null)}
-                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition cursor-pointer disabled:opacity-50"
               >
                 Cancelar
               </button>
               <button
                 id="btn-confirmar-desactivar"
+                disabled={isUpdatingStatus}
                 onClick={handleConfirmDeactivate}
-                className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold shadow-md transition cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold shadow-md transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Confirmar Desactivación
+                {isUpdatingStatus && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                <span>{isUpdatingStatus ? 'Desactivando...' : 'Confirmar Desactivación'}</span>
               </button>
             </div>
           </div>
@@ -1685,101 +1411,27 @@ export const SuperAdminStores: React.FC = () => {
 
             <div className="pt-2 flex items-center justify-center gap-3">
               <button
+                disabled={isUpdatingStatus}
                 onClick={() => setSuspendingStore(null)}
-                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition cursor-pointer disabled:opacity-50"
               >
                 Cancelar
               </button>
               <button
                 id="btn-confirmar-suspender"
+                disabled={isUpdatingStatus}
                 onClick={handleConfirmSuspend}
-                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-md transition cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-md transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Confirmar Suspensión
+                {isUpdatingStatus && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                <span>{isUpdatingStatus ? 'Suspendiendo...' : 'Confirmar Suspensión'}</span>
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* 7. MODAL DE ADVERTENCIA: ELIMINAR DEFINITIVAMENTE (CONFIRMACIÓN EXPLÍCITA) */}
-      {/* ========================================================================= */}
-      {deletingStore && (
-        <div
-          id="modal-confirm-eliminar"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md animate-fade-in"
-          onClick={() => setDeletingStore(null)}
-        >
-          <div
-            className="w-full max-w-lg rounded-3xl bg-slate-900 border-2 border-rose-600 p-6 sm:p-7 shadow-2xl space-y-5"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Ícono de Advertencia Crítica */}
-            <div className="w-14 h-14 rounded-2xl bg-rose-600/20 border border-rose-500/40 flex items-center justify-center text-rose-400 mx-auto">
-              <AlertTriangle className="w-7 h-7 animate-pulse" />
-            </div>
 
-            <div className="text-center space-y-2">
-              <span className="inline-block px-3 py-1 rounded-full bg-rose-500/20 border border-rose-500/40 text-rose-400 text-[11px] font-extrabold uppercase tracking-wider">
-                ¡Advertencia Crítica e Irreversible!
-              </span>
-              <h3 className="text-lg font-extrabold text-white">
-                Eliminar Definitivamente el Comercio
-              </h3>
-              <p className="text-xs text-rose-200/90 leading-relaxed">
-                Estás a punto de eliminar de manera permanente el comercio{' '}
-                <strong className="text-white underline">{deletingStore.name}</strong>.
-              </p>
-              <div className="p-3 rounded-xl bg-rose-950/50 border border-rose-800/60 text-left text-xs text-slate-300 space-y-1.5">
-                <p className="text-rose-300 font-semibold">• Esta acción NO se puede deshacer.</p>
-                <p className="text-slate-400">• El comercio dejará de aparecer en CentralBo de forma definitiva.</p>
-                <p className="text-slate-400">• Se eliminarán sus registros y configuraciones asociadas.</p>
-                <p className="text-slate-400">• No se trata de una suspensión temporal.</p>
-              </div>
-            </div>
-
-            {/* Confirmación explícita escribiendo el nombre exacto */}
-            <div className="space-y-2">
-              <label htmlFor="confirm-delete-input" className="block text-xs font-semibold text-slate-300 text-center">
-                Para confirmar, escribe exactamente el nombre del comercio:{' '}
-                <span className="text-rose-400 font-bold select-all">"{deletingStore.name}"</span>
-              </label>
-              <input
-                id="confirm-delete-input"
-                type="text"
-                value={deleteConfirmationText}
-                onChange={(e) => setDeleteConfirmationText(e.target.value)}
-                placeholder={deletingStore.name}
-                className="w-full px-3 py-2.5 rounded-xl bg-slate-950 border border-rose-500/50 text-white text-xs font-bold text-center focus:outline-hidden focus:border-rose-500"
-              />
-            </div>
-
-            {/* Botones */}
-            <div className="pt-2 flex items-center justify-center gap-3">
-              <button
-                onClick={() => setDeletingStore(null)}
-                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition cursor-pointer"
-              >
-                Cancelar y Volver
-              </button>
-              <button
-                id="btn-confirmar-eliminar-definitivo"
-                onClick={handleConfirmDelete}
-                disabled={deleteConfirmationText.trim() !== deletingStore.name.trim()}
-                className={`px-5 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
-                  deleteConfirmationText.trim() === deletingStore.name.trim()
-                    ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-600/40 cursor-pointer active:scale-98'
-                    : 'bg-slate-800 text-slate-600 border border-slate-700 cursor-not-allowed opacity-60'
-                }`}
-              >
-                <Trash2 className="w-4 h-4" />
-                <span>Eliminar definitivamente</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ========================================================================= */}
       {/* MODAL DE CONFIRMACIÓN: CREDENCIALES INICIALES DEL DUEÑO                    */}

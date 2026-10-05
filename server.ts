@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import { createServer as createViteServer } from 'vite';
 import healthHandler from './api/health.js';
 import createStoreOwnerHandler from './api/superadmin/create-store-owner.js';
+import updateStoreStatusHandler from './api/superadmin/update-store-status.js';
 import createOrderHandler from './api/checkout/create-order.js';
 import createAppointmentHandler from './api/appointments/create-appointment.js';
 import appointmentAvailabilityHandler from './api/appointments/availability.js';
@@ -28,6 +29,11 @@ app.get('/api/health', (req: Request, res: Response) => {
 // 2. Creación Real de Comercio + Dueño (SuperAdmin)
 app.post('/api/superadmin/create-store-owner', (req: Request, res: Response) => {
   createStoreOwnerHandler(req as any, res as any);
+});
+
+// 2b. Actualización Canónica de Estado de Comercio (SuperAdmin P1-SA-01)
+app.post('/api/superadmin/update-store-status', (req: Request, res: Response) => {
+  updateStoreStatusHandler(req as any, res as any);
 });
 
 // 3. Creación Atómica de Pedidos (Público / Checkout Anónimo H-01)
