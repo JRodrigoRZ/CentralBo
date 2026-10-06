@@ -9,6 +9,7 @@ import createOrderHandler from './api/checkout/create-order.js';
 import createAppointmentHandler from './api/appointments/create-appointment.js';
 import appointmentAvailabilityHandler from './api/appointments/availability.js';
 import activePromotionsHandler from './api/promotions/active.js';
+import chatHandler from './api/chat.js';
 
 dotenv.config();
 
@@ -54,6 +55,11 @@ app.all('/api/appointments/availability', (req: Request, res: Response) => {
 // 6. Consulta Pública Segura de Promociones y Cupones Activos (Fase 2 Parte 2)
 app.all('/api/promotions/active', (req: Request, res: Response) => {
   activePromotionsHandler(req as any, res as any);
+});
+
+// 7. Chatbot de Atención Inteligente Multi-Tenant (Google Generative AI + Supabase)
+app.all('/api/chat', (req: Request, res: Response) => {
+  chatHandler(req as any, res as any);
 });
 
 // ----------------------------------------------------------------------------

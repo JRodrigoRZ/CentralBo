@@ -69,7 +69,6 @@ export default defineConfig(() => {
       headers: {
         'X-Content-Type-Options': 'nosniff',
         'Referrer-Policy': 'strict-origin-when-cross-origin',
-        'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://images.unsplash.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co; font-src 'self'; object-src 'none'; frame-src 'none'; base-uri 'self'; form-action 'self'; worker-src 'self'; manifest-src 'self' data:; frame-ancestors 'self' https://ai.studio https://*.google.com;",
       },
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
@@ -81,7 +80,6 @@ export default defineConfig(() => {
       headers: {
         'X-Content-Type-Options': 'nosniff',
         'Referrer-Policy': 'strict-origin-when-cross-origin',
-        'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://images.unsplash.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co; font-src 'self'; object-src 'none'; frame-src 'none'; base-uri 'self'; form-action 'self'; worker-src 'self'; manifest-src 'self' data:; frame-ancestors 'self' https://ai.studio https://*.google.com;",
       },
     },
   };

@@ -84,6 +84,7 @@ import { PriceDisplay } from './common/PriceDisplay';
 import { StorePWAInstallButton } from './publicStore/StorePWAInstallButton';
 import { StoreHighlights } from './publicStore/StoreHighlights';
 import { PublicStorePromotions } from './publicStore/PublicStorePromotions';
+import { ChatWidget } from './chat/ChatWidget';
 
 interface PublicStoreViewProps {
   slug: string;
@@ -1042,6 +1043,17 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
           storeWhatsapp={profile.whatsapp || profile.phone || ''}
           onClose={() => setIsOrdersHistoryOpen(false)}
           primaryColor={primaryColor}
+        />
+      )}
+
+      {/* CHATBOT DE ATENCIÓN INTELIGENTE (GOOGLE GEMINI + SUPABASE) */}
+      {store && (
+        <ChatWidget
+          storeId={store.id}
+          storeName={profile?.name || store.name}
+          storeType={store.store_type}
+          primaryColor={primaryColor}
+          hasFloatingCart={cartItems.length > 0}
         />
       )}
     </div>
