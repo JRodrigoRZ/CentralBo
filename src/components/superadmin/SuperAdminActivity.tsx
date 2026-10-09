@@ -25,7 +25,7 @@ export const SuperAdminActivity: React.FC = () => {
             </span>
           </h2>
           <p className="text-xs text-slate-400 mt-0.5">
-            Métricas esenciales de interacción y transacciones globales en CentralBo.
+            Métricas esenciales de interacción y transacciones globales en MAXINEGO.
           </p>
         </div>
 

@@ -10,7 +10,7 @@ import {
   Server,
   Zap,
 } from 'lucide-react';
-import { testCentralBoConnection } from '../lib/supabase';
+import { testMaxinegoConnection } from '../lib/supabase';
 import { usePWA } from '../hooks/usePWA';
 
 export const SystemReadinessCard: React.FC = () => {
@@ -68,7 +68,7 @@ export const SystemReadinessCard: React.FC = () => {
     }
 
     setDbStatus((prev) => ({ ...prev, testing: true }));
-    const result = await testCentralBoConnection();
+    const result = await testMaxinegoConnection();
     setDbStatus({
       testing: false,
       tested: true,
@@ -240,7 +240,7 @@ export const SystemReadinessCard: React.FC = () => {
                 <h3 className="text-sm sm:text-base font-bold text-white">
                   Conexión Supabase
                 </h3>
-                <p className="text-[11px] text-slate-400">Proyecto CentralBo</p>
+                <p className="text-[11px] text-slate-400">Proyecto MAXINEGO</p>
               </div>
             </div>
             <button
@@ -267,7 +267,7 @@ export const SystemReadinessCard: React.FC = () => {
 
           <div className="space-y-2 text-xs">
             <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80">
-              <div className="text-slate-400 text-[11px] mb-0.5">Endpoint CentralBo</div>
+              <div className="text-slate-400 text-[11px] mb-0.5">Endpoint MAXINEGO</div>
               <div className="font-mono text-xs text-slate-200 truncate">
                 {dbStatus.endpoint}
               </div>

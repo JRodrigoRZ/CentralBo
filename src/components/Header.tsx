@@ -108,7 +108,7 @@ export const Header: React.FC<HeaderProps> = ({ pwaStatus, onInstallClick }) => 
             type="button"
             onClick={handleGoHome}
             className="flex items-center gap-2.5 text-left group cursor-pointer focus:outline-none"
-            aria-label="CentralBo - Ir al inicio"
+            aria-label="MAXINEGO - Ir al inicio"
           >
             <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-xs group-hover:bg-blue-700 transition">
               <StoreIcon className="w-5 h-5" />
@@ -116,12 +116,12 @@ export const Header: React.FC<HeaderProps> = ({ pwaStatus, onInstallClick }) => 
             <div className="flex flex-col">
               <div className="flex items-center gap-1.5">
                 <span className="font-extrabold text-base tracking-tight text-slate-900 dark:text-white">
-                  CentralBo
+                  MAXINEGO
                 </span>
                 <span className="w-1.5 h-1.5 rounded-full bg-blue-600 dark:bg-blue-400" />
               </div>
               <span className="text-[11px] text-slate-500 dark:text-slate-400 leading-none font-medium hidden sm:block">
-                Comercio Digital en Bolivia
+                Plataforma para Comercios y Negocios Locales
               </span>
             </div>
           </button>
@@ -166,7 +166,7 @@ export const Header: React.FC<HeaderProps> = ({ pwaStatus, onInstallClick }) => 
               type="button"
               onClick={onInstallClick}
               className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#121d36] border border-slate-200/70 dark:border-[#1c2a47] transition-colors cursor-pointer"
-              title="Instalar aplicación CentralBo"
+              title="Instalar aplicación MAXINEGO"
             >
               <Smartphone className="w-3.5 h-3.5" />
               <span className="hidden lg:inline">Instalar</span>

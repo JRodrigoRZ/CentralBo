@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "CentralBo — Plataforma PWA",
-  "short_name": "CentralBo",
-  "description": "Plataforma SaaS Marketplace Multi-Tenant y PWA de CentralBo",
+  "name": "MAXINEGO — Plataforma para Comercios y Negocios Locales",
+  "short_name": "MAXINEGO",
+  "description": "Plataforma para Comercios y Negocios Locales",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

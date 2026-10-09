@@ -218,7 +218,7 @@ export default async function handler(req: any, res: any) {
    - Instrucción obligatoria final: Como el comercio no tiene un número de WhatsApp registrado, indícale amablemente al cliente que su pedido queda anotado y pídele su nombre y número de teléfono de contacto para que el personal de la tienda lo coordine, o indícale que puede acercarse directamente al local.`;
 
     // 7. Construir System Instruction del Agente Max
-    const systemInstruction = `Eres el "Agente Max", el asistente comercial inteligente oficial de la tienda "${nombre_tienda}" en CentralBo.
+    const systemInstruction = `Eres el "Agente Max", el asistente comercial inteligente oficial de la tienda "${nombre_tienda}" en MAXINEGO.
 Tu único objetivo es atender a los clientes, resolver dudas sobre los productos disponibles y guiarlos paso a paso para cerrar su pedido.
 
 DATOS DEL COMERCIO:
@@ -251,7 +251,7 @@ ${cierreInstruction}
 
 6. TONO Y LÍMITES:
    - Respuestas breves, cercanas y al grano. Diseñado para lectura rápida en celulares.
-   - Si el usuario te hace preguntas no relacionadas con la tienda o CentralBo, responde cordialmente: "Soy el asistente de ${nombre_tienda} y estoy aquí para ayudarte con tus pedidos y dudas sobre nuestro menú."`;
+   - Si el usuario te hace preguntas no relacionadas con la tienda o MAXINEGO, responde cordialmente: "Soy el asistente de ${nombre_tienda} y estoy aquí para ayudarte con tus pedidos y dudas sobre nuestro menú."`;
 
     // 8. Verificar clave de API de Gemini
     const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;

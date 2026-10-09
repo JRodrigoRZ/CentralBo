@@ -14,9 +14,9 @@ export default defineConfig(() => {
         includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'icon.svg', 'manifest.json'],
         manifest: {
           id: '/',
-          name: 'CentralBo — Plataforma PWA',
-          short_name: 'CentralBo',
-          description: 'Plataforma SaaS Marketplace Multi-Tenant y PWA de CentralBo',
+          name: 'MAXINEGO — Plataforma para Comercios y Negocios Locales',
+          short_name: 'MAXINEGO',
+          description: 'Plataforma para Comercios y Negocios Locales',
           theme_color: '#0f172a',
           background_color: '#0f172a',
           display: 'standalone',

@@ -1,13 +1,26 @@
 import { CartItem, CustomerSavedProfile, PlacedOrderRecord, CheckoutPaymentMethod } from './types';
 import { AppointmentRequest, StoreType } from '../../types';
 
-const CART_PREFIX = 'centralbo_cart_v5_';
-const PROFILE_KEY = 'centralbo_customer_profile_v5';
-const PROFILE_KEY_PREFIX = 'centralbo_customer_profile_v5_';
-const ORDERS_KEY_PREFIX = 'centralbo_customer_orders_v5_';
-const APPOINTMENTS_KEY_PREFIX = 'centralbo_customer_appointments_v5_';
-const LEGACY_ORDERS_KEY = 'centralbo_customer_orders_v5';
-const LEGACY_APPOINTMENTS_KEY = 'centralbo_customer_appointments_v5';
+const CART_PREFIX = 'maxinego_cart_v5_';
+const LEGACY_CART_PREFIX = 'centralbo_cart_v5_';
+
+const PROFILE_KEY = 'maxinego_customer_profile_v5';
+const LEGACY_PROFILE_KEY = 'centralbo_customer_profile_v5';
+
+const PROFILE_KEY_PREFIX = 'maxinego_customer_profile_v5_';
+const LEGACY_PROFILE_KEY_PREFIX = 'centralbo_customer_profile_v5_';
+
+const ORDERS_KEY_PREFIX = 'maxinego_customer_orders_v5_';
+const LEGACY_ORDERS_KEY_PREFIX = 'centralbo_customer_orders_v5_';
+
+const APPOINTMENTS_KEY_PREFIX = 'maxinego_customer_appointments_v5_';
+const LEGACY_APPOINTMENTS_KEY_PREFIX = 'centralbo_customer_appointments_v5_';
+
+const LEGACY_ORDERS_GLOBAL_KEY = 'maxinego_customer_orders_v5';
+const OLD_LEGACY_ORDERS_GLOBAL_KEY = 'centralbo_customer_orders_v5';
+
+const LEGACY_APPOINTMENTS_GLOBAL_KEY = 'maxinego_customer_appointments_v5';
+const OLD_LEGACY_APPOINTMENTS_GLOBAL_KEY = 'centralbo_customer_appointments_v5';
 
 function isValidTenantId(tenantId: string | undefined | null): boolean {
   return (
@@ -170,7 +183,7 @@ function sanitizeAppointmentRequest(data: any, tenantId?: string): AppointmentRe
     professionalName: typeof data.professionalName === 'string' ? data.professionalName.slice(0, 100) : '',
     customerName: typeof data.customerName === 'string' ? data.customerName.trim().slice(0, 100) : '',
     customerPhone: typeof data.customerPhone === 'string' ? data.customerPhone.trim().slice(0, 25) : '',
-    customerEmail: typeof data.customerEmail === 'string' ? data.customerEmail.trim().slice(0, 120) : 'cliente@centralbo.bo',
+    customerEmail: typeof data.customerEmail === 'string' ? data.customerEmail.trim().slice(0, 120) : 'cliente@maxinego.app',
     date: data.date,
     time: data.time.slice(0, 10),
     status: status,
@@ -181,17 +194,36 @@ function sanitizeAppointmentRequest(data: any, tenantId?: string): AppointmentRe
 
 export function getTenantCart(tenantId: string): CartItem[] {
   if (!isValidTenantId(tenantId)) return [];
+  const cleanTenantId = tenantId.trim();
   try {
-    const raw = localStorage.getItem(`${CART_PREFIX}${tenantId.trim()}`);
+    // 1. Prioridad: Buscar la nueva clave Maxinego
+    const raw = localStorage.getItem(`${CART_PREFIX}${cleanTenantId}`);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) return [];
-      return parsed
-        .map(sanitizeCartItem)
-        .filter((item): item is CartItem => item !== null);
+      if (Array.isArray(parsed)) {
+        return parsed
+          .map(sanitizeCartItem)
+          .filter((item): item is CartItem => item !== null);
+      }
+    }
+
+    // 2. Fallback: Buscar la clave heredada CentralBo
+    const legacyRaw = localStorage.getItem(`${LEGACY_CART_PREFIX}${cleanTenantId}`);
+    if (legacyRaw) {
+      const parsed = JSON.parse(legacyRaw);
+      if (Array.isArray(parsed)) {
+        const cleanItems = parsed
+          .map(sanitizeCartItem)
+          .filter((item): item is CartItem => item !== null);
+        // Migración suave a la nueva clave Maxinego sin destruir la heredada
+        try {
+          localStorage.setItem(`${CART_PREFIX}${cleanTenantId}`, JSON.stringify(cleanItems));
+        } catch {}
+        return cleanItems;
+      }
     }
   } catch (e) {
-    console.warn('[CentralBo PublicStore] Error al leer carrito (JSON inválido o corrupto):', e);
+    console.warn('[PublicStore] Error al leer carrito (JSON inválido o corrupto):', e);
   }
   return [];
 }
@@ -199,25 +231,29 @@ export function getTenantCart(tenantId: string): CartItem[] {
 export function saveTenantCart(tenantId: string, items: CartItem[]): void {
   if (!isValidTenantId(tenantId)) return;
   if (!Array.isArray(items)) {
-    console.warn('[CentralBo PublicStore] Intento de guardar carrito con tipo no array');
+    console.warn('[PublicStore] Intento de guardar carrito con tipo no array');
     return;
   }
   try {
     const cleanItems = items
       .map(sanitizeCartItem)
       .filter((i): i is CartItem => i !== null);
+    // Escribir en la nueva clave Maxinego
     localStorage.setItem(`${CART_PREFIX}${tenantId.trim()}`, JSON.stringify(cleanItems));
   } catch (e) {
-    console.warn('[CentralBo PublicStore] Error al guardar carrito:', e);
+    console.warn('[PublicStore] Error al guardar carrito:', e);
   }
 }
 
 export function clearTenantCart(tenantId: string): void {
   if (!isValidTenantId(tenantId)) return;
+  const cleanTenantId = tenantId.trim();
   try {
-    localStorage.removeItem(`${CART_PREFIX}${tenantId.trim()}`);
+    localStorage.removeItem(`${CART_PREFIX}${cleanTenantId}`);
+    // Limpieza segura de la clave heredada para evitar que rehidrate un carrito vaciado explícitamente
+    localStorage.removeItem(`${LEGACY_CART_PREFIX}${cleanTenantId}`);
   } catch (e) {
-    console.warn('[CentralBo PublicStore] Error al limpiar carrito:', e);
+    console.warn('[PublicStore] Error al limpiar carrito:', e);
   }
 }
 
@@ -225,21 +261,50 @@ export function getSavedCustomerProfile(tenantId?: string): CustomerSavedProfile
   try {
     // 1. Si se proporciona tenantId, consultar primero el perfil específico del tenant
     if (isValidTenantId(tenantId)) {
-      const tenantRaw = localStorage.getItem(`${PROFILE_KEY_PREFIX}${tenantId!.trim()}`);
+      const cleanTenantId = tenantId!.trim();
+      // 1a. Clave nueva Maxinego por tenant
+      const tenantRaw = localStorage.getItem(`${PROFILE_KEY_PREFIX}${cleanTenantId}`);
       if (tenantRaw) {
         const parsed = JSON.parse(tenantRaw);
         const clean = sanitizeCustomerProfile(parsed);
         if (clean) return clean;
       }
+      // 1b. Fallback clave heredada CentralBo por tenant
+      const legacyTenantRaw = localStorage.getItem(`${LEGACY_PROFILE_KEY_PREFIX}${cleanTenantId}`);
+      if (legacyTenantRaw) {
+        const parsed = JSON.parse(legacyTenantRaw);
+        const clean = sanitizeCustomerProfile(parsed);
+        if (clean) {
+          try {
+            localStorage.setItem(`${PROFILE_KEY_PREFIX}${cleanTenantId}`, JSON.stringify(clean));
+          } catch {}
+          return clean;
+        }
+      }
     }
+
     // 2. Fallback al perfil global del comprador
+    // 2a. Clave nueva Maxinego global
     const raw = localStorage.getItem(PROFILE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      return sanitizeCustomerProfile(parsed);
+      const clean = sanitizeCustomerProfile(parsed);
+      if (clean) return clean;
+    }
+    // 2b. Fallback clave heredada CentralBo global
+    const legacyRaw = localStorage.getItem(LEGACY_PROFILE_KEY);
+    if (legacyRaw) {
+      const parsed = JSON.parse(legacyRaw);
+      const clean = sanitizeCustomerProfile(parsed);
+      if (clean) {
+        try {
+          localStorage.setItem(PROFILE_KEY, JSON.stringify(clean));
+        } catch {}
+        return clean;
+      }
     }
   } catch (e) {
-    console.warn('[CentralBo PublicStore] Error al leer perfil guardado:', e);
+    console.warn('[PublicStore] Error al leer perfil guardado:', e);
   }
   return null;
 }
@@ -249,14 +314,14 @@ export function saveCustomerProfile(profile: CustomerSavedProfile, tenantId?: st
   if (!cleanProfile) return;
 
   try {
-    // Si se provee tenantId, aislar también el perfil para este tenant
+    // Si se provee tenantId, guardar en la nueva clave aislada para este tenant
     if (isValidTenantId(tenantId)) {
       localStorage.setItem(`${PROFILE_KEY_PREFIX}${tenantId!.trim()}`, JSON.stringify(cleanProfile));
     }
-    // Guardar en el perfil global del cliente para conveniencia de autocompletado general
+    // Guardar en el perfil global de Maxinego
     localStorage.setItem(PROFILE_KEY, JSON.stringify(cleanProfile));
   } catch (e) {
-    console.warn('[CentralBo PublicStore] Error al guardar perfil:', e);
+    console.warn('[PublicStore] Error al guardar perfil:', e);
   }
 }
 
@@ -268,7 +333,7 @@ export function getCustomerPlacedOrders(tenantId?: string): PlacedOrderRecord[] 
 
   const cleanTenantId = tenantId!.trim();
   try {
-    // 1. Leer almacenamiento estrictamente aislado del tenant
+    // 1. Leer almacenamiento nuevo Maxinego estrictamente aislado del tenant
     const scopedRaw = localStorage.getItem(`${ORDERS_KEY_PREFIX}${cleanTenantId}`);
     if (scopedRaw) {
       const parsed = JSON.parse(scopedRaw);
@@ -277,11 +342,27 @@ export function getCustomerPlacedOrders(tenantId?: string): PlacedOrderRecord[] 
           .map((o) => sanitizePlacedOrder(o, cleanTenantId))
           .filter((o): o is PlacedOrderRecord => o !== null);
       }
-      return [];
     }
 
-    // 2. Migración suave desde la clave legacy para no perder pedidos previos
-    const legacyRaw = localStorage.getItem(LEGACY_ORDERS_KEY);
+    // 2. Fallback: clave heredada CentralBo aislada del tenant
+    const legacyScopedRaw = localStorage.getItem(`${LEGACY_ORDERS_KEY_PREFIX}${cleanTenantId}`);
+    if (legacyScopedRaw) {
+      const parsed = JSON.parse(legacyScopedRaw);
+      if (Array.isArray(parsed)) {
+        const tenantOrders = parsed
+          .map((o) => sanitizePlacedOrder(o, cleanTenantId))
+          .filter((o): o is PlacedOrderRecord => o !== null);
+        if (tenantOrders.length > 0) {
+          try {
+            localStorage.setItem(`${ORDERS_KEY_PREFIX}${cleanTenantId}`, JSON.stringify(tenantOrders));
+          } catch {}
+          return tenantOrders;
+        }
+      }
+    }
+
+    // 3. Fallback: clave global anterior migrada
+    const legacyRaw = localStorage.getItem(LEGACY_ORDERS_GLOBAL_KEY) || localStorage.getItem(OLD_LEGACY_ORDERS_GLOBAL_KEY);
     if (legacyRaw) {
       const legacyOrders = JSON.parse(legacyRaw);
       if (Array.isArray(legacyOrders)) {
@@ -290,26 +371,28 @@ export function getCustomerPlacedOrders(tenantId?: string): PlacedOrderRecord[] 
           .map((o) => sanitizePlacedOrder(o, cleanTenantId))
           .filter((o): o is PlacedOrderRecord => o !== null);
         if (tenantOrders.length > 0) {
-          localStorage.setItem(`${ORDERS_KEY_PREFIX}${cleanTenantId}`, JSON.stringify(tenantOrders));
+          try {
+            localStorage.setItem(`${ORDERS_KEY_PREFIX}${cleanTenantId}`, JSON.stringify(tenantOrders));
+          } catch {}
           return tenantOrders;
         }
       }
     }
   } catch (e) {
-    console.warn(`[CentralBo PublicStore] Error al leer pedidos del tenant ${cleanTenantId}:`, e);
+    console.warn(`[PublicStore] Error al leer pedidos del tenant ${cleanTenantId}:`, e);
   }
   return [];
 }
 
 export function recordCustomerPlacedOrder(order: PlacedOrderRecord): void {
   if (!order || !isValidTenantId(order.tenantId)) {
-    console.warn('[CentralBo PublicStore] Intento de registrar pedido con tenantId inválido');
+    console.warn('[PublicStore] Intento de registrar pedido con tenantId inválido');
     return;
   }
   const cleanTenantId = order.tenantId.trim();
   const cleanOrder = sanitizePlacedOrder(order, cleanTenantId);
   if (!cleanOrder) {
-    console.warn('[CentralBo PublicStore] Estructura de pedido inválida para persistencia');
+    console.warn('[PublicStore] Estructura de pedido inválida para persistencia');
     return;
   }
 
@@ -318,7 +401,7 @@ export function recordCustomerPlacedOrder(order: PlacedOrderRecord): void {
     const updated = [cleanOrder, ...existing.filter((o) => o.id !== cleanOrder.id)].slice(0, 30);
     localStorage.setItem(`${ORDERS_KEY_PREFIX}${cleanTenantId}`, JSON.stringify(updated));
   } catch (e) {
-    console.warn('[CentralBo PublicStore] Error al registrar pedido del cliente:', e);
+    console.warn('[PublicStore] Error al registrar pedido del cliente:', e);
   }
 }
 
@@ -330,7 +413,7 @@ export function getCustomerAppointments(tenantId?: string): AppointmentRequest[]
 
   const cleanTenantId = tenantId!.trim();
   try {
-    // 1. Leer almacenamiento estrictamente aislado del tenant
+    // 1. Leer almacenamiento nuevo Maxinego estrictamente aislado del tenant
     const scopedRaw = localStorage.getItem(`${APPOINTMENTS_KEY_PREFIX}${cleanTenantId}`);
     if (scopedRaw) {
       const parsed = JSON.parse(scopedRaw);
@@ -339,11 +422,27 @@ export function getCustomerAppointments(tenantId?: string): AppointmentRequest[]
           .map((a) => sanitizeAppointmentRequest(a, cleanTenantId))
           .filter((a): a is AppointmentRequest => a !== null);
       }
-      return [];
     }
 
-    // 2. Migración suave desde la clave legacy
-    const legacyRaw = localStorage.getItem(LEGACY_APPOINTMENTS_KEY);
+    // 2. Fallback: clave heredada CentralBo aislada del tenant
+    const legacyScopedRaw = localStorage.getItem(`${LEGACY_APPOINTMENTS_KEY_PREFIX}${cleanTenantId}`);
+    if (legacyScopedRaw) {
+      const parsed = JSON.parse(legacyScopedRaw);
+      if (Array.isArray(parsed)) {
+        const tenantAppointments = parsed
+          .map((a) => sanitizeAppointmentRequest(a, cleanTenantId))
+          .filter((a): a is AppointmentRequest => a !== null);
+        if (tenantAppointments.length > 0) {
+          try {
+            localStorage.setItem(`${APPOINTMENTS_KEY_PREFIX}${cleanTenantId}`, JSON.stringify(tenantAppointments));
+          } catch {}
+          return tenantAppointments;
+        }
+      }
+    }
+
+    // 3. Fallback: clave global anterior migrada
+    const legacyRaw = localStorage.getItem(LEGACY_APPOINTMENTS_GLOBAL_KEY) || localStorage.getItem(OLD_LEGACY_APPOINTMENTS_GLOBAL_KEY);
     if (legacyRaw) {
       const legacyAppointments = JSON.parse(legacyRaw);
       if (Array.isArray(legacyAppointments)) {
@@ -352,26 +451,28 @@ export function getCustomerAppointments(tenantId?: string): AppointmentRequest[]
           .map((a) => sanitizeAppointmentRequest(a, cleanTenantId))
           .filter((a): a is AppointmentRequest => a !== null);
         if (tenantAppointments.length > 0) {
-          localStorage.setItem(`${APPOINTMENTS_KEY_PREFIX}${cleanTenantId}`, JSON.stringify(tenantAppointments));
+          try {
+            localStorage.setItem(`${APPOINTMENTS_KEY_PREFIX}${cleanTenantId}`, JSON.stringify(tenantAppointments));
+          } catch {}
           return tenantAppointments;
         }
       }
     }
   } catch (e) {
-    console.warn(`[CentralBo PublicStore] Error al leer citas del tenant ${cleanTenantId}:`, e);
+    console.warn(`[PublicStore] Error al leer citas del tenant ${cleanTenantId}:`, e);
   }
   return [];
 }
 
 export function recordCustomerAppointment(appointment: AppointmentRequest): void {
   if (!appointment || !isValidTenantId(appointment.tenant_id)) {
-    console.warn('[CentralBo PublicStore] Intento de registrar cita con tenant_id inválido');
+    console.warn('[PublicStore] Intento de registrar cita con tenant_id inválido');
     return;
   }
   const cleanTenantId = appointment.tenant_id.trim();
   const cleanAppt = sanitizeAppointmentRequest(appointment, cleanTenantId);
   if (!cleanAppt) {
-    console.warn('[CentralBo PublicStore] Estructura de cita inválida para persistencia');
+    console.warn('[PublicStore] Estructura de cita inválida para persistencia');
     return;
   }
 
@@ -380,6 +481,6 @@ export function recordCustomerAppointment(appointment: AppointmentRequest): void
     const updated = [cleanAppt, ...existing.filter((a) => a.id !== cleanAppt.id)].slice(0, 30);
     localStorage.setItem(`${APPOINTMENTS_KEY_PREFIX}${cleanTenantId}`, JSON.stringify(updated));
   } catch (e) {
-    console.warn('[CentralBo PublicStore] Error al registrar cita del cliente:', e);
+    console.warn('[PublicStore] Error al registrar cita del cliente:', e);
   }
 }

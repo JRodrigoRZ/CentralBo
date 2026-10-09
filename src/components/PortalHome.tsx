@@ -104,7 +104,7 @@ const getCardMetadata = (store: { slug?: string; store_type?: string; name?: str
 
 const NEUTRAL_DEMO_STORE: Store = {
   id: 'demo-neutral',
-  name: 'Comercio Local CentralBo',
+  name: 'Comercio Local MAXINEGO',
   slug: 'comercio-ejemplo',
   store_type: 'general',
   status: 'prueba',
@@ -298,7 +298,7 @@ const getHeroStoreShowcase = (store: Store): HeroMockupShowcase => {
     };
   }
 
-  // Comercio General / Retail / CentralBo Demo
+  // Comercio General / Retail / MAXINEGO Demo
   return {
     id: store.id,
     name: store.name,
@@ -857,7 +857,7 @@ export const PortalHome: React.FC = () => {
             )}
           </div>
 
-          {/* Columna Derecha: Mockup Interactivo de Tienda Pública CentralBo */}
+          {/* Columna Derecha: Mockup Interactivo de Tienda Pública MAXINEGO */}
           <div
             className="lg:col-span-6 relative hero-anim-mockup"
             onMouseEnter={() => setIsHeroPaused(true)}
@@ -879,7 +879,7 @@ export const PortalHome: React.FC = () => {
                   </div>
                   <div className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-white dark:bg-[#080d1a] border border-slate-200/80 dark:border-[#1c2a47] text-[11px] font-mono text-slate-600 dark:text-slate-300 min-w-0 max-w-[170px] sm:max-w-[240px] truncate shadow-2xs">
                     <Globe className="w-3 h-3 text-slate-400 shrink-0" />
-                    <span className="truncate">centralbo.com/tienda/{heroShowcase.slug}</span>
+                    <span className="truncate">maxinego.app/tienda/{heroShowcase.slug}</span>
                   </div>
                 </div>
 
@@ -1141,7 +1141,7 @@ export const PortalHome: React.FC = () => {
               </span>
             </div>
             <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-              Comercios destacados en CentralBo
+              Comercios destacados en MAXINEGO
             </h2>
           </div>
 
@@ -1271,23 +1271,23 @@ export const PortalHome: React.FC = () => {
       <div className="w-full h-px bg-slate-200/70 dark:bg-[#16223b]" />
 
       {/* ========================================================================= */}
-      {/* 3. ¿QUÉ ES CENTRALBO?                                                     */}
+      {/* 3. ¿QUÉ ES MAXINEGO?                                                      */}
       {/* ========================================================================= */}
-      <section id="que-es-centralbo" className="w-full space-y-6 sm:space-y-8 scroll-mt-20">
+      <section id="que-es-maxinego" className="w-full space-y-6 sm:space-y-8 scroll-mt-20">
         <div className="max-w-3xl space-y-2.5">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-950/60 border border-blue-200/80 dark:border-blue-800/60 text-blue-700 dark:text-blue-300 text-xs font-bold uppercase tracking-wider">
             <Sparkles className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
             <span>Conoce la Plataforma</span>
           </div>
           <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-            ¿Qué es CentralBo?
+            ¿Qué es MAXINEGO?
           </h2>
           <p className="text-sm sm:text-base lg:text-lg text-slate-600 dark:text-slate-300 leading-relaxed">
-            CentralBo es la plataforma que permite a los comercios locales dar el salto al mundo digital. Aquí puedes abrir tu propia tienda online, mostrar tus productos y servicios con claridad y recibir pedidos directamente de tus clientes sin intermediarios ni complicaciones.
+            MAXINEGO es la plataforma que permite a los comercios locales dar el salto al mundo digital. Aquí puedes abrir tu propia tienda online, mostrar tus productos y servicios con claridad y recibir pedidos directamente de tus clientes sin intermediarios ni complicaciones.
           </p>
         </div>
 
-        {/* 3 Pilares Fundamentales de CentralBo */}
+        {/* 3 Pilares Fundamentales de MAXINEGO */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5 sm:gap-6">
           <div className="p-6 rounded-2xl bg-white dark:bg-[#0d162b] border border-slate-200/80 dark:border-[#1c2a47] shadow-2xs hover:shadow-md hover:border-blue-300/80 dark:hover:border-blue-600/60 transition-all duration-200 space-y-3 group">
             <div className="w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-950/70 border border-blue-200 dark:border-blue-800/60 flex items-center justify-center text-blue-600 dark:text-blue-400 group-hover:scale-105 transition-transform">
@@ -1341,7 +1341,7 @@ export const PortalHome: React.FC = () => {
               <span>Tu Negocio en Digital</span>
             </div>
             <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-              Así se ve tu tienda en CentralBo
+              Así se ve tu tienda en MAXINEGO
             </h2>
             <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 leading-relaxed">
               Tu comercio contará con una vitrina pública profesional diseñada para que tus clientes naveguen cómodamente, descubran lo que ofreces y compren con total facilidad.
@@ -1503,10 +1503,10 @@ export const PortalHome: React.FC = () => {
             <span>Herramientas para el Comercio</span>
           </div>
           <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-            Todo lo que puedes hacer con CentralBo
+            Todo lo que puedes hacer con MAXINEGO
           </h2>
           <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 leading-relaxed">
-            CentralBo te brinda las herramientas esenciales para administrar tu comercio y vender con facilidad, sin complicaciones técnicas.
+            MAXINEGO te brinda las herramientas esenciales para administrar tu comercio y vender con facilidad, sin complicaciones técnicas.
           </p>
         </div>
 
@@ -1596,7 +1596,7 @@ export const PortalHome: React.FC = () => {
       <div className="w-full h-px bg-slate-200/70 dark:bg-[#16223b]" />
 
       {/* ========================================================================= */}
-      {/* 6. CENTRALBO TE AYUDA A SER DESCUBIERTO                                   */}
+      {/* 6. MAXINEGO TE AYUDA A SER DESCUBIERTO                                    */}
       {/* ========================================================================= */}
       <section id="ecosistema-descubrimiento" className="w-full">
         <div className="rounded-3xl sm:rounded-[32px] bg-gradient-to-br from-[#060c23] via-[#0b163b] to-[#171242] text-white p-7 sm:p-10 lg:p-12 border border-blue-500/25 shadow-2xl shadow-blue-950/60 ring-1 ring-white/10 relative overflow-hidden">
@@ -1629,11 +1629,11 @@ export const PortalHome: React.FC = () => {
               </div>
 
               <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white tracking-tight leading-tight">
-                CentralBo te ayuda a ser descubierto
+                MAXINEGO te ayuda a ser descubierto
               </h2>
 
               <p className="text-base sm:text-lg text-slate-200 leading-relaxed max-w-2xl">
-                <strong>Tu tienda es tu negocio digital.</strong> CentralBo es el ecosistema donde los comercios locales pueden mostrar lo que ofrecen y ser descubiertos por nuevos clientes.
+                <strong>Tu tienda es tu negocio digital.</strong> MAXINEGO es el ecosistema donde los comercios locales pueden mostrar lo que ofrecen y ser descubiertos por nuevos clientes.
               </p>
 
               <div className="pt-2 grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs sm:text-sm text-slate-200">
@@ -1683,7 +1683,7 @@ export const PortalHome: React.FC = () => {
       <div className="w-full h-px bg-slate-200/70 dark:bg-[#16223b]" />
 
       {/* ========================================================================= */}
-      {/* 7. DESCUBRE TIENDAS EN CENTRALBO (#descubre-tiendas)                       */}
+      {/* 7. DESCUBRE TIENDAS EN MAXINEGO (#descubre-tiendas)                        */}
       {/* ========================================================================= */}
       <section
         id="descubre-tiendas"
@@ -1697,7 +1697,7 @@ export const PortalHome: React.FC = () => {
               <span>Vitrina Comercial</span>
             </div>
             <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-              Descubre tiendas en CentralBo
+              Descubre tiendas en MAXINEGO
             </h2>
             <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300">
               Explora los comercios locales que ya forman parte de la plataforma y conoce sus catálogos:
@@ -1758,7 +1758,7 @@ export const PortalHome: React.FC = () => {
               No hay comercios disponibles por el momento
             </h3>
             <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-300 max-w-md mx-auto">
-              Sé el primer negocio en abrir su tienda online en CentralBo y llega a nuevos clientes.
+              Sé el primer negocio en abrir su tienda online en MAXINEGO y llega a nuevos clientes.
             </p>
             <button
               type="button"
@@ -1860,7 +1860,7 @@ export const PortalHome: React.FC = () => {
             <span>Preguntas Frecuentes</span>
           </div>
           <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-            Respuestas a tus dudas sobre CentralBo
+            Respuestas a tus dudas sobre MAXINEGO
           </h2>
           <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 leading-relaxed">
             Conoce cómo funciona la plataforma, cómo publicar tu comercio local y cómo gestionar tus pedidos de manera ágil y directa.
@@ -1871,12 +1871,12 @@ export const PortalHome: React.FC = () => {
         <div className="space-y-3 max-w-4xl">
           {[
             {
-              q: '¿Qué es CentralBo y para qué tipo de negocios está pensado?',
-              a: 'CentralBo es una plataforma desarrollada en Bolivia para que comercios locales, restaurantes, boutiques de moda, proveedores de servicios y emprendimientos puedan tener su propia vitrina digital, exhibir sus catálogos con fotos y precios, y recibir pedidos directamente en su WhatsApp comercial.',
+              q: '¿Qué es MAXINEGO y para qué tipo de negocios está pensado?',
+              a: 'MAXINEGO es una plataforma desarrollada en Bolivia para que comercios locales, restaurantes, boutiques de moda, proveedores de servicios y emprendimientos puedan tener su propia vitrina digital, exhibir sus catálogos con fotos y precios, y recibir pedidos directamente en su WhatsApp comercial.',
             },
             {
-              q: '¿CentralBo cobra comisiones o porcentajes por las ventas realizadas?',
-              a: 'No. En CentralBo no cobramos ningún tipo de comisión sobre las ventas de tu negocio. El 100% del valor de cada producto o servicio vendido te pertenece. La coordinación de pagos y entregas se realiza directamente entre tú y tu comprador.',
+              q: '¿MAXINEGO cobra comisiones o porcentajes por las ventas realizadas?',
+              a: 'No. En MAXINEGO no cobramos ningún tipo de comisión sobre las ventas de tu negocio. El 100% del valor de cada producto o servicio vendido te pertenece. La coordinación de pagos y entregas se realiza directamente entre tú y tu comprador.',
             },
             {
               q: '¿Cómo reciben los comercios los pedidos de los clientes?',
@@ -1884,14 +1884,14 @@ export const PortalHome: React.FC = () => {
             },
             {
               q: '¿Mis clientes necesitan descargar alguna app para ver mi catálogo o comprar?',
-              a: 'No necesitan instalar ninguna aplicación obligatoria. Tu comercio cuenta con una dirección web propia (por ejemplo centralbo.com/tienda/tu-negocio) que abre al instante en cualquier teléfono o computadora. Además, gracias a su tecnología PWA, si tus clientes recurrentes lo desean, pueden añadirla como acceso directo en la pantalla de su teléfono con un solo toque.',
+              a: 'No necesitan instalar ninguna aplicación obligatoria. Tu comercio cuenta con una dirección web propia (por ejemplo maxinego.app/tienda/tu-negocio) que abre al instante en cualquier teléfono o computadora. Además, gracias a su tecnología PWA, si tus clientes recurrentes lo desean, pueden añadirla como acceso directo en la pantalla de su teléfono con un solo toque.',
             },
             {
               q: '¿Puedo personalizar los horarios, categorías y disponibilidad de mis productos?',
               a: 'Sí. Cada comercio dispone de un panel de administración privado donde puedes cargar o pausar productos, modificar precios, definir horarios de atención, configurar zonas de entrega y actualizar las formas de pago aceptadas en cualquier momento.',
             },
             {
-              q: '¿Cómo puedo solicitar la creación de mi tienda en CentralBo?',
+              q: '¿Cómo puedo solicitar la creación de mi tienda en MAXINEGO?',
               a: 'Puedes solicitarla fácilmente utilizando el botón "Crear mi tienda". Solo necesitas tener listos los datos básicos de tu comercio (nombre, rubro, logotipo si lo tienes, número de WhatsApp para pedidos y tu lista inicial de artículos con precios). Nuestro equipo te asiste en la activación de tu vitrina digital.',
             },
           ].map((faq, index) => {

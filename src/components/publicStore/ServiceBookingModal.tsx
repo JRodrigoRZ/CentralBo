@@ -121,9 +121,22 @@ export const ServiceBookingModal: React.FC<ServiceBookingModalProps> = ({
     useState<AppointmentRequest | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // SEC-14A-03: Cooldown temporal para reservas
+  // SEC-14A-03: Cooldown temporal para reservas (Maxinego con fallback a clave legacy)
+  const getBookingCooldownLastTs = (tId: string): number => {
+    if (typeof window === 'undefined' || typeof sessionStorage === 'undefined') return 0;
+    try {
+      return Number(
+        sessionStorage.getItem(`maxinego_last_booking_${tId}`) ||
+        sessionStorage.getItem(`cb_last_booking_${tId}`) ||
+        0
+      );
+    } catch {
+      return 0;
+    }
+  };
+
   const [bookingCooldownRemaining, setBookingCooldownRemaining] = useState<number>(() => {
-    const lastTs = Number(sessionStorage.getItem(`cb_last_booking_${tenantId}`) || 0);
+    const lastTs = getBookingCooldownLastTs(tenantId);
     const elapsed = Date.now() - lastTs;
     if (elapsed < BOOKING_COOLDOWN_MS) {
       return Math.ceil((BOOKING_COOLDOWN_MS - elapsed) / 1000);
@@ -134,7 +147,7 @@ export const ServiceBookingModal: React.FC<ServiceBookingModalProps> = ({
   useEffect(() => {
     if (bookingCooldownRemaining <= 0) return;
     const timer = setInterval(() => {
-      const lastTs = Number(sessionStorage.getItem(`cb_last_booking_${tenantId}`) || 0);
+      const lastTs = getBookingCooldownLastTs(tenantId);
       const elapsed = Date.now() - lastTs;
       const remaining = Math.ceil((BOOKING_COOLDOWN_MS - elapsed) / 1000);
       if (remaining <= 0) {
@@ -218,7 +231,7 @@ export const ServiceBookingModal: React.FC<ServiceBookingModalProps> = ({
     setErrorMsg(null);
 
     // SEC-14A-03: Verificación de cooldown entre solicitudes de reserva
-    const lastBookingTs = Number(sessionStorage.getItem(`cb_last_booking_${tenantId}`) || 0);
+    const lastBookingTs = getBookingCooldownLastTs(tenantId);
     const elapsed = Date.now() - lastBookingTs;
     if (elapsed < BOOKING_COOLDOWN_MS) {
       const remainingSecs = Math.ceil((BOOKING_COOLDOWN_MS - elapsed) / 1000);
@@ -302,7 +315,7 @@ export const ServiceBookingModal: React.FC<ServiceBookingModalProps> = ({
       professionalName: currentProfessional.name,
       customerName: trimmedName.slice(0, 100),
       customerPhone: trimmedPhone.slice(0, 25),
-      customerEmail: customerEmail.trim().slice(0, 120) || 'cliente@centralbo.bo',
+      customerEmail: customerEmail.trim().slice(0, 120) || 'cliente@maxinego.app',
       date: selectedDate,
       time: selectedTime,
       durationMinutes: serviceDuration,
@@ -327,8 +340,10 @@ export const ServiceBookingModal: React.FC<ServiceBookingModalProps> = ({
     // Guardar en pedidos/citas del cliente local
     recordCustomerAppointment(result.appointment);
 
-    // SEC-14A-03: Registrar emisión para cooldown temporal
-    sessionStorage.setItem(`cb_last_booking_${tenantId}`, String(Date.now()));
+    // SEC-14A-03: Registrar emisión para cooldown temporal (Maxinego)
+    try {
+      sessionStorage.setItem(`maxinego_last_booking_${tenantId}`, String(Date.now()));
+    } catch {}
     setBookingCooldownRemaining(Math.ceil(BOOKING_COOLDOWN_MS / 1000));
 
     setSubmittedAppointment(result.appointment);

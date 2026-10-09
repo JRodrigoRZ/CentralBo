@@ -18,9 +18,9 @@ import {
 import { supabase } from './supabase';
 
 // ----------------------------------------------------------------------------
-// 4. PLANES OFICIALES DE CENTRALBO
+// 4. PLANES OFICIALES DE MAXINEGO
 // ----------------------------------------------------------------------------
-export const CENTRALBO_PLANS: PlanDefinition[] = [
+export const MAXINEGO_PLANS: PlanDefinition[] = [
   {
     id: 'basic',
     name: 'Basic',
@@ -36,7 +36,7 @@ export const CENTRALBO_PLANS: PlanDefinition[] = [
     restrictions: [
       'Sin personalización avanzada',
       'Sin colores personalizados',
-      'Sin dominio propio (acceso vía slug CentralBo)',
+      'Sin dominio propio (acceso vía slug MAXINEGO)',
     ],
     semiannualDiscountPercent: 10,
     annualDiscountPercent: 20,
@@ -54,7 +54,7 @@ export const CENTRALBO_PLANS: PlanDefinition[] = [
       'Mayor personalización visual',
       'PWA instalable (Web App móvil y escritorio)',
       'Tema claro / oscuro integrado',
-      'Soporte prioritario CentralBo',
+      'Soporte prioritario MAXINEGO',
     ],
     restrictions: [],
     semiannualDiscountPercent: 10,
@@ -62,12 +62,19 @@ export const CENTRALBO_PLANS: PlanDefinition[] = [
   },
 ];
 
+// Alias de retrocompatibilidad técnica
+export const CENTRALBO_PLANS = MAXINEGO_PLANS;
+
 // ----------------------------------------------------------------------------
 // 2. COMERCIOS REGISTRADOS (CON DETALLE COMPLETO)
 // ----------------------------------------------------------------------------
 export const INITIAL_SUPERADMIN_STORES: SuperAdminStoreRecord[] = [];
 
-const SUPERADMIN_STORES_STORAGE_KEY = 'centralbo_superadmin_stores_v2';
+const SUPERADMIN_STORES_STORAGE_KEY = 'maxinego_superadmin_stores_v2';
+const LEGACY_SUPERADMIN_STORES_STORAGE_KEY = 'centralbo_superadmin_stores_v2';
+
+export const SUPERADMIN_STORES_CHANGED_EVENT = 'maxinego:superadmin_stores_changed';
+export const LEGACY_SUPERADMIN_STORES_CHANGED_EVENT = 'centralbo:superadmin_stores_changed';
 
 const MOCK_STORE_IDS = new Set([
   'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d',
@@ -89,6 +96,7 @@ function loadStoresFromStorage(): SuperAdminStoreRecord[] {
     return [];
   }
   try {
+    // 1. Prioridad: Buscar la nueva clave Maxinego
     const raw = localStorage.getItem(SUPERADMIN_STORES_STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
@@ -99,8 +107,24 @@ function loadStoresFromStorage(): SuperAdminStoreRecord[] {
         return filtered;
       }
     }
+
+    // 2. Fallback: Buscar la clave heredada CentralBo
+    const legacyRaw = localStorage.getItem(LEGACY_SUPERADMIN_STORES_STORAGE_KEY);
+    if (legacyRaw) {
+      const parsed = JSON.parse(legacyRaw);
+      if (Array.isArray(parsed)) {
+        const filtered = parsed.filter(
+          (s) => s && !MOCK_STORE_IDS.has(s.id) && !MOCK_SLUGS.has(s.slug)
+        );
+        // Migración suave a la nueva clave
+        try {
+          localStorage.setItem(SUPERADMIN_STORES_STORAGE_KEY, JSON.stringify(filtered));
+        } catch {}
+        return filtered;
+      }
+    }
   } catch (e) {
-    console.warn('[CentralBo SuperAdmin] Error al cargar comercios:', e);
+    console.warn('[SuperAdmin] Error al cargar comercios:', e);
   }
   return [];
 }
@@ -109,10 +133,12 @@ function persistStores(stores: SuperAdminStoreRecord[]): void {
   try {
     if (typeof window !== 'undefined') {
       localStorage.setItem(SUPERADMIN_STORES_STORAGE_KEY, JSON.stringify(stores));
-      window.dispatchEvent(new CustomEvent('centralbo:superadmin_stores_changed'));
+      // Despachar el nuevo evento oficial y el evento legacy para compatibilidad
+      window.dispatchEvent(new CustomEvent(SUPERADMIN_STORES_CHANGED_EVENT));
+      window.dispatchEvent(new CustomEvent(LEGACY_SUPERADMIN_STORES_CHANGED_EVENT));
     }
   } catch (e) {
-    console.warn('[CentralBo SuperAdmin] Error al persistir comercios:', e);
+    console.warn('[SuperAdmin] Error al persistir comercios:', e);
   }
   // Sincronizar array en memoria para compatibilidad global
   SUPERADMIN_STORES.splice(0, SUPERADMIN_STORES.length, ...stores);
@@ -494,7 +520,7 @@ export function getSuperAdminDashboardMetrics() {
     : storeOwnersCount;
   const publicClientUsers = baseUsers.filter((u) => u.profile === 'public_client').length;
 
-  const totalPlans = CENTRALBO_PLANS.length;
+  const totalPlans = MAXINEGO_PLANS.length;
   const totalSubscriptions = SUPERADMIN_STORES.length;
   const activeSubscriptions = SUPERADMIN_STORES.filter(
     (s) => s.subscription.status === 'activa'

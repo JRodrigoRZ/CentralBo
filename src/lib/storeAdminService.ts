@@ -58,7 +58,8 @@ export function getStorePlan(tenantId: string): 'basic' | 'pro' {
 // DATOS SEMILLA POR TENANT (Módulo 4)
 // ----------------------------------------------------------------------------
 
-const TENANT_STORAGE_PREFIX = 'centralbo_store_data_v4_';
+const TENANT_STORAGE_PREFIX = 'maxinego_store_data_v4_';
+const LEGACY_TENANT_STORAGE_PREFIX = 'centralbo_store_data_v4_';
 
 function isValidTenantId(tenantId: string | undefined | null): boolean {
   return (
@@ -78,6 +79,10 @@ export function isValidUUID(value: unknown): value is string {
 
 function getStorageKey(tenantId: string, section: string): string {
   return `${TENANT_STORAGE_PREFIX}${tenantId.trim()}_${section.trim()}`;
+}
+
+function getLegacyStorageKey(tenantId: string, section: string): string {
+  return `${LEGACY_TENANT_STORAGE_PREFIX}${tenantId.trim()}_${section.trim()}`;
 }
 
 export const CANONICAL_ORDER_STATUSES: readonly string[] = [
@@ -297,63 +302,81 @@ function loadFromStorage<T>(tenantId: string, section: string, fallback: T): T {
     return cloneFallback(fallback);
   }
   if (!isValidTenantId(tenantId)) {
-    console.warn(`[CentralBo StoreAdmin] Intento de acceso a sección "${section}" con tenantId inválido: "${tenantId}"`);
+    console.warn(`[StoreAdmin] Intento de acceso a sección "${section}" con tenantId inválido: "${tenantId}"`);
     return cloneFallback(fallback);
   }
   try {
-    const raw = localStorage.getItem(getStorageKey(tenantId, section));
+    let raw = localStorage.getItem(getStorageKey(tenantId, section));
+    let isFromLegacy = false;
+    if (!raw) {
+      raw = localStorage.getItem(getLegacyStorageKey(tenantId, section));
+      if (raw) {
+        isFromLegacy = true;
+      }
+    }
     if (raw) {
       const parsed = JSON.parse(raw);
 
       // Si el fallback esperado es un Array, validar que parsed sea Array y descartar corruptos
       if (Array.isArray(fallback)) {
         if (!Array.isArray(parsed)) {
-          console.warn(`[CentralBo StoreAdmin] Se esperaba un array para "${section}", recibido:`, typeof parsed);
+          console.warn(`[StoreAdmin] Se esperaba un array para "${section}", recibido:`, typeof parsed);
           return cloneFallback(fallback);
         }
 
+        let cleanList: any[] = [];
         if (section === 'products') {
-          const sanitizedProducts = parsed
+          cleanList = parsed
             .map((item) => sanitizeProductItem(item, tenantId))
             .filter((p): p is Product => p !== null);
-          return sanitizedProducts as unknown as T;
-        }
-
-        if (section === 'orders') {
-          const sanitizedOrders = parsed
+        } else if (section === 'orders') {
+          cleanList = parsed
             .map((item) => sanitizeOrderItem(item, tenantId))
             .filter((o): o is Order => o !== null);
-          return sanitizedOrders as unknown as T;
-        }
-
-        if (section === 'categories') {
-          const sanitizedCategories = parsed
+        } else if (section === 'categories') {
+          cleanList = parsed
             .map((item) => sanitizeCategoryItem(item, tenantId))
             .filter((c): c is Category => c !== null);
-          return sanitizedCategories as unknown as T;
+        } else {
+          // Para otras colecciones (schedule, promotions, professionals, appointments):
+          // descartar elementos que no sean objetos válidos
+          cleanList = parsed.filter(
+            (item) => item !== null && typeof item === 'object' && !Array.isArray(item)
+          );
         }
 
-        // Para otras colecciones (schedule, promotions, professionals, appointments):
-        // descartar elementos que no sean objetos válidos
-        const cleanList = parsed.filter(
-          (item) => item !== null && typeof item === 'object' && !Array.isArray(item)
-        );
+        // Migración suave si se leyó de la clave heredada
+        if (isFromLegacy) {
+          try {
+            localStorage.setItem(getStorageKey(tenantId, section), JSON.stringify(cleanList));
+          } catch {}
+        }
         return cleanList as unknown as T;
       }
 
       // Si el fallback es un objeto individual, validar tipo objeto no nulo y no array
       if (typeof fallback === 'object' && fallback !== null) {
         if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-          console.warn(`[CentralBo StoreAdmin] Se esperaba un objeto para "${section}", recibido:`, typeof parsed);
+          console.warn(`[StoreAdmin] Se esperaba un objeto para "${section}", recibido:`, typeof parsed);
           return cloneFallback(fallback);
+        }
+        if (isFromLegacy) {
+          try {
+            localStorage.setItem(getStorageKey(tenantId, section), JSON.stringify(parsed));
+          } catch {}
         }
         return parsed as T;
       }
 
+      if (isFromLegacy) {
+        try {
+          localStorage.setItem(getStorageKey(tenantId, section), JSON.stringify(parsed));
+        } catch {}
+      }
       return parsed as T;
     }
   } catch (e) {
-    console.warn(`[CentralBo StoreAdmin] Error al cargar ${section} (JSON inválido o corrupto):`, e);
+    console.warn(`[StoreAdmin] Error al cargar ${section} (JSON inválido o corrupto):`, e);
   }
   return cloneFallback(fallback);
 }
@@ -508,7 +531,7 @@ export function getStoreProfile(tenantId: string): StoreProfileSettings {
   const defaultProfile: StoreProfileSettings = {
     logoUrl: adminRecord?.logo_url || '',
     name: adminRecord?.name || 'Mi Comercio',
-    description: 'Comercio registrado en la plataforma CentralBo.',
+    description: 'Comercio registrado en la plataforma MAXINEGO.',
     address: 'Bolivia',
     phone: adminRecord?.owner.phone || '+591 70000000',
     whatsapp: adminRecord?.owner.socials?.whatsapp || '+591 70000000',
@@ -3585,7 +3608,7 @@ export function getStoreCategories(tenantId: string, storeType?: StoreType): Cat
 
   // Si existe registro en localStorage para este tenant, devolverlo fielmente
   if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
-    const raw = localStorage.getItem(getStorageKey(tenantId, 'categories'));
+    const raw = localStorage.getItem(getStorageKey(tenantId, 'categories')) ?? localStorage.getItem(getLegacyStorageKey(tenantId, 'categories'));
     if (raw !== null) {
       return loadFromStorage<Category[]>(tenantId, 'categories', []);
     }
@@ -4833,7 +4856,8 @@ export async function deleteStorePromotion(
 // ----------------------------------------------------------------------------
 // 12. ESTADÍSTICAS Y ANTI-INFLACIÓN DE VISITAS
 // ----------------------------------------------------------------------------
-const VISIT_SESSION_KEY = 'centralbo_last_visit_timestamp_';
+const VISIT_SESSION_KEY = 'maxinego_last_visit_timestamp_';
+const LEGACY_VISIT_SESSION_KEY = 'centralbo_last_visit_timestamp_';
 
 export function getStoreStatistics(tenantId: string): StoreStatistics {
   const superStore = SUPERADMIN_STORES.find((s) => s.id === tenantId);
@@ -4882,7 +4906,8 @@ export function recordStoreVisitSafely(tenantId: string): boolean {
   }
   const now = Date.now();
   const sessionKey = `${VISIT_SESSION_KEY}${tenantId.trim()}`;
-  const lastRecorded = localStorage.getItem(sessionKey);
+  const legacySessionKey = `${LEGACY_VISIT_SESSION_KEY}${tenantId.trim()}`;
+  const lastRecorded = localStorage.getItem(sessionKey) || localStorage.getItem(legacySessionKey);
 
   if (lastRecorded) {
     const elapsedMinutes = (now - Number(lastRecorded)) / (1000 * 60);

@@ -18,7 +18,7 @@ export const OfflineIndicator: React.FC = () => {
       <div className="flex-1">
         <p className="font-semibold leading-tight">Modo Sin Conexión</p>
         <p className="text-[11px] opacity-90 leading-tight mt-0.5">
-          La PWA de CentralBo sigue disponible localmente con caché de recursos.
+          La PWA de MAXINEGO sigue disponible localmente con caché de recursos.
         </p>
       </div>
     </div>

@@ -513,7 +513,7 @@ export const CatalogoConfigEspecifica: React.FC<CatalogoConfigEspecificaProps> =
               >
                 <div className="flex items-center gap-2 text-xs font-bold text-indigo-300">
                   <Plus className="w-4 h-4" />
-                  <span>Registrar Nuevo Profesional en CentralBo</span>
+                  <span>Registrar Nuevo Profesional en MAXINEGO</span>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                   <input

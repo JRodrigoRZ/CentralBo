@@ -809,7 +809,7 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
         )}
       </div>
 
-      {/* 3. FIRMA DE PIE DE PÁGINA ("Powered by CentralBo") */}
+      {/* 3. FIRMA DE PIE DE PÁGINA ("Potenciado por Maxinego.") */}
       <footer
         className={`border-t mt-14 py-8 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto w-full ${
           isFashion
@@ -827,7 +827,7 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
             © 2026 {profile.name || store.name} · Todos los derechos reservados.
           </p>
 
-          {/* Lado Derecho (Sello de Plataforma CentralBo) */}
+          {/* Lado Derecho (Sello de Plataforma MAXINEGO) */}
           <button
             onClick={() => navigate('/')}
             className="inline-flex items-center gap-1.5 text-stone-500 hover:text-stone-700 dark:text-stone-400 dark:hover:text-stone-200 font-medium transition-colors cursor-pointer group"
@@ -836,14 +836,14 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
             <span className="inline-flex items-center gap-1.5">
               <img
                 src="/icon.svg"
-                alt="CentralBo"
+                alt="MAXINEGO"
                 className="w-3.5 h-3.5 rounded-[3px] inline-block shrink-0 opacity-80 group-hover:opacity-100 transition-opacity"
               />
               <span
                 className="font-bold tracking-tight transition-opacity"
                 style={{ color: primaryColor }}
               >
-                CentralBo
+                Maxinego.
               </span>
             </span>
             <span className="font-semibold text-stone-400 dark:text-stone-500 group-hover:text-stone-600 dark:group-hover:text-stone-300 transition-colors ml-0.5">

@@ -122,7 +122,7 @@ export const ResponsiveViewportPreview: React.FC = () => {
                   Marketplace Multi-Tenant
                 </span>
                 <h3 className="text-sm sm:text-base font-bold text-white mt-0.5">
-                  CentralBo Web & PWA
+                  MAXINEGO Web & PWA
                 </h3>
                 <p className="text-xs text-slate-300 mt-1 max-w-xl">
                   Diseñado para adaptarse óptimamente desde smartphones con navegación táctil hasta monitores panorámicos de alta resolución.

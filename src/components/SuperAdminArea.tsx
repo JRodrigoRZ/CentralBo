@@ -94,7 +94,7 @@ export const SuperAdminArea: React.FC = () => {
                 Panel SuperAdmin Global
               </h1>
               <span className="hidden sm:inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/40 uppercase">
-                CentralBo
+                MAXINEGO
               </span>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 truncate max-w-xs sm:max-w-md mt-0.5">

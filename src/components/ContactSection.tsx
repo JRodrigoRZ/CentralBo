@@ -36,8 +36,8 @@ interface FormErrors {
   email?: string;
 }
 
-// Número oficial de WhatsApp de CentralBo para recibir solicitudes
-const CENTRALBO_OFFICIAL_WHATSAPP = '59163527099';
+// Número oficial de WhatsApp de Maxinego para recibir solicitudes
+const MAXINEGO_OFFICIAL_WHATSAPP = '59163527099';
 
 export const ContactSection: React.FC = () => {
   const [formData, setFormData] = useState<ContactFormData>({
@@ -107,7 +107,7 @@ export const ContactSection: React.FC = () => {
 
     // Construcción estructurada del mensaje según especificación
     const messageLines = [
-      '¡Hola CentralBo! Quiero solicitar información para crear mi tienda online.',
+      '¡Hola MAXINEGO! Quiero solicitar información para crear mi tienda online.',
       '',
       '📌 *Datos del negocio:*',
       `• *Nombre del negocio:* ${formData.businessName.trim()}`,
@@ -122,7 +122,7 @@ export const ContactSection: React.FC = () => {
     ];
 
     const encodedMessage = encodeURIComponent(messageLines.join('\n'));
-    const whatsappUrl = `https://wa.me/${CENTRALBO_OFFICIAL_WHATSAPP}?text=${encodedMessage}`;
+    const whatsappUrl = `https://wa.me/${MAXINEGO_OFFICIAL_WHATSAPP}?text=${encodedMessage}`;
 
     setLastGeneratedUrl(whatsappUrl);
     setIsSubmitted(true);
@@ -250,7 +250,7 @@ export const ContactSection: React.FC = () => {
             <div className="space-y-4">
               <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-100/80 dark:bg-blue-500/15 border border-blue-300/80 dark:border-blue-400/30 text-blue-700 dark:text-blue-300 text-xs font-bold uppercase tracking-wider backdrop-blur-xs shadow-2xs">
                 <Sparkles className="w-3.5 h-3.5 text-blue-600 dark:text-blue-300" />
-                <span>Crear mi tienda en CentralBo</span>
+                <span>Crear mi tienda en MAXINEGO</span>
               </div>
 
               <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 dark:text-white tracking-tight leading-[1.12]">
@@ -588,7 +588,7 @@ export const ContactSection: React.FC = () => {
 
                   {/* Mensaje de apoyo obligatorio con el número oficial 63527099 */}
                   <p className="text-[11px] sm:text-xs text-center text-slate-500 dark:text-slate-400 leading-relaxed px-2">
-                    Al hacer clic, se preparará y abrirá WhatsApp para continuar la conversación con el número oficial de CentralBo:{' '}
+                    Al hacer clic, se preparará y abrirá WhatsApp para continuar la conversación con el número oficial de MAXINEGO:{' '}
                     <strong className="text-slate-700 dark:text-slate-200 font-semibold">63527099</strong>.
                   </p>
                 </div>

@@ -6,7 +6,7 @@ const phases: ProjectPhase[] = [
   {
     id: 1,
     title: 'Base de Datos y Seguridad',
-    description: 'Esquema PostgreSQL, RLS multi-tenant, funciones de seguridad y storage completados en Supabase CentralBo.',
+    description: 'Esquema PostgreSQL, RLS multi-tenant, funciones de seguridad y storage completados en Supabase MAXINEGO.',
     status: 'completed',
     badge: 'Completado (Fase 1)',
   },
@@ -58,7 +58,7 @@ export const PhaseTracker: React.FC = () => {
         <div>
           <div className="flex items-center gap-2">
             <h2 className="text-base sm:text-lg font-bold text-white">
-              Arquitectura de Fases CentralBo
+              Arquitectura de Fases MAXINEGO
             </h2>
             <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
               5 Módulos Oficiales

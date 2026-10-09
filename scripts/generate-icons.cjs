@@ -76,7 +76,7 @@ function crc32(buf) {
   return (crc ^ -1) >>> 0;
 }
 
-// Shader for CentralBo Logo
+// Shader for MAXINEGO Logo
 function renderLogo(isMaskable = false) {
   return (x, y, w, h) => {
     // Normalized coordinates (-1 to 1)
@@ -162,7 +162,7 @@ if (!fs.existsSync(publicDir)) {
   fs.mkdirSync(publicDir, { recursive: true });
 }
 
-console.log('Generating PWA icons for CentralBo...');
+console.log('Generating PWA icons for MAXINEGO...');
 
 const icon192 = createPng(192, 192, renderLogo(false));
 fs.writeFileSync(path.join(publicDir, 'pwa-192x192.png'), icon192);

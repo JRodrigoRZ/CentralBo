@@ -1,13 +1,13 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { AuthenticatedUser, CentralBoProfile } from '../types';
+import { AuthenticatedUser, MaxinegoProfile } from '../types';
 import { resolveUserProfile } from '../lib/multiTenantService';
 
 const SESSION_STORAGE_KEY = 'centralbo_auth_session';
 
 interface AuthContextType {
   user: AuthenticatedUser | null;
-  profile: CentralBoProfile;
+  profile: MaxinegoProfile;
   isLoading: boolean;
   error: string | null;
   isPasswordRecovery: boolean;
@@ -206,7 +206,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const origin =
         typeof window !== 'undefined' && window.location.origin
           ? window.location.origin
-          : 'https://centralbo.bo';
+          : 'https://maxinego.app';
       const redirectTo = `${origin}/#/login`;
 
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
@@ -254,7 +254,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const profile: CentralBoProfile = user ? user.profile : 'public_client';
+  const profile: MaxinegoProfile = user ? user.profile : 'public_client';
 
   return (
     <AuthContext.Provider

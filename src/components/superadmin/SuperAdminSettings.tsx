@@ -23,7 +23,7 @@ export const SuperAdminSettings: React.FC = () => {
           </span>
         </h2>
         <p className="text-xs text-slate-400 mt-0.5">
-          Parámetros globales y directivas de funcionamiento del ecosistema CentralBo.
+          Parámetros globales y directivas de funcionamiento del ecosistema MAXINEGO.
         </p>
       </div>
 
@@ -39,7 +39,7 @@ export const SuperAdminSettings: React.FC = () => {
           <div className="space-y-2.5 text-xs">
             <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950/70 border border-slate-800">
               <span className="text-slate-400">Nombre del Sistema</span>
-              <span className="font-bold text-white">CentralBo</span>
+              <span className="font-bold text-white">MAXINEGO</span>
             </div>
             <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950/70 border border-slate-800">
               <span className="text-slate-400">Versión de la Plataforma</span>
@@ -129,7 +129,7 @@ export const SuperAdminSettings: React.FC = () => {
       </div>
 
       <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-400 flex items-center justify-between">
-        <span>Parámetros de infraestructura y gobernanza de CentralBo en producción.</span>
+        <span>Parámetros de infraestructura y gobernanza de MAXINEGO en producción.</span>
         <span className="text-emerald-400 font-medium flex items-center gap-1.5">
           <CheckCircle2 className="w-3.5 h-3.5" />
           Sistema Operativo

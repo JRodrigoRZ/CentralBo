@@ -143,7 +143,7 @@ export const StoreAdminArea: React.FC<StoreAdminAreaProps> = ({
           className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold cursor-pointer transition"
         >
           <ArrowLeft className="w-4 h-4" />
-          <span>Regresar a CentralBo</span>
+          <span>Regresar a MAXINEGO</span>
         </button>
       </div>
     );
@@ -280,7 +280,7 @@ export const StoreAdminArea: React.FC<StoreAdminAreaProps> = ({
           </div>
           <div>
             <span className="text-sm font-bold text-white tracking-tight block leading-tight">
-              CentralBo
+              MAXINEGO
             </span>
             <span className="text-[10px] text-slate-400 font-medium block leading-tight">
               Panel Administrativo

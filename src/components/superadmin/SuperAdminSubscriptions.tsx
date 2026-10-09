@@ -39,13 +39,19 @@ export const SuperAdminSubscriptions: React.FC = () => {
       }
     });
 
+    let lastHandled = 0;
     const handleStoresChanged = () => {
+      const now = Date.now();
+      if (now - lastHandled < 50) return;
+      lastHandled = now;
       setStores(getSuperAdminStores());
     };
+    window.addEventListener('maxinego:superadmin_stores_changed', handleStoresChanged);
     window.addEventListener('centralbo:superadmin_stores_changed', handleStoresChanged);
 
     return () => {
       mounted = false;
+      window.removeEventListener('maxinego:superadmin_stores_changed', handleStoresChanged);
       window.removeEventListener('centralbo:superadmin_stores_changed', handleStoresChanged);
     };
   }, []);

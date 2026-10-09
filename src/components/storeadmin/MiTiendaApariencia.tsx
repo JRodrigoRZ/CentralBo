@@ -243,7 +243,7 @@ export const MiTiendaApariencia: React.FC<MiTiendaAparienciaProps> = ({ store })
         {!isPro && (
           <div className="p-3 rounded-xl bg-amber-950/30 border border-amber-500/30 text-xs text-amber-300 flex items-center justify-between gap-3">
             <span>
-              En el <strong>Plan Basic</strong>, tu tienda utiliza la paleta estándar de CentralBo.
+              En el <strong>Plan Basic</strong>, tu tienda utiliza la paleta estándar de MAXINEGO.
               Actualiza a Pro para personalizar tu identidad cromática.
             </span>
             <button
@@ -379,10 +379,10 @@ export const MiTiendaApariencia: React.FC<MiTiendaAparienciaProps> = ({ store })
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-medium text-slate-300 mb-1.5">
-              Subdominio Oficial CentralBo (Gratuito en todos los planes)
+              Subdominio Oficial MAXINEGO (Gratuito en todos los planes)
             </label>
             <div className="px-3.5 py-2.5 rounded-xl bg-slate-900/80 border border-slate-800 text-slate-300 text-xs font-mono">
-              centralbo.com/tienda/{store.slug}
+              maxinego.app/tienda/{store.slug}
             </div>
           </div>
 

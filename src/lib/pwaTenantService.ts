@@ -1,5 +1,5 @@
 /**
- * CentralBo — Servicio PWA Específico por Comercio y Administración
+ * MAXINEGO — Servicio PWA Específico por Comercio y Administración
  *
  * Módulo de Aislamiento e Instalación PWA:
  * 1. Genera e inyecta dinámicamente el Web App Manifest por comercio (slug)
@@ -34,7 +34,7 @@ export function generateStoreIconSvg(storeName: string, primaryColor: string = '
   const initials =
     words.length > 1
       ? (words[0][0] + words[1][0]).toUpperCase()
-      : (storeName.trim().slice(0, 2) || 'CB').toUpperCase();
+      : (storeName.trim().slice(0, 2) || 'MN').toUpperCase();
 
   const safeColor = primaryColor || '#4f46e5';
 
@@ -99,7 +99,7 @@ export function buildStoreManifest(config: StorePWAConfig) {
   const safeName = config.name.trim();
   const shortName = safeName.length > 12 ? safeName.slice(0, 12).trim() : safeName;
   const description =
-    config.description?.trim() || `Tienda oficial de ${safeName} en CentralBo`;
+    config.description?.trim() || `Tienda oficial de ${safeName} en MAXINEGO`;
   const primaryColor = config.primaryColor || '#0f172a';
   const iconSvgUri = generateStoreIconSvg(safeName, primaryColor);
 
@@ -167,7 +167,7 @@ export function buildAdminManifest(config: AdminPWAConfig) {
   const safeName = config.storeName.trim();
   const shortName = `Admin ${safeName.length > 6 ? safeName.slice(0, 6).trim() : safeName}`;
   const description =
-    config.description?.trim() || `Panel de administración de ${safeName} en CentralBo`;
+    config.description?.trim() || `Panel de administración de ${safeName} en MAXINEGO`;
   const adminIconSvgUri = generateAdminIconSvg(safeName);
 
   return {
@@ -205,14 +205,14 @@ export function buildAdminManifest(config: AdminPWAConfig) {
 }
 
 /**
- * Construye el manifiesto global para el portal principal de CentralBo
+ * Construye el manifiesto global para el portal principal de MAXINEGO
  */
 export function buildPlatformManifest() {
   return {
     id: '/',
-    name: 'CentralBo — Plataforma PWA',
-    short_name: 'CentralBo',
-    description: 'Plataforma SaaS Marketplace Multi-Tenant y PWA de CentralBo',
+    name: 'MAXINEGO — Plataforma para Comercios y Negocios Locales',
+    short_name: 'MAXINEGO',
+    description: 'Plataforma para Comercios y Negocios Locales',
     start_url: '/',
     scope: '/',
     display: 'standalone',
@@ -286,15 +286,15 @@ export function applyPWAManifest(manifestObj: ReturnType<typeof buildStoreManife
       try {
         cb(manifestObj.id);
       } catch (err) {
-        console.warn('[CentralBo PWA] Error en listener de manifest:', err);
+        console.warn('[MAXINEGO PWA] Error en listener de manifest:', err);
       }
     });
 
     // 3. Título de la página
     if (manifestObj.id === '/') {
-      document.title = 'CentralBo — Plataforma PWA';
+      document.title = 'MAXINEGO — Plataforma para Comercios y Negocios Locales';
     } else {
-      document.title = `${manifestObj.name} — CentralBo`;
+      document.title = `${manifestObj.name} — MAXINEGO`;
     }
 
     // 4. Meta theme-color
@@ -342,7 +342,7 @@ export function applyPWAManifest(manifestObj: ReturnType<typeof buildStoreManife
       }
     }
   } catch (err) {
-    console.warn('[CentralBo PWA] No se pudo actualizar dinámicamente el manifiesto:', err);
+    console.warn('[MAXINEGO PWA] No se pudo actualizar dinámicamente el manifiesto:', err);
   }
 }
 
@@ -357,7 +357,7 @@ export function useStorePWA(config: StorePWAConfig | null): void {
     applyPWAManifest(storeManifest);
 
     return () => {
-      // Al salir de la tienda, restaurar el manifiesto base de CentralBo
+      // Al salir de la tienda, restaurar el manifiesto base de MAXINEGO
       const platformManifest = buildPlatformManifest();
       applyPWAManifest(platformManifest);
     };

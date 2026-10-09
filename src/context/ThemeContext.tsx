@@ -11,15 +11,29 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
-const THEME_STORAGE_KEY = 'centralbo_theme';
+const THEME_STORAGE_KEY = 'maxinego_theme';
+const LEGACY_THEME_STORAGE_KEY = 'centralbo_theme';
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [theme, setThemeState] = useState<Theme>(() => {
     if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem(THEME_STORAGE_KEY);
-      if (stored === 'light' || stored === 'dark') {
-        return stored;
-      }
+      try {
+        // 1. Prioridad: Buscar la nueva clave Maxinego
+        const stored = localStorage.getItem(THEME_STORAGE_KEY);
+        if (stored === 'light' || stored === 'dark') {
+          return stored;
+        }
+
+        // 2. Fallback: Buscar la clave heredada CentralBo
+        const legacyStored = localStorage.getItem(LEGACY_THEME_STORAGE_KEY);
+        if (legacyStored === 'light' || legacyStored === 'dark') {
+          // Migración suave a la nueva clave
+          try {
+            localStorage.setItem(THEME_STORAGE_KEY, legacyStored);
+          } catch {}
+          return legacyStored;
+        }
+      } catch {}
     }
     return 'dark'; // Default inicial
   });

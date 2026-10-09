@@ -46,7 +46,7 @@ export const StoreAdminEstadisticas: React.FC<StoreAdminEstadisticasProps> = ({
       <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 text-xs text-slate-300 flex items-start gap-3">
         <Info className="w-4 h-4 text-cyan-400 flex-shrink-0 mt-0.5" />
         <div className="space-y-1">
-          <p className="font-bold text-white">Mecanismo Anti-Inflación de Visitas de CentralBo</p>
+          <p className="font-bold text-white">Mecanismo Anti-Inflación de Visitas de MAXINEGO</p>
           <p className="text-[11px] text-slate-400 leading-relaxed">
             Las recargas consecutivas de página o visitas repetidas de un mismo cliente en un lapso
             menor a <strong>30 minutos</strong> se consolidan como una única sesión. Esto previene

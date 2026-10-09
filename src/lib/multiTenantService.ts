@@ -10,7 +10,7 @@
  */
 
 import { supabase } from './supabase';
-import { Store, StoreUserRole, CentralBoProfile, AuthenticatedUser } from '../types';
+import { Store, StoreUserRole, MaxinegoProfile, AuthenticatedUser } from '../types';
 import { getSuperAdminStores } from './superadminService';
 
 /**
@@ -161,7 +161,7 @@ export async function resolveUserProfile(
         return {
           id: userId,
           email: userEmail,
-          fullName: storeUserData.full_name || 'SuperAdmin CentralBo',
+          fullName: storeUserData.full_name || 'SuperAdmin MAXINEGO',
           profile: 'superadmin',
           tenantId: null,
           store: null,

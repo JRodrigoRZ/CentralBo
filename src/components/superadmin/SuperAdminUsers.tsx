@@ -17,14 +17,14 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { getSuperAdminStores, SUPERADMIN_USERS } from '../../lib/superadminService';
-import { CentralBoProfile } from '../../types';
+import { MaxinegoProfile } from '../../types';
 
 interface DisplayUser {
   id: string;
   fullName: string;
   email: string;
   phone?: string;
-  profile: CentralBoProfile;
+  profile: MaxinegoProfile;
   tenantId: string | null;
   storeName: string | null;
   storeSlug?: string | null;
@@ -91,11 +91,17 @@ export const SuperAdminUsers: React.FC = () => {
 
   // Sincronización reactiva si cambian los comercios en el almacenamiento local
   useEffect(() => {
+    let lastHandled = 0;
     const handleUpdate = () => {
+      const now = Date.now();
+      if (now - lastHandled < 50) return;
+      lastHandled = now;
       setUsers(loadAllUsers());
     };
+    window.addEventListener('maxinego:superadmin_stores_changed', handleUpdate);
     window.addEventListener('centralbo:superadmin_stores_changed', handleUpdate);
     return () => {
+      window.removeEventListener('maxinego:superadmin_stores_changed', handleUpdate);
       window.removeEventListener('centralbo:superadmin_stores_changed', handleUpdate);
     };
   }, []);
@@ -147,7 +153,7 @@ export const SuperAdminUsers: React.FC = () => {
     }
   };
 
-  const getProfileBadge = (profile: CentralBoProfile) => {
+  const getProfileBadge = (profile: MaxinegoProfile) => {
     switch (profile) {
       case 'superadmin':
         return (
@@ -640,7 +646,7 @@ export const SuperAdminUsers: React.FC = () => {
       <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 text-xs text-slate-400 space-y-1">
         <div className="flex items-center gap-2 text-slate-200 font-bold">
           <ShieldCheck className="w-4 h-4 text-indigo-400" />
-          <span>Aislamiento por Tenant y Seguridad CentralBo</span>
+          <span>Aislamiento por Tenant y Seguridad MAXINEGO</span>
         </div>
         <p className="text-[11px] text-slate-400 leading-relaxed">
           Esta vista es de auditoría y solo lectura para el SuperAdmin. Cada administrador de comercio (<strong className="text-slate-300">store_admin</strong>) permanece rigurosamente aislado a su respectivo <code className="text-cyan-300 font-mono">tenantId</code>, sin acceso a otros comercios ni a funciones globales de la plataforma.

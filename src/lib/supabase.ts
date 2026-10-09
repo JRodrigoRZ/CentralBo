@@ -37,10 +37,10 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 });
 
 /**
- * Función de diagnóstico no destructiva para verificar conectividad con Supabase CentralBo
+ * Función de diagnóstico no destructiva para verificar conectividad con Supabase Maxinego
  * Consulta únicamente el catálogo público para confirmar que la API responde.
  */
-export async function testCentralBoConnection(): Promise<{
+export async function testMaxinegoConnection(): Promise<{
   connected: boolean;
   message: string;
   endpoint: string;
@@ -67,7 +67,7 @@ export async function testCentralBoConnection(): Promise<{
 
     return {
       connected: true,
-      message: 'Conexión activa y validada con Supabase CentralBo',
+      message: 'Conexión activa y validada con Supabase Maxinego',
       endpoint: supabaseUrl,
       latencyMs,
     };
@@ -82,3 +82,6 @@ export async function testCentralBoConnection(): Promise<{
     };
   }
 }
+
+// Alias de retrocompatibilidad técnica
+export const testCentralBoConnection = testMaxinegoConnection;

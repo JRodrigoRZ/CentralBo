@@ -11,12 +11,12 @@ interface RouterContextType {
 const RouterContext = createContext<RouterContextType | undefined>(undefined);
 
 /**
- * Detecta si el hostname actual corresponde a un subdominio de tienda en producción (ej. cafedelicia.centralbo.bo)
+ * Detecta si el hostname actual corresponde a un subdominio de tienda en producción (ej. cafedelicia.maxinego.app)
  * Reglas:
- * - Debe ser un subdominio de centralbo.bo
- * - centralbo.bo NO produce slug de tienda
- * - www.centralbo.bo NO produce slug de tienda
- * - Entornos de desarrollo/preview (localhost, 127.0.0.1, *.run.app, etc.) devuelven null
+ * - Debe ser un subdominio de maxinego.app
+ * - maxinego.app NO produce slug de tienda
+ * - www.maxinego.app NO produce slug de tienda
+ * - Entornos de desarrollo/preview (localhost, 127.0.0.1, *.run.app, *.vercel.app, etc.) devuelven null
  */
 export function getStoreSlugFromHostname(): string | null {
   if (typeof window === 'undefined') return null;
@@ -24,14 +24,14 @@ export function getStoreSlugFromHostname(): string | null {
   try {
     const rawHostname = window.location.hostname || '';
     const hostname = rawHostname.toLowerCase().split(':')[0].trim();
-    const baseDomain = 'centralbo.bo';
+    const baseDomain = 'maxinego.app';
 
-    // Debe ser estrictamente un subdominio de centralbo.bo
+    // Debe ser estrictamente un subdominio de maxinego.app
     if (!hostname.endsWith(`.${baseDomain}`)) {
       return null;
     }
 
-    // Extraer la porción anterior a .centralbo.bo
+    // Extraer la porción anterior a .maxinego.app
     const subdomain = hostname.slice(0, -(baseDomain.length + 1)).trim();
 
     // Validar que no sea vacío ni 'www'
@@ -55,7 +55,7 @@ export function getStoreSlugFromHostname(): string | null {
 /**
  * Resuelve la ruta inicial respetando el parámetro de apertura PWA (?pwa_slug=... o ?pwa_admin=...),
  * el hash de URL (#/tienda/slug), el pathname directo (/tienda/slug)
- * o el subdominio de tienda en producción (ej. cafedelicia.centralbo.bo).
+ * o el subdominio de tienda en producción (ej. cafedelicia.maxinego.app).
  */
 function getInitialPath(): string {
   if (typeof window === 'undefined') return '/';
@@ -106,7 +106,7 @@ function getInitialPath(): string {
     return pathname;
   }
 
-  // 4. Subdominio de tienda en producción (ej. cafedelicia.centralbo.bo)
+  // 4. Subdominio de tienda en producción (ej. cafedelicia.maxinego.app)
   const subdomainSlug = getStoreSlugFromHostname();
   if (subdomainSlug) {
     return `/tienda/${subdomainSlug}`;

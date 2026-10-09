@@ -39,7 +39,7 @@ export const PWAInstallButton: React.FC = () => {
         className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white text-xs font-semibold shadow-md shadow-indigo-600/20 transition-all cursor-pointer disabled:opacity-50"
       >
         <Download className="w-4 h-4" />
-        <span>{isInstalling ? 'Instalando...' : 'Instalar CentralBo'}</span>
+        <span>{isInstalling ? 'Instalando...' : 'Instalar MAXINEGO'}</span>
       </button>
     );
   }
@@ -64,7 +64,7 @@ export const PWAInstallButton: React.FC = () => {
           >
             <div className="w-full max-w-sm rounded-2xl bg-slate-900 border border-slate-800 p-6 shadow-2xl text-slate-200">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-base font-semibold text-white">Instalar CentralBo en iPhone / iPad</h3>
+                <h3 className="text-base font-semibold text-white">Instalar MAXINEGO en iPhone / iPad</h3>
                 <button
                   onClick={() => setShowIOSGuide(false)}
                   className="p-1 rounded-md text-slate-400 hover:text-white hover:bg-slate-800 transition"
@@ -97,7 +97,7 @@ export const PWAInstallButton: React.FC = () => {
                     3
                   </span>
                   <p>
-                    Presiona <strong>Agregar</strong> en la esquina superior derecha para usar CentralBo como app nativa.
+                    Presiona <strong>Agregar</strong> en la esquina superior derecha para usar MAXINEGO como app nativa.
                   </p>
                 </div>
               </div>
@@ -120,7 +120,7 @@ export const PWAInstallButton: React.FC = () => {
     <div
       id="pwa-ready-badge"
       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800/80 text-slate-300 border border-slate-700/60 text-xs font-medium"
-      title="CentralBo es una PWA compatible con Chrome, Edge, Safari y navegadores móviles"
+      title="MAXINEGO es una PWA compatible con Chrome, Edge, Safari y navegadores móviles"
     >
       <Download className="w-3.5 h-3.5 text-indigo-400" />
       <span>PWA Habilitada</span>

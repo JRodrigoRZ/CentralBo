@@ -181,12 +181,18 @@ export const SuperAdminStores: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    let lastHandled = 0;
     const handleStoresChanged = () => {
+      const now = Date.now();
+      if (now - lastHandled < 50) return;
+      lastHandled = now;
       refreshStores();
     };
 
+    window.addEventListener('maxinego:superadmin_stores_changed', handleStoresChanged);
     window.addEventListener('centralbo:superadmin_stores_changed', handleStoresChanged);
     return () => {
+      window.removeEventListener('maxinego:superadmin_stores_changed', handleStoresChanged);
       window.removeEventListener('centralbo:superadmin_stores_changed', handleStoresChanged);
     };
   }, [selectedStore]);
@@ -1583,7 +1589,7 @@ export const SuperAdminStores: React.FC = () => {
                 id="btn-copiar-todas-credenciales"
                 onClick={async () => {
                   try {
-                    const text = `Credenciales de Acceso a CentralBo\n\n` +
+                    const text = `Credenciales de Acceso a MAXINEGO\n\n` +
                       `Comercio: ${createdCredentials.storeName}\n` +
                       `Dueño: ${createdCredentials.ownerName}\n` +
                       `Correo de acceso: ${createdCredentials.ownerEmail}\n` +

@@ -118,7 +118,7 @@ export const MiTiendaEnvios: React.FC<MiTiendaEnviosProps> = ({ store }) => {
       <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-300 flex items-start gap-2.5">
         <Info className="w-4 h-4 text-indigo-400 flex-shrink-0 mt-0.5" />
         <p>
-          <strong>Política CentralBo:</strong> La plataforma no calcula automáticamente tarifas
+          <strong>Política MAXINEGO:</strong> La plataforma no calcula automáticamente tarifas
           dinámicas por distancia geográfica. El comercio define si el servicio es gratuito o
           aplica una tarifa plana transparente en Bolivianos (Bs).
         </p>

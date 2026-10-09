@@ -538,7 +538,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ redirectPath }) => {
             ¡Contraseña actualizada con éxito!
           </h2>
           <p className="text-xs text-slate-600 dark:text-slate-400 mb-6 leading-relaxed">
-            Tu nueva contraseña ya está registrada en el sistema de autenticación de CentralBo. Ahora
+            Tu nueva contraseña ya está registrada en el sistema de autenticación de MAXINEGO. Ahora
             puedes iniciar sesión normalmente con tus nuevas credenciales.
           </p>
 
@@ -621,7 +621,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ redirectPath }) => {
                     type="email"
                     value={recoveryEmail}
                     onChange={(e) => setRecoveryEmail(e.target.value)}
-                    placeholder="ejemplo@centralbo.com"
+                    placeholder="ejemplo@maxinego.app"
                     disabled={sendingRecovery}
                     className="w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-hidden focus:border-blue-500 transition disabled:opacity-60"
                     required
@@ -683,7 +683,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ redirectPath }) => {
                 Iniciar Sesión
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Ingresa tus credenciales de acceso a CentralBo
+                Ingresa tus credenciales de acceso a MAXINEGO
               </p>
             </div>
           </div>
@@ -738,7 +738,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ redirectPath }) => {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="ejemplo@centralbo.com"
+                  placeholder="ejemplo@maxinego.app"
                   disabled={submitting || lockSecondsRemaining > 0}
                   className="w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-hidden focus:border-blue-500 transition disabled:opacity-60 disabled:cursor-not-allowed"
                   required

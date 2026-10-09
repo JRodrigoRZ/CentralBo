@@ -122,22 +122,25 @@ export interface PWAStatus {
 // ----------------------------------------------------------------------------
 
 /**
- * Exactamente los 3 perfiles definidos en el Módulo 2:
+ * Exactamente los 3 perfiles definidos en la plataforma Maxinego:
  * 1. SuperAdmin Global
  * 2. Administrador del Comercio
  * 3. Cliente / comprador público
  */
-export type CentralBoProfile = 'superadmin' | 'store_admin' | 'public_client';
+export type MaxinegoProfile = 'superadmin' | 'store_admin' | 'public_client';
+
+// Alias de retrocompatibilidad técnica
+export type CentralBoProfile = MaxinegoProfile;
 
 export interface AuthenticatedUser {
   id: string;
   email: string;
   fullName: string;
-  profile: CentralBoProfile;
+  profile: MaxinegoProfile;
   // Solo aplicable a 'store_admin'
   tenantId: string | null;
   store: Store | null;
-  // Rol específico dentro del esquema de Fase 1 ('admin' | 'staff' | 'superadmin')
+  // Rol específico dentro del esquema ('admin' | 'staff' | 'superadmin')
   storeRole: StoreUserRole | null;
 }
 
@@ -246,7 +249,7 @@ export interface SuperAdminUserRecord {
   fullName: string;
   email: string;
   phone?: string;
-  profile: CentralBoProfile; // exactamente los 3 perfiles
+  profile: MaxinegoProfile; // exactamente los 3 perfiles
   tenantId: string | null;
   storeName: string | null;
   storeSlug?: string | null;

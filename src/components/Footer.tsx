@@ -4,17 +4,17 @@ import { ShieldCheck, Smartphone, Globe } from 'lucide-react';
 export const Footer: React.FC = () => {
   return (
     <footer
-      id="centralbo-main-footer"
+      id="maxinego-main-footer"
       className="w-full border-t border-slate-200 dark:border-[#1a2744] bg-white dark:bg-[#080d1a] py-8 px-4 sm:px-6 lg:px-8 text-xs text-slate-500 dark:text-slate-400 mt-12 transition-colors"
     >
       <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold text-xs shadow-xs">
-            CB
+            MN
           </div>
           <div>
             <p className="text-slate-900 dark:text-slate-200 font-semibold text-xs">
-              CentralBo — Plataforma de Comercio Digital
+              MAXINEGO — Plataforma para Comercios y Negocios Locales
             </p>
             <p className="text-xs text-slate-500 dark:text-slate-400">
               Comercio electrónico y gestión integral para tiendas en Bolivia

@@ -34,7 +34,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
           <h2 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
             <span>Resumen Global de la Plataforma</span>
             <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-              CentralBo Core
+              MAXINEGO Core
             </span>
           </h2>
           <p className="text-xs text-slate-400 mt-0.5">

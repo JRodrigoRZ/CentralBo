@@ -11,7 +11,7 @@ import {
   SunMoon,
   Tag,
 } from 'lucide-react';
-import { CENTRALBO_PLANS } from '../../lib/superadminService';
+import { MAXINEGO_PLANS } from '../../lib/superadminService';
 import { PlanBillingCycle } from '../../types';
 
 export const SuperAdminPlans: React.FC = () => {
@@ -57,7 +57,7 @@ export const SuperAdminPlans: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-800">
         <div>
           <h2 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
-            <span>Planes de CentralBo</span>
+            <span>Planes de MAXINEGO</span>
             <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-400 border border-cyan-500/30">
               2 Planes Oficiales
             </span>
@@ -126,7 +126,7 @@ export const SuperAdminPlans: React.FC = () => {
             </div>
 
             <p className="text-xs text-slate-400 mb-6 leading-relaxed">
-              {CENTRALBO_PLANS[0].description}
+              {MAXINEGO_PLANS[0].description}
             </p>
 
             {/* Precios */}
@@ -224,7 +224,7 @@ export const SuperAdminPlans: React.FC = () => {
             </div>
 
             <p className="text-xs text-slate-400 mb-6 leading-relaxed">
-              {CENTRALBO_PLANS[1].description}
+              {MAXINEGO_PLANS[1].description}
             </p>
 
             {/* Precios */}

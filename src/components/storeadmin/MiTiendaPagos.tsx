@@ -176,7 +176,7 @@ export const MiTiendaPagos: React.FC<MiTiendaPagosProps> = ({ store }) => {
         <div className="pt-2 border-t border-emerald-500/20 text-xs text-slate-300 leading-relaxed flex items-start gap-2">
           <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
           <span>
-            En CentralBo, <strong>WhatsApp es obligatorio</strong> y no se trata como un método de pago opcional.
+            En MAXINEGO, <strong>WhatsApp es obligatorio</strong> y no se trata como un método de pago opcional.
             No puede ser deshabilitado, ocultado ni desactivado desde la configuración.
             Al finalizar un pedido, el cliente siempre dispondrá del botón para enviar el detalle completo por WhatsApp a este comercio.
           </span>
