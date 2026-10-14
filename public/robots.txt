@@ -1,0 +1,15 @@
+# MAXINEGO — Reglas de rastreo para buscadores (Robots Exclusion Standard)
+User-agent: *
+Allow: /
+Allow: /tienda/
+
+# Rutas privadas y administrativas
+Disallow: /admin/
+Disallow: /admin
+Disallow: /superadmin/
+Disallow: /superadmin
+Disallow: /login
+Disallow: /api/
+
+# Ubicación canónica del mapa del sitio
+Sitemap: https://www.maxinego.app/sitemap.xml
