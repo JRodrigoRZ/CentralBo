@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Store as StoreIcon,
   Users,
@@ -13,8 +13,14 @@ import {
   ShieldCheck,
   Package,
   ShoppingBag,
+  Loader2,
 } from 'lucide-react';
-import { getSuperAdminDashboardMetrics } from '../../lib/superadminService';
+import {
+  getSuperAdminDashboardMetrics,
+  fetchSuperAdminStores,
+  SUPERADMIN_STORES_CHANGED_EVENT,
+  LEGACY_SUPERADMIN_STORES_CHANGED_EVENT,
+} from '../../lib/superadminService';
 import { SuperAdminSection } from '../../types';
 
 interface SuperAdminDashboardProps {
@@ -24,7 +30,41 @@ interface SuperAdminDashboardProps {
 export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
   onNavigateSection,
 }) => {
-  const metrics = getSuperAdminDashboardMetrics();
+  const [metrics, setMetrics] = useState(() => getSuperAdminDashboardMetrics());
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const refreshMetrics = () => {
+      if (mounted) {
+        setMetrics(getSuperAdminDashboardMetrics());
+      }
+    };
+
+    window.addEventListener(SUPERADMIN_STORES_CHANGED_EVENT, refreshMetrics);
+    window.addEventListener(LEGACY_SUPERADMIN_STORES_CHANGED_EVENT, refreshMetrics);
+
+    setIsLoading(true);
+    fetchSuperAdminStores()
+      .then(() => {
+        if (mounted) {
+          setMetrics(getSuperAdminDashboardMetrics());
+          setIsLoading(false);
+        }
+      })
+      .catch(() => {
+        if (mounted) {
+          setIsLoading(false);
+        }
+      });
+
+    return () => {
+      mounted = false;
+      window.removeEventListener(SUPERADMIN_STORES_CHANGED_EVENT, refreshMetrics);
+      window.removeEventListener(LEGACY_SUPERADMIN_STORES_CHANGED_EVENT, refreshMetrics);
+    };
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -43,8 +83,17 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
         </div>
 
         <div className="flex items-center gap-2 text-xs text-slate-400 bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-800 self-start sm:self-auto">
-          <Activity className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
-          <span>Estado general: <strong className="text-emerald-400">Operativo</strong></span>
+          {isLoading ? (
+            <>
+              <Loader2 className="w-3.5 h-3.5 text-indigo-400 animate-spin" />
+              <span>Sincronizando con Supabase...</span>
+            </>
+          ) : (
+            <>
+              <Activity className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+              <span>Estado general: <strong className="text-emerald-400">Operativo</strong></span>
+            </>
+          )}
         </div>
       </div>
 
@@ -82,7 +131,9 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
             <div className="mt-2 flex items-baseline justify-between">
               <span className="text-2xl font-black text-emerald-400">{metrics.stores.activos}</span>
               <span className="text-[10px] text-emerald-400/80 font-mono">
-                {Math.round((metrics.stores.activos / metrics.stores.total) * 100)}%
+                {metrics.stores.total > 0
+                  ? Math.round((metrics.stores.activos / metrics.stores.total) * 100)
+                  : 0}%
               </span>
             </div>
           </div>

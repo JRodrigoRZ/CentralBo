@@ -147,8 +147,49 @@ function persistStores(stores: SuperAdminStoreRecord[]): void {
 export const SUPERADMIN_STORES: SuperAdminStoreRecord[] = loadStoresFromStorage();
 
 /**
+ * Formatea una marca temporal en una descripción temporal relativa o exacta en español.
+ * Evita textos sintéticos inventados o constantes estáticas.
+ */
+export function formatRelativeOrExactDate(dateStr: string | null | undefined): string {
+  if (!dateStr) return 'Sin actividad registrada';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return 'Sin actividad registrada';
+
+  const now = Date.now();
+  const diffMs = now - d.getTime();
+
+  // Si la fecha está en el futuro muy cercano por pequeñas discrepancias de reloj
+  if (diffMs < 0 && diffMs > -120_000) {
+    return 'Hace unos instantes';
+  }
+
+  const diffSec = Math.floor(diffMs / 1000);
+  if (diffSec < 60) {
+    return 'Hace unos segundos';
+  }
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) {
+    return `Hace ${diffMin} min`;
+  }
+  const diffHours = Math.floor(diffMin / 60);
+  if (diffHours < 24) {
+    return `Hace ${diffHours} h`;
+  }
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 30) {
+    return `Hace ${diffDays} d`;
+  }
+
+  return d.toLocaleDateString('es-BO', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+}
+
+/**
  * Consulta la base de datos Supabase para cargar los comercios reales existentes
- * y los combina con los datos canónicos de store_users sin inyectar datos ficticios.
+ * y los combina con los datos canónicos de store_users, products y orders sin inyectar datos ficticios.
  */
 export async function fetchSuperAdminStores(): Promise<SuperAdminStoreRecord[]> {
   try {
@@ -158,7 +199,7 @@ export async function fetchSuperAdminStores(): Promise<SuperAdminStoreRecord[]> 
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.warn('[CentralBo SuperAdmin] Error al consultar comercios en Supabase:', error);
+      console.warn('[MAXINEGO SuperAdmin] Error al consultar comercios en Supabase:', error);
       return loadStoresFromStorage();
     }
 
@@ -174,7 +215,25 @@ export async function fetchSuperAdminStores(): Promise<SuperAdminStoreRecord[]> 
       .eq('is_active', true);
 
     if (storeUsersError) {
-      console.warn('[CentralBo SuperAdmin] Advertencia al consultar store_users en Supabase:', storeUsersError);
+      console.warn('[MAXINEGO SuperAdmin] Advertencia al consultar store_users en Supabase:', storeUsersError);
+    }
+
+    // Consulta canónica de productos en products (conteo e indicadores por comercio)
+    const { data: productsData, error: productsError } = await supabase
+      .from('products')
+      .select('id, tenant_id, name, price, status, is_available, created_at, updated_at');
+
+    if (productsError) {
+      console.warn('[MAXINEGO SuperAdmin] Advertencia al consultar products en Supabase:', productsError);
+    }
+
+    // Consulta canónica de pedidos en orders (conteo y volumen transaccional por comercio)
+    const { data: ordersData, error: ordersError } = await supabase
+      .from('orders')
+      .select('id, tenant_id, total, status, created_at, updated_at');
+
+    if (ordersError) {
+      console.warn('[MAXINEGO SuperAdmin] Advertencia al consultar orders en Supabase:', ordersError);
     }
 
     // Mapeo canónico de dueño por tenant_id (priorizando rol 'admin')
@@ -188,6 +247,37 @@ export async function fetchSuperAdminStores(): Promise<SuperAdminStoreRecord[]> 
             email: su.email?.trim() || '',
           });
         }
+      }
+    }
+
+    // Mapeo canónico de productos por tenant_id
+    const productsByTenant = new Map<string, { count: number; latestDate?: string }>();
+    if (productsData && productsData.length > 0) {
+      for (const p of productsData) {
+        if (!p.tenant_id) continue;
+        const current = productsByTenant.get(p.tenant_id) || { count: 0, latestDate: undefined };
+        current.count += 1;
+        const pDate = p.updated_at || p.created_at;
+        if (pDate && (!current.latestDate || new Date(pDate).getTime() > new Date(current.latestDate).getTime())) {
+          current.latestDate = pDate;
+        }
+        productsByTenant.set(p.tenant_id, current);
+      }
+    }
+
+    // Mapeo canónico de pedidos por tenant_id
+    const ordersByTenant = new Map<string, { count: number; totalSales: number; latestDate?: string }>();
+    if (ordersData && ordersData.length > 0) {
+      for (const o of ordersData) {
+        if (!o.tenant_id) continue;
+        const current = ordersByTenant.get(o.tenant_id) || { count: 0, totalSales: 0, latestDate: undefined };
+        current.count += 1;
+        current.totalSales += Number(o.total) || 0;
+        const oDate = o.created_at || o.updated_at;
+        if (oDate && (!current.latestDate || new Date(oDate).getTime() > new Date(current.latestDate).getTime())) {
+          current.latestDate = oDate;
+        }
+        ordersByTenant.set(o.tenant_id, current);
       }
     }
 
@@ -227,8 +317,49 @@ export async function fetchSuperAdminStores(): Promise<SuperAdminStoreRecord[]> 
         ...(existing?.owner?.socials ? { socials: existing.owner.socials } : {}),
       };
 
+      // Métricas canónicas calculadas para este comercio
+      const prodInfo = productsByTenant.get(st.id);
+      const ordInfo = ordersByTenant.get(st.id);
+
+      const storeProducts = prodInfo?.count || 0;
+      const storeOrders = ordInfo?.count || 0;
+      const storeVentas = Math.round((ordInfo?.totalSales || 0) * 100) / 100;
+      const storeVisitas = existing?.activity?.visitas || 0;
+
+      // Calcular última actividad canónica a partir de eventos reales (pedidos, productos, comercios)
+      const candidateDates: number[] = [];
+      if (ordInfo?.latestDate) {
+        const t = new Date(ordInfo.latestDate).getTime();
+        if (!isNaN(t)) candidateDates.push(t);
+      }
+      if (prodInfo?.latestDate) {
+        const t = new Date(prodInfo.latestDate).getTime();
+        if (!isNaN(t)) candidateDates.push(t);
+      }
+      if (st.updated_at) {
+        const t = new Date(st.updated_at).getTime();
+        if (!isNaN(t)) candidateDates.push(t);
+      }
+      if (st.created_at) {
+        const t = new Date(st.created_at).getTime();
+        if (!isNaN(t)) candidateDates.push(t);
+      }
+
+      const latestTimestamp = candidateDates.length > 0 ? Math.max(...candidateDates) : null;
+      const ultimaActividad = latestTimestamp
+        ? formatRelativeOrExactDate(new Date(latestTimestamp).toISOString())
+        : 'Sin actividad registrada';
+
+      const activityData = {
+        visitas: storeVisitas,
+        pedidos: storeOrders,
+        productos: storeProducts,
+        ventas: storeVentas,
+        ultimaActividad,
+      };
+
       if (existing) {
-        return {
+        const storeRec: any = {
           ...st,
           name: st.name,
           slug: st.slug,
@@ -239,10 +370,13 @@ export async function fetchSuperAdminStores(): Promise<SuperAdminStoreRecord[]> 
           updated_at: st.updated_at,
           owner: ownerObj,
           subscription: existing.subscription,
-          activity: existing.activity,
+          activity: activityData,
         };
+        if (latestTimestamp) storeRec._latestEventTimestamp = latestTimestamp;
+        return storeRec as SuperAdminStoreRecord;
       }
-      return {
+
+      const storeRec: any = {
         id: st.id,
         name: st.name,
         slug: st.slug,
@@ -261,20 +395,16 @@ export async function fetchSuperAdminStores(): Promise<SuperAdminStoreRecord[]> 
           billingCycle: 'mensual',
           paymentHistory: [],
         },
-        activity: {
-          visitas: 0,
-          pedidos: 0,
-          productos: 0,
-          ventas: 0,
-          ultimaActividad: 'Sin actividad registrada',
-        },
+        activity: activityData,
       };
+      if (latestTimestamp) storeRec._latestEventTimestamp = latestTimestamp;
+      return storeRec as SuperAdminStoreRecord;
     });
 
     persistStores(merged);
     return merged;
   } catch (err) {
-    console.warn('[CentralBo SuperAdmin] Excepción al sincronizar comercios:', err);
+    console.warn('[MAXINEGO SuperAdmin] Excepción al sincronizar comercios:', err);
     return loadStoresFromStorage();
   }
 }
@@ -399,9 +529,10 @@ export async function createSuperAdminStore(input: CreateStoreInput): Promise<{
         pedidos: 0,
         productos: 0,
         ventas: 0,
-        ultimaActividad: 'Recién creado',
+        ultimaActividad: formatRelativeOrExactDate(store.created_at || new Date().toISOString()),
       },
     };
+    (newStoreRecord as any)._latestEventTimestamp = Date.now();
 
     const current = getSuperAdminStores();
     const updatedList = [newStoreRecord, ...current.filter((s) => s.id !== store.id)];
@@ -532,11 +663,30 @@ export function getSuperAdminDashboardMetrics() {
     (s) => s.subscription.status === 'vencida' || s.subscription.status === 'cancelada'
   ).length;
 
-  // Actividad general acumulada
-  const totalVisitas = SUPERADMIN_STORES.reduce((sum, s) => sum + s.activity.visitas, 0);
-  const totalPedidos = SUPERADMIN_STORES.reduce((sum, s) => sum + s.activity.pedidos, 0);
-  const totalProductos = SUPERADMIN_STORES.reduce((sum, s) => sum + s.activity.productos, 0);
-  const totalVentasBs = SUPERADMIN_STORES.reduce((sum, s) => sum + s.activity.ventas, 0);
+  // Actividad general acumulada con fuentes canónicas
+  const totalVisitas = SUPERADMIN_STORES.reduce((sum, s) => sum + (s.activity?.visitas || 0), 0);
+  const totalPedidos = SUPERADMIN_STORES.reduce((sum, s) => sum + (s.activity?.pedidos || 0), 0);
+  const totalProductos = SUPERADMIN_STORES.reduce((sum, s) => sum + (s.activity?.productos || 0), 0);
+  const totalVentasBs = Math.round(SUPERADMIN_STORES.reduce((sum, s) => sum + (s.activity?.ventas || 0), 0) * 100) / 100;
+
+  // Encontrar el evento canónico más reciente de toda la plataforma
+  let globalLatestTimestamp = 0;
+  let globalLatestStoreName = '';
+
+  for (const s of SUPERADMIN_STORES) {
+    const rawLatest = (s as any)._latestEventTimestamp || 0;
+    if (rawLatest > globalLatestTimestamp) {
+      globalLatestTimestamp = rawLatest;
+      globalLatestStoreName = s.name;
+    }
+  }
+
+  const ultimaActividadGeneral =
+    globalLatestTimestamp > 0
+      ? `${formatRelativeOrExactDate(new Date(globalLatestTimestamp).toISOString())} (${globalLatestStoreName})`
+      : SUPERADMIN_STORES.length > 0
+      ? 'Sin eventos recientes'
+      : 'Sin actividad registrada';
 
   return {
     stores: {
@@ -568,10 +718,9 @@ export function getSuperAdminDashboardMetrics() {
       totalPedidos,
       totalProductos,
       totalVentasBs,
-      ultimaActividadGeneral:
-        SUPERADMIN_STORES.length > 0
-          ? `Actividad reciente (${SUPERADMIN_STORES[0].name})`
-          : 'Sin actividad registrada',
+      ultimaActividadGeneral,
     },
   };
 }
+
+export const getSuperAdminGlobalMetrics = getSuperAdminDashboardMetrics;

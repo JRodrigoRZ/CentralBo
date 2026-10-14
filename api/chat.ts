@@ -125,6 +125,8 @@ export default async function handler(req: any, res: any) {
       console.warn('[Chat API] Advertencia al obtener productos:', prodError.message);
     }
 
+    const isServices = store.store_type === 'servicios';
+
     // 5. Consultar promociones vigentes (opcional y seguro)
     const todayStr = new Date().toISOString().split('T')[0];
     let promotionsSummary = '';
@@ -146,7 +148,36 @@ export default async function handler(req: any, res: any) {
       // Si la tabla no existe o falla, continuar sin interrumpir
     }
 
-    // 6. Preparar datos de perfil y configuración
+    // 5b. Consultar profesionales activos básicos exclusivamente para comercios de tipo 'servicios' (AM-03)
+    let profesionalesSummary = '';
+    if (isServices) {
+      try {
+        const { data: profs, error: profsError } = await supabase
+          .from('professionals')
+          .select('id, name, specialty, service_ids')
+          .eq('tenant_id', store.id)
+          .eq('is_active', true)
+          .order('name', { ascending: true })
+          .limit(20);
+
+        if (!profsError && profs && Array.isArray(profs) && profs.length > 0) {
+          profesionalesSummary =
+            '\nPROFESIONALES ACTIVOS REGISTRADOS:\n' +
+            profs
+              .map((prof: any) => {
+                const spec = prof.specialty ? ` - Especialidad: ${prof.specialty}` : '';
+                return `• ${prof.name}${spec}`;
+              })
+              .join('\n');
+        } else {
+          profesionalesSummary = '\nPROFESIONALES ACTIVOS REGISTRADOS:\nActualmente no hay profesionales registrados en el sistema.';
+        }
+      } catch (profErr) {
+        console.warn('[Chat API] Advertencia al consultar profesionales:', profErr);
+        profesionalesSummary = '\nPROFESIONALES ACTIVOS REGISTRADOS:\nActualmente no hay profesionales registrados en el sistema.';
+      }
+    }
+
     // 6. Preparar datos de perfil y configuración
     const profile = (store.profile && typeof store.profile === 'object' ? store.profile : {}) as Record<string, any>;
     const payment = (store.payment_settings && typeof store.payment_settings === 'object' ? store.payment_settings : {}) as Record<string, any>;
@@ -180,13 +211,28 @@ export default async function handler(req: any, res: any) {
     const hasQr = typeof rawQr === 'string' && rawQr.trim().startsWith('http');
     const qr_url_tienda = hasQr ? rawQr.trim() : '';
 
-    // Formatear catálogo de productos para {lista_productos}
+    // Formatear catálogo de productos/servicios para {lista_productos}
     const lista_productos = (products && products.length > 0)
       ? products.map((p: any) => {
           const catName = p.category_id ? categoryMap.get(p.category_id) || 'General' : 'General';
           const desc = p.description ? ` - ${p.description.replace(/\n/g, ' ')}` : '';
-          return `• ${p.name} | Precio: Bs. ${p.price} | Categoría: ${catName}${desc}`;
+
+          // Extracción segura de duración registrada para servicios (AM-03)
+          let durationStr = '';
+          const rawDuration = p.attributes?.duration_minutes ?? p.attributes?.duration;
+          if (typeof rawDuration === 'number' && Number.isFinite(rawDuration) && rawDuration > 0) {
+            durationStr = ` | Duración: ${rawDuration} min`;
+          } else if (typeof rawDuration === 'string' && /^\d+$/.test(rawDuration.trim())) {
+            const parsed = parseInt(rawDuration.trim(), 10);
+            if (parsed > 0) {
+              durationStr = ` | Duración: ${parsed} min`;
+            }
+          }
+
+          return `• ${p.name} | Precio: Bs. ${p.price}${durationStr} | Categoría: ${catName}${desc}`;
         }).join('\n')
+      : isServices
+      ? 'Actualmente no hay servicios registrados en el catálogo.'
       : 'Actualmente no hay productos registrados en el catálogo.';
 
     const qrInstruction = hasQr
@@ -217,8 +263,53 @@ export default async function handler(req: any, res: any) {
    - ESTÁ ESTRICTAMENTE PROHIBIDO generar enlaces rotos de WhatsApp como "https://wa.me/" o inventar números de teléfono.
    - Instrucción obligatoria final: Como el comercio no tiene un número de WhatsApp registrado, indícale amablemente al cliente que su pedido queda anotado y pídele su nombre y número de teléfono de contacto para que el personal de la tienda lo coordine, o indícale que puede acercarse directamente al local.`;
 
-    // 7. Construir System Instruction del Agente Max
-    const systemInstruction = `Eres el "Agente Max", el asistente comercial inteligente oficial de la tienda "${nombre_tienda}" en MAXINEGO.
+    // 7. Construir System Instruction del Agente Max (Diferenciando 'servicios' vs comercios generales / restaurantes)
+    let systemInstruction = '';
+
+    if (isServices) {
+      systemInstruction = `Eres el "Agente Max", el asistente comercial inteligente oficial de la tienda de servicios "${nombre_tienda}" en MAXINEGO.
+Tu objetivo es atender a los clientes, resolver dudas sobre los servicios profesionales ofrecidos, sus precios y duración, y guiarlos cordialmente hacia la reserva de citas.
+
+DATOS DEL COMERCIO:
+- Tipo de comercio: Servicios Profesionales
+- WhatsApp oficial: ${hasWhatsapp ? `${whatsapp_tienda} (wa.me/${cleanWhatsapp})` : 'No registrado (ESTRICTAMENTE PROHIBIDO generar enlaces a https://wa.me/)'}
+- QR de pago disponible: ${hasQr ? qr_url_tienda : 'No registrado (ESTRICTAMENTE PROHIBIDO mostrar etiquetas de imagen de QR)'}
+
+CATÁLOGO DE SERVICIOS DISPONIBLES:
+${lista_productos}
+${profesionalesSummary}
+
+=== REGLAS ESTRICTAS DE SEGURIDAD Y SERVICIOS ===
+1. CATÁLOGO CERRADO DE SERVICIOS (PROHIBIDO INVENTAR):
+   - Solo puedes ofrecer y hablar de los servicios que están explícitamente en el catálogo suministrado.
+   - Si el cliente pregunta por un servicio que NO está en la lista, responde amablemente: "Actualmente no ofrecemos [servicio] en nuestro catálogo. Te sugiero revisar nuestras opciones disponibles en pantalla."
+   - Nunca inventes servicios, precios, duraciones ni condiciones que no figuren en los datos.
+   - Si el cliente pregunta por la duración de un servicio y NO está especificada en la lista, reconoce amablemente que la duración exacta no está indicada y sugiere consultar directamente con el comercio.
+
+2. PROFESIONALES REGISTRADOS:
+   - Solo puedes mencionar los profesionales que figuren explícitamente en la lista de profesionales registrados.
+   - Si el cliente pregunta por un profesional que no está en la lista o si no hay profesionales registrados, indícalo amablemente sin inventar nombres ni especialidades.
+
+3. PRECIOS Y MONEDA:
+   - Todos los precios son estrictamente en Bolivianos (Bs.). Muestra siempre el monto con el prefijo "Bs." (ejemplo: Bs. 80).
+
+4. GESTIÓN DE CITAS Y RESERVAS:
+   - Este comercio ofrece servicios profesionales. NO apliques instrucciones de comida, delivery, zonas de entrega ni retiro físico de productos a menos que el cliente pregunte expresamente por productos físicos disponibles.
+   - Cuando el cliente pregunte por disponibilidad de citas, horarios exactos o exprese la intención de agendar/reservar:
+     * Brinda primero la información confirmada del servicio (precio, duración y profesional si están disponibles en los datos).
+     * Explica amablemente que para elegir la fecha y el horario disponible debe utilizar la opción "Reservar Cita" disponible en la pantalla de la tienda.
+     * ESTÁ ESTRICTAMENTE PROHIBIDO afirmar que has creado, reservado, modificado, cancelado o confirmado una cita dentro de este chat, ya que la selección y confirmación de turnos se realiza exclusivamente mediante el sistema de reservas de la tienda.
+     * No inventes cupos, turnos ni horarios disponibles.
+
+${qrInstruction}
+
+${cierreInstruction}
+
+6. TONO Y LÍMITES:
+   - Respuestas breves, cercanas y profesionales. Diseñado para lectura rápida en celulares.
+   - Si el usuario te hace preguntas no relacionadas con la tienda o MAXINEGO, responde cordialmente: "Soy el asistente de ${nombre_tienda} y estoy aquí para ayudarte con información sobre nuestros servicios profesionales y reservas."`;
+    } else {
+      systemInstruction = `Eres el "Agente Max", el asistente comercial inteligente oficial de la tienda "${nombre_tienda}" en MAXINEGO.
 Tu único objetivo es atender a los clientes, resolver dudas sobre los productos disponibles y guiarlos paso a paso para cerrar su pedido.
 
 DATOS DEL COMERCIO:
@@ -252,6 +343,7 @@ ${cierreInstruction}
 6. TONO Y LÍMITES:
    - Respuestas breves, cercanas y al grano. Diseñado para lectura rápida en celulares.
    - Si el usuario te hace preguntas no relacionadas con la tienda o MAXINEGO, responde cordialmente: "Soy el asistente de ${nombre_tienda} y estoy aquí para ayudarte con tus pedidos y dudas sobre nuestro menú."`;
+    }
 
     // 8. Verificar clave de API de Gemini
     const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;

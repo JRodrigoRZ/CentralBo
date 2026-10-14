@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ShieldCheck,
   LayoutDashboard,
@@ -15,6 +15,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useRouter } from '../context/RouterContext';
 import { SuperAdminSection } from '../types';
+import { fetchSuperAdminStores } from '../lib/superadminService';
 import { SuperAdminDashboard } from './superadmin/SuperAdminDashboard';
 import { SuperAdminStores } from './superadmin/SuperAdminStores';
 import { SuperAdminUsers } from './superadmin/SuperAdminUsers';
@@ -23,6 +24,7 @@ import { SuperAdminSubscriptions } from './superadmin/SuperAdminSubscriptions';
 import { SuperAdminActivity } from './superadmin/SuperAdminActivity';
 import { SuperAdminSettings } from './superadmin/SuperAdminSettings';
 import { ThemeToggle } from './ThemeToggle';
+import { MaxiNegoLogo } from './common/MaxiNegoLogo';
 
 interface MenuTabItem {
   id: SuperAdminSection;
@@ -45,6 +47,13 @@ export const SuperAdminArea: React.FC = () => {
   const { user, signOut } = useAuth();
   const { navigate } = useRouter();
   const [activeSection, setActiveSection] = useState<SuperAdminSection>('dashboard');
+
+  // Sincronización canónica inicial al ingresar al área SuperAdmin
+  useEffect(() => {
+    fetchSuperAdminStores().catch((err) => {
+      console.warn('[MAXINEGO SuperAdmin] Error en sincronización inicial:', err);
+    });
+  }, []);
 
   // Guardia de Seguridad Interna: Disponible ÚNICAMENTE para SuperAdmin Global
   if (!user || user.profile !== 'superadmin') {
@@ -84,9 +93,7 @@ export const SuperAdminArea: React.FC = () => {
             <ArrowLeft className="w-4 h-4" />
           </button>
 
-          <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800/40 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold">
-            <ShieldCheck className="w-5 h-5" />
-          </div>
+          <MaxiNegoLogo size={40} />
 
           <div>
             <div className="flex items-center gap-2">

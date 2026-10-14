@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Activity as ActivityIcon,
   TrendingUp,
@@ -7,11 +7,56 @@ import {
   Clock,
   Eye,
   Store as StoreIcon,
+  Loader2,
 } from 'lucide-react';
-import { SUPERADMIN_STORES, getSuperAdminDashboardMetrics } from '../../lib/superadminService';
+import {
+  getSuperAdminStores,
+  fetchSuperAdminStores,
+  getSuperAdminDashboardMetrics,
+  SUPERADMIN_STORES_CHANGED_EVENT,
+  LEGACY_SUPERADMIN_STORES_CHANGED_EVENT,
+} from '../../lib/superadminService';
+import { SuperAdminStoreRecord } from '../../types';
 
 export const SuperAdminActivity: React.FC = () => {
-  const metrics = getSuperAdminDashboardMetrics();
+  const [stores, setStores] = useState<SuperAdminStoreRecord[]>(() => getSuperAdminStores());
+  const [metrics, setMetrics] = useState(() => getSuperAdminDashboardMetrics());
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const refreshData = () => {
+      if (mounted) {
+        setStores(getSuperAdminStores());
+        setMetrics(getSuperAdminDashboardMetrics());
+      }
+    };
+
+    window.addEventListener(SUPERADMIN_STORES_CHANGED_EVENT, refreshData);
+    window.addEventListener(LEGACY_SUPERADMIN_STORES_CHANGED_EVENT, refreshData);
+
+    setIsLoading(true);
+    fetchSuperAdminStores()
+      .then((loaded) => {
+        if (mounted) {
+          setStores(loaded);
+          setMetrics(getSuperAdminDashboardMetrics());
+          setIsLoading(false);
+        }
+      })
+      .catch(() => {
+        if (mounted) {
+          setIsLoading(false);
+        }
+      });
+
+    return () => {
+      mounted = false;
+      window.removeEventListener(SUPERADMIN_STORES_CHANGED_EVENT, refreshData);
+      window.removeEventListener(LEGACY_SUPERADMIN_STORES_CHANGED_EVENT, refreshData);
+    };
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -30,8 +75,17 @@ export const SuperAdminActivity: React.FC = () => {
         </div>
 
         <div className="text-xs text-slate-400 bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-800 self-start sm:self-auto flex items-center gap-2">
-          <Clock className="w-3.5 h-3.5 text-indigo-400" />
-          <span>Último evento: <strong className="text-white">Hace 12 min</strong></span>
+          {isLoading ? (
+            <>
+              <Loader2 className="w-3.5 h-3.5 text-indigo-400 animate-spin" />
+              <span>Sincronizando eventos...</span>
+            </>
+          ) : (
+            <>
+              <Clock className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Último evento: <strong className="text-white">{metrics.activity.ultimaActividadGeneral}</strong></span>
+            </>
+          )}
         </div>
       </div>
 
@@ -90,7 +144,7 @@ export const SuperAdminActivity: React.FC = () => {
             <span>Actividad Registrada por Comercio</span>
           </h3>
           <span className="text-xs text-slate-500">
-            {SUPERADMIN_STORES.length} Comercios analizados
+            {stores.length} Comercios analizados
           </span>
         </div>
 
@@ -107,7 +161,7 @@ export const SuperAdminActivity: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
-              {SUPERADMIN_STORES.map((st) => (
+              {stores.map((st) => (
                 <tr key={st.id} className="hover:bg-slate-800/30 transition">
                   <td className="py-3 px-4">
                     <div className="font-semibold text-white">{st.name}</div>

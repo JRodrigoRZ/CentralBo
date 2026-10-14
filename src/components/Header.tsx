@@ -12,6 +12,7 @@ import { useAuth } from '../context/AuthContext';
 import { useRouter } from '../context/RouterContext';
 import { PWAStatus } from '../types';
 import { ThemeToggle } from './ThemeToggle';
+import { MaxiNegoLogo } from './common/MaxiNegoLogo';
 
 interface HeaderProps {
   pwaStatus: PWAStatus;
@@ -110,9 +111,7 @@ export const Header: React.FC<HeaderProps> = ({ pwaStatus, onInstallClick }) => 
             className="flex items-center gap-2.5 text-left group cursor-pointer focus:outline-none"
             aria-label="MAXINEGO - Ir al inicio"
           >
-            <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-xs group-hover:bg-blue-700 transition">
-              <StoreIcon className="w-5 h-5" />
-            </div>
+            <MaxiNegoLogo size={36} className="transition-transform group-hover:scale-105" />
             <div className="flex flex-col">
               <div className="flex items-center gap-1.5">
                 <span className="font-extrabold text-base tracking-tight text-slate-900 dark:text-white">

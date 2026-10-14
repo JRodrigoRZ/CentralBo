@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useRouter } from '../context/RouterContext';
+import { MaxiNegoLogo } from './common/MaxiNegoLogo';
 
 interface LoginViewProps {
   redirectPath?: string;
@@ -674,10 +675,8 @@ export const LoginView: React.FC<LoginViewProps> = ({ redirectPath }) => {
       {/* VISTA 4: Formulario de Inicio de Sesión Normal */}
       {mode === 'login' && (
         <div className="max-w-md mx-auto rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 sm:p-8 shadow-sm transition-colors">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="p-3 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800/40">
-              <Lock className="w-5 h-5" />
-            </div>
+          <div className="flex items-center gap-3.5 mb-6">
+            <MaxiNegoLogo size={46} />
             <div>
               <h2 className="text-lg font-bold text-slate-900 dark:text-white">
                 Iniciar Sesión

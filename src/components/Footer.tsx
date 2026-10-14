@@ -1,5 +1,6 @@
 import React from 'react';
 import { ShieldCheck, Smartphone, Globe } from 'lucide-react';
+import { MaxiNegoLogo } from './common/MaxiNegoLogo';
 
 export const Footer: React.FC = () => {
   return (
@@ -9,9 +10,7 @@ export const Footer: React.FC = () => {
     >
       <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold text-xs shadow-xs">
-            MN
-          </div>
+          <MaxiNegoLogo size={28} />
           <div>
             <p className="text-slate-900 dark:text-slate-200 font-semibold text-xs">
               MAXINEGO — Plataforma para Comercios y Negocios Locales

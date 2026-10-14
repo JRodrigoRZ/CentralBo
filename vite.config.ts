@@ -11,7 +11,18 @@ export default defineConfig(() => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
-        includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'icon.svg', 'manifest.json'],
+        includeAssets: [
+          'favicon.ico',
+          'apple-touch-icon.png',
+          'icon.svg',
+          'icon-192.png',
+          'icon-512.png',
+          'icon-maskable-512.png',
+          'pwa-192x192.png',
+          'pwa-512x512.png',
+          'pwa-maskable-512x512.png',
+          'manifest.json'
+        ],
         manifest: {
           id: '/',
           name: 'MAXINEGO — Plataforma para Comercios y Negocios Locales',
@@ -26,8 +37,20 @@ export default defineConfig(() => {
           categories: ['business', 'shopping', 'productivity'],
           icons: [
             {
+              src: '/icon-192.png',
+              sizes: '192x192',
+              type: 'image/png',
+              purpose: 'any',
+            },
+            {
               src: '/pwa-192x192.png',
               sizes: '192x192',
+              type: 'image/png',
+              purpose: 'any',
+            },
+            {
+              src: '/icon-512.png',
+              sizes: '512x512',
               type: 'image/png',
               purpose: 'any',
             },
@@ -36,6 +59,12 @@ export default defineConfig(() => {
               sizes: '512x512',
               type: 'image/png',
               purpose: 'any',
+            },
+            {
+              src: '/icon-maskable-512.png',
+              sizes: '512x512',
+              type: 'image/png',
+              purpose: 'maskable',
             },
             {
               src: '/pwa-maskable-512x512.png',

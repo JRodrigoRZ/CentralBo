@@ -43,6 +43,7 @@ import { useAdminPWA } from '../lib/pwaTenantService';
 import { StoreAdminPWAInstallButton } from './storeadmin/StoreAdminPWAInstallButton';
 import { MiTiendaContacto } from './storeadmin/MiTiendaContacto';
 import { CatalogoProductos } from './storeadmin/CatalogoProductos';
+import { MaxiNegoLogo } from './common/MaxiNegoLogo';
 import { CatalogoCategorias } from './storeadmin/CatalogoCategorias';
 import { CatalogoConfigEspecifica } from './storeadmin/CatalogoConfigEspecifica';
 import { StoreAdminPedidos } from './storeadmin/StoreAdminPedidos';
@@ -275,9 +276,7 @@ export const StoreAdminArea: React.FC<StoreAdminAreaProps> = ({
       {/* Brand Header en Sidebar */}
       <div className="px-5 py-4 border-b border-slate-800/80 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold shadow-xs">
-            <StoreIcon className="w-4 h-4" />
-          </div>
+          <MaxiNegoLogo size={32} />
           <div>
             <span className="text-sm font-bold text-white tracking-tight block leading-tight">
               MAXINEGO
