@@ -323,7 +323,30 @@ export function applyPWAManifest(manifestObj: ReturnType<typeof buildStoreManife
       metaDesc.content = manifestObj.description;
     }
 
-    // 7. Iconos apple-touch-icon y favicon aislados por tenant
+    // 7. Canonical URL y Open Graph URL
+    let canonicalUrl = 'https://www.maxinego.app/';
+    if (manifestObj.id && manifestObj.id !== '/') {
+      const cleanPath = manifestObj.id.startsWith('/') ? manifestObj.id : `/${manifestObj.id}`;
+      canonicalUrl = `https://www.maxinego.app${cleanPath}`;
+    }
+
+    let linkCanonical = document.querySelector<HTMLLinkElement>('link[rel="canonical"]');
+    if (!linkCanonical) {
+      linkCanonical = document.createElement('link');
+      linkCanonical.rel = 'canonical';
+      document.head.appendChild(linkCanonical);
+    }
+    linkCanonical.href = canonicalUrl;
+
+    let metaOgUrl = document.querySelector<HTMLMetaElement>('meta[property="og:url"]');
+    if (!metaOgUrl) {
+      metaOgUrl = document.createElement('meta');
+      metaOgUrl.setAttribute('property', 'og:url');
+      document.head.appendChild(metaOgUrl);
+    }
+    metaOgUrl.content = canonicalUrl;
+
+    // 8. Iconos apple-touch-icon y favicon aislados por tenant
     if (manifestObj.icons && manifestObj.icons.length > 0) {
       const topIcon = manifestObj.icons[0].src;
       let appleIcon = document.querySelector<HTMLLinkElement>('link[rel="apple-touch-icon"]');
