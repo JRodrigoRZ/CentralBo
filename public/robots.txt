@@ -9,6 +9,8 @@ Disallow: /admin
 Disallow: /superadmin/
 Disallow: /superadmin
 Disallow: /login
+Disallow: /unauthorized/
+Disallow: /unauthorized
 Disallow: /api/
 
 # Ubicación canónica del mapa del sitio
