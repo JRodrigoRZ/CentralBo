@@ -94,13 +94,32 @@
       "headers": [
         {
           "key": "X-Robots-Tag",
+           {
+      "source": "/superadmin/(.*)",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "query",
+          "key": "pwa_admin"
+        }
+      ],
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
           "value": "noindex, nofollow"
         }
       ]
     }
   ],
-  "rewrites": [
-    {
+  "rewrites": [    {
       "source": "/api/(.*)",
       "destination": "/api/$1"
     },
@@ -110,4 +129,3 @@
     }
   ]
 }
-
