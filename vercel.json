@@ -94,13 +94,6 @@
       "headers": [
         {
           "key": "X-Robots-Tag",
-           {
-      "source": "/superadmin/(.*)",
-         {
-      "source": "/superadmin/(.*)",
-      "headers": [
-        {
-          "key": "X-Robots-Tag",
           "value": "noindex, nofollow"
         }
       ]
