@@ -96,6 +96,8 @@
           "key": "X-Robots-Tag",
            {
       "source": "/superadmin/(.*)",
+         {
+      "source": "/superadmin/(.*)",
       "headers": [
         {
           "key": "X-Robots-Tag",
@@ -119,7 +121,8 @@
       ]
     }
   ],
-  "rewrites": [    {
+  "rewrites": [
+    {
       "source": "/api/(.*)",
       "destination": "/api/$1"
     },
