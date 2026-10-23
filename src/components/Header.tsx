@@ -46,7 +46,7 @@ export const Header: React.FC<HeaderProps> = ({ pwaStatus, onInstallClick }) => 
         document.getElementById('descubre-tiendas');
       if (section) {
         section.scrollIntoView({ behavior: 'smooth' });
-        window.history.replaceState(null, '', '#carrusel-comercios');
+        window.history.replaceState(null, '', '/#carrusel-comercios');
       }
     } else {
       navigate('/#carrusel-comercios');
@@ -60,7 +60,7 @@ export const Header: React.FC<HeaderProps> = ({ pwaStatus, onInstallClick }) => 
       const section = document.getElementById('faq');
       if (section) {
         section.scrollIntoView({ behavior: 'smooth' });
-        window.history.replaceState(null, '', '#faq');
+        window.history.replaceState(null, '', '/#faq');
       }
     } else {
       navigate('/#faq');
@@ -68,13 +68,13 @@ export const Header: React.FC<HeaderProps> = ({ pwaStatus, onInstallClick }) => 
   };
 
   const handleCreateStoreClick = (e: React.MouseEvent) => {
+    e.preventDefault();
     setMobileMenuOpen(false);
     // Enlace preparado para la pantalla/sección de contacto de la siguiente etapa
     const contactSection = document.getElementById('contacto');
     if (contactSection) {
-      e.preventDefault();
       contactSection.scrollIntoView({ behavior: 'smooth' });
-      window.history.replaceState(null, '', '#contacto');
+      window.history.replaceState(null, '', '/#contacto');
     } else if (!isHome) {
       navigate('/#contacto');
     } else {

@@ -74,11 +74,9 @@ function getInitialPath(): string {
       return '/login';
     }
 
-    // Si es un ancla interna de producto (#prod-...), no es una ruta de navegación principal
-    if (!hash.startsWith('prod-')) {
-      if (!hash.startsWith('/')) {
-        hash = `/${hash}`;
-      }
+    // Solo los hashes con formato #/ruta pertenecen al router.
+    // Los hashes simples (#faq, #contacto, #prod-...) son anclas del documento.
+    if (hash.startsWith('/')) {
       return hash;
     }
   }
@@ -283,7 +281,16 @@ export const RouterProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [currentPath, parseRoute]);
 
   const navigate = useCallback((path: string) => {
-    const normalized = path.startsWith('/') ? path : `/${path}`;
+    const [routePath, sectionId] = path.split('#', 2);
+    const normalizedPath = routePath || '/';
+    const normalized = normalizedPath.startsWith('/') ? normalizedPath : `/${normalizedPath}`;
+
+    if (sectionId) {
+      window.history.pushState(null, '', `${normalized}#${sectionId}`);
+      setCurrentPath(normalized);
+      return;
+    }
+
     window.location.hash = normalized;
     setCurrentPath(normalized);
   }, []);
