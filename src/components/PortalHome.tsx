@@ -26,6 +26,9 @@ import {
   Search,
   ExternalLink,
   HelpCircle,
+  ShieldCheck,
+  Lock,
+  Zap,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useRouter } from '../context/RouterContext';
@@ -101,6 +104,64 @@ const getCardMetadata = (store: { slug?: string; store_type?: string; name?: str
     iconColor: 'text-blue-700 dark:text-blue-300',
   };
 };
+
+/**
+ * Componente de logotipo oficial y auténtico para comercios en la vitrina.
+ * Utiliza el logo oficial registrado en Supabase o el recurso auténtico local,
+ * garantizando proporciones intactas, fondo nítido y visibilidad de alto contraste
+ * en modo claro y modo oscuro.
+ */
+function StoreCardLogo({ store }: { store: Store }) {
+  const localAsset = useMemo(() => {
+    const slug = (store.slug || '').toLowerCase();
+    const name = (store.name || '').toLowerCase();
+    if (slug.includes('sushi') || name.includes('sushi')) {
+      return '/assets/stores/sushibill-logo.webp';
+    }
+    if (slug.includes('gloria') || name.includes('gloria')) {
+      return '/assets/stores/tienda-gloria-logo.png';
+    }
+    return null;
+  }, [store.slug, store.name]);
+
+  const candidateUrl = (store.logo_url && store.logo_url.trim()) || localAsset;
+  const [currentSrc, setCurrentSrc] = useState<string | null>(candidateUrl);
+  const [hasFailed, setHasFailed] = useState<boolean>(!candidateUrl);
+
+  useEffect(() => {
+    const nextUrl = (store.logo_url && store.logo_url.trim()) || localAsset;
+    setCurrentSrc(nextUrl);
+    setHasFailed(!nextUrl);
+  }, [store.logo_url, localAsset]);
+
+  const handleImageError = () => {
+    if (currentSrc !== localAsset && localAsset) {
+      setCurrentSrc(localAsset);
+    } else {
+      setHasFailed(true);
+    }
+  };
+
+  if (!hasFailed && currentSrc) {
+    return (
+      <div className="w-14 h-14 rounded-2xl bg-white border border-slate-200/90 dark:border-slate-700/70 shadow-xs overflow-hidden flex items-center justify-center p-1.5 shrink-0 group-hover:scale-105 transition-transform duration-200">
+        <img
+          src={currentSrc}
+          alt={`Logotipo oficial de ${store.name}`}
+          className="w-full h-full object-contain"
+          onError={handleImageError}
+          loading="lazy"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-blue-700 text-white font-black text-xl flex items-center justify-center shadow-md shrink-0 group-hover:scale-105 transition-transform duration-200">
+      {store.name.slice(0, 2).toUpperCase()}
+    </div>
+  );
+}
 
 const NEUTRAL_DEMO_STORE: Store = {
   id: 'demo-neutral',
@@ -339,13 +400,411 @@ const getHeroStoreShowcase = (store: Store): HeroMockupShowcase => {
   };
 };
 
+/**
+ * Avatar SVG exclusivo de Agente Max
+ * Representa al robot asistente con el emblema MN en el pecho y visor digital cian.
+ */
+function AgenteMaxAvatar({ className = 'w-11 h-11' }: { className?: string }) {
+  return (
+    <div className={`relative ${className} shrink-0`}>
+      <svg
+        viewBox="0 0 64 64"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        className="w-full h-full drop-shadow-md"
+      >
+        {/* Antena con luz cian pulsante */}
+        <circle cx="32" cy="7" r="3" fill="#38BDF8" />
+        <path d="M32 10V17" stroke="#94A3B8" strokeWidth="2.5" strokeLinecap="round" />
+        
+        {/* Auriculares / Orejeras */}
+        <rect x="7" y="27" width="5" height="12" rx="2.5" fill="#38BDF8" />
+        <rect x="52" y="27" width="5" height="12" rx="2.5" fill="#38BDF8" />
+        
+        {/* Cabeza metálica blanca redondeada */}
+        <rect x="11" y="16" width="42" height="33" rx="14" fill="#FFFFFF" stroke="#CBD5E1" strokeWidth="1.5" />
+        
+        {/* Visor digital oscuro */}
+        <rect x="16" y="22" width="32" height="18" rx="8" fill="#0B132B" />
+        
+        {/* Ojos cian expresivos y brillantes */}
+        <circle cx="25" cy="30" r="3" fill="#38BDF8" />
+        <circle cx="26" cy="29" r="1" fill="#FFFFFF" />
+        <circle cx="39" cy="30" r="3" fill="#38BDF8" />
+        <circle cx="40" cy="29" r="1" fill="#FFFFFF" />
+        
+        {/* Sonrisa digital sutil */}
+        <path d="M29 35.5C30.5 36.8 33.5 36.8 35 35.5" stroke="#38BDF8" strokeWidth="1.5" strokeLinecap="round" />
+        
+        {/* Torso / Base con el logotipo de MAXINEGO (MN) */}
+        <path d="M19 49C19 49 22 59 32 59C42 59 45 49 45 49H19Z" fill="#F8FAFC" stroke="#CBD5E1" strokeWidth="1.2" />
+        <text
+          x="32"
+          y="56.5"
+          textAnchor="middle"
+          fill="#2563EB"
+          fontSize="6.5"
+          fontWeight="900"
+          fontFamily="system-ui, -apple-system, sans-serif"
+          letterSpacing="-0.5"
+        >
+          MN
+        </text>
+      </svg>
+      {/* Indicador de conexión en vivo */}
+      <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-400 border-2 border-white dark:border-slate-900 shadow-sm" />
+    </div>
+  );
+}
+
+const SHOWCASE_VERTICALS = {
+  restaurante: {
+    id: 'restaurante' as const,
+    name: 'Trattoria Roma • Menú & Pastas',
+    shortName: 'Trattoria Roma',
+    slug: 'trattoria-roma',
+    initials: 'TR',
+    rubro: 'Gastronomía & Pastas',
+    badge: 'Menú & Delivery',
+    badgeClass: 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/70 dark:text-amber-300 dark:border-amber-800/60',
+    location: 'Av. Principal #450, Centro Comercial',
+    schedule: '12:00 - 22:30 • Mar a Dom',
+    headerGradient: 'from-amber-500/15 via-orange-500/10 to-rose-500/10 dark:from-amber-950/40 dark:via-orange-950/30 dark:to-rose-950/30',
+    avatarBg: 'bg-gradient-to-br from-amber-600 to-orange-600 text-white',
+    categories: ['Pastas Frescas', 'Especialidades', 'Postres'],
+    products: [
+      {
+        id: 'r1',
+        name: 'Fettuccine ai Funghi Porcini',
+        desc: 'Pasta fresca al huevo con reducción de setas porcini, crema y parmesano reggiano.',
+        price: 'Bs 52.00',
+        icon: Utensils,
+        iconBg: 'bg-amber-50 text-amber-700 dark:bg-amber-950/70 dark:text-amber-300 border-amber-200 dark:border-amber-800/60',
+      },
+      {
+        id: 'r2',
+        name: 'Lasaña Boloñesa Tradicional',
+        desc: 'Capas de pasta al huevo con ragú clásico cocido lentamente y bechamel gratinada.',
+        price: 'Bs 48.00',
+        icon: Utensils,
+        iconBg: 'bg-orange-50 text-orange-700 dark:bg-orange-950/70 dark:text-orange-300 border-orange-200 dark:border-orange-800/60',
+      },
+      {
+        id: 'r3',
+        name: 'Tiramisú Artesanal Italiano',
+        desc: 'Savoiardi bañados en espresso, mascarpone cremoso y cacao amargo espolvoreado.',
+        price: 'Bs 26.00',
+        icon: ShoppingBag,
+        iconBg: 'bg-rose-50 text-rose-700 dark:bg-rose-950/70 dark:text-rose-300 border-rose-200 dark:border-rose-800/60',
+      },
+    ],
+    cartCount: 3,
+    cartTotal: 'Bs 126.00',
+    features: [
+      {
+        title: 'Dirección web exclusiva',
+        desc: 'maxinego.app/tienda/trattoria-roma para compartir en WhatsApp, Instagram y folletos.',
+      },
+      {
+        title: 'Catálogo con precios en Bs',
+        desc: 'Fotos de cada plato, descripciones e ingredientes claros para ordenar sin dudas.',
+      },
+      {
+        title: 'Categorías organizadas',
+        desc: 'Pastas, especialidades y postres ordenados para navegación rápida.',
+      },
+      {
+        title: 'Pedido directo a WhatsApp',
+        desc: 'El cliente arma su orden y llega a tu chat con el desglose exacto y total a cobrar.',
+      },
+    ],
+    mobilePreview: {
+      headline: 'Pedido listo para WhatsApp',
+      items: ['2x Fettuccine ai Funghi', '1x Tiramisú Artesanal'],
+      total: 'Bs 126.00',
+    },
+  },
+  moda: {
+    id: 'moda' as const,
+    name: 'Boutique Milano • Tendencias',
+    shortName: 'Boutique Milano',
+    slug: 'boutique-milano',
+    initials: 'BM',
+    rubro: 'Moda & Colecciones',
+    badge: 'Nueva Colección',
+    badgeClass: 'bg-rose-50 text-rose-800 border-rose-200 dark:bg-rose-950/70 dark:text-rose-300 dark:border-rose-800/60',
+    location: 'Galería Central, Local 12 • Envíos a todo el país',
+    schedule: '10:00 - 20:00 • Lun a Sáb',
+    headerGradient: 'from-rose-500/15 via-purple-500/10 to-blue-500/10 dark:from-rose-950/40 dark:via-purple-950/30 dark:to-blue-950/30',
+    avatarBg: 'bg-gradient-to-br from-rose-600 to-purple-600 text-white',
+    categories: ['Nueva Temporada', 'Prendas Superiores', 'Calzado'],
+    products: [
+      {
+        id: 'm1',
+        name: 'Blusa Satinada Confort',
+        desc: 'Corte contemporáneo con tejido suave, acabado satinado y caída elegante.',
+        price: 'Bs 145.00',
+        icon: Shirt,
+        iconBg: 'bg-rose-50 text-rose-700 dark:bg-rose-950/70 dark:text-rose-300 border-rose-200 dark:border-rose-800/60',
+      },
+      {
+        id: 'm2',
+        name: 'Vestido Midi de Lino Natural',
+        desc: 'Tejido 100% lino transpirable con silueta fluida y lazo ajustable a la cintura.',
+        price: 'Bs 210.00',
+        icon: Shirt,
+        iconBg: 'bg-purple-50 text-purple-700 dark:bg-purple-950/70 dark:text-purple-300 border-purple-200 dark:border-purple-800/60',
+      },
+      {
+        id: 'm3',
+        name: 'Calzado Casual Anatómico',
+        desc: 'Plantilla de confort ergonómica con suela ligera y acabados resistentes.',
+        price: 'Bs 195.00',
+        icon: ShoppingBag,
+        iconBg: 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/70 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800/60',
+      },
+    ],
+    cartCount: 2,
+    cartTotal: 'Bs 355.00',
+    features: [
+      {
+        title: 'Vitrina visual de moda',
+        desc: 'maxinego.app/tienda/boutique-milano lista para colocar en el perfil de Instagram y TikTok.',
+      },
+      {
+        title: 'Detalle de prendas y tallas',
+        desc: 'Fotografías de prendas, tallas vigentes y precios en Bs sin mensajes privados.',
+      },
+      {
+        title: 'Colecciones de temporada',
+        desc: 'Organiza por vestidos, prendas superiores, accesorios y calzado con un toque.',
+      },
+      {
+        title: 'Compra y envío por WhatsApp',
+        desc: 'Tus clientes seleccionan sus prendas y coordinan el despacho y pago en tu chat.',
+      },
+    ],
+    mobilePreview: {
+      headline: 'Pedido listo para WhatsApp',
+      items: ['1x Blusa Satinada Confort', '1x Vestido Midi de Lino'],
+      total: 'Bs 355.00',
+    },
+  },
+  servicios: {
+    id: 'servicios' as const,
+    name: 'Zenit Studio • Spa & Estética',
+    shortName: 'Zenit Studio',
+    slug: 'zenit-studio',
+    initials: 'ZS',
+    rubro: 'Servicios Profesionales',
+    badge: 'Citas & Atención',
+    badgeClass: 'bg-teal-50 text-teal-800 border-teal-200 dark:bg-teal-950/70 dark:text-teal-300 dark:border-teal-800/60',
+    location: 'Edificio Los Olivos, Piso 3 • Agenda Online',
+    schedule: '08:30 - 18:30 • Lun a Sáb',
+    headerGradient: 'from-teal-500/15 via-emerald-500/10 to-blue-500/10 dark:from-teal-950/40 dark:via-emerald-950/30 dark:to-blue-950/30',
+    avatarBg: 'bg-gradient-to-br from-teal-600 to-emerald-600 text-white',
+    categories: ['Sesiones de Spa', 'Tratamientos Faciales', 'Paquetes'],
+    products: [
+      {
+        id: 's1',
+        name: 'Masaje Terapéutico Integral (60 min)',
+        desc: 'Terapia relajante con aceites esenciales naturales y aromaterapia guiada.',
+        price: 'Bs 150.00',
+        icon: Sparkles,
+        iconBg: 'bg-teal-100 text-teal-700 dark:bg-teal-950/70 dark:text-teal-300 border-teal-200 dark:border-teal-800/60',
+      },
+      {
+        id: 's2',
+        name: 'Limpieza Facial Profunda con Hidratación',
+        desc: 'Exfoliación suave, ultrasonido indoloro y mascarilla nutritiva regeneradora.',
+        price: 'Bs 180.00',
+        icon: Sparkles,
+        iconBg: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60',
+      },
+      {
+        id: 's3',
+        name: 'Evaluación y Diagnóstico Inicial',
+        desc: 'Consulta preliminar especializada con plan de cuidados para el hogar.',
+        price: 'Bs 80.00',
+        icon: Briefcase,
+        iconBg: 'bg-blue-100 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300 border-blue-200 dark:border-blue-800/60',
+      },
+    ],
+    cartCount: 1,
+    cartTotal: 'Bs 150.00',
+    features: [
+      {
+        title: 'Agenda de servicios online',
+        desc: 'maxinego.app/tienda/zenit-studio disponible para compartir con pacientes y clientes.',
+      },
+      {
+        title: 'Protocolos y tarifas claras',
+        desc: 'Duración de cada sesión, beneficios del tratamiento y tarifas transparentes.',
+      },
+      {
+        title: 'Paquetes y sesiones individuales',
+        desc: 'Filtra fácilmente entre masajes, tratamientos faciales o paquetes combinados.',
+      },
+      {
+        title: 'Solicitud directa de reserva',
+        desc: 'El cliente selecciona el servicio deseado y coordina día y hora por WhatsApp.',
+      },
+    ],
+    mobilePreview: {
+      headline: 'Cita lista para WhatsApp',
+      items: ['1x Masaje Terapéutico Integral'],
+      total: 'Bs 150.00',
+    },
+  },
+  billar: {
+    id: 'billar' as const,
+    name: 'Club Billar Imperial • Mesas & Bar',
+    shortName: 'Club Billar Imperial',
+    slug: 'club-billar-imperial',
+    initials: 'CB',
+    rubro: 'Billar, Torneos & Salón',
+    badge: 'Club & Mesas',
+    badgeClass: 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/70 dark:text-emerald-300 dark:border-emerald-800/60',
+    location: 'Av. Las Américas #310 • Zona Central',
+    schedule: '14:00 - 02:00 • Todos los días',
+    headerGradient: 'from-emerald-500/15 via-teal-500/10 to-indigo-500/10 dark:from-emerald-950/40 dark:via-teal-950/30 dark:to-indigo-950/30',
+    avatarBg: 'bg-gradient-to-br from-emerald-700 to-teal-800 text-white',
+    categories: ['Mesas & Turnos', 'Snacks & Bebidas', 'Accesorios de Juego'],
+    products: [
+      {
+        id: 'b1',
+        name: 'Mesa Profesional de Billar (1 hora)',
+        desc: 'Mesa de paño profesional con bolas reglamentarias, tiza y soporte de descanso.',
+        price: 'Bs 35.00',
+        icon: Sparkles,
+        iconBg: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60',
+      },
+      {
+        id: 'b2',
+        name: 'Tabla de Piqueo & Bebidas Especiales',
+        desc: 'Variedad de embutidos, quesos artesanales y bebidas para compartir con tu mesa.',
+        price: 'Bs 45.00',
+        icon: Utensils,
+        iconBg: 'bg-amber-100 text-amber-700 dark:bg-amber-950/70 dark:text-amber-300 border-amber-200 dark:border-amber-800/60',
+      },
+      {
+        id: 'b3',
+        name: 'Taco Desmontable Profesional',
+        desc: 'Taco de madera seleccionada con rosca de acero y suela laminada de alta precisión.',
+        price: 'Bs 180.00',
+        icon: ShoppingBag,
+        iconBg: 'bg-blue-100 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300 border-blue-200 dark:border-blue-800/60',
+      },
+    ],
+    cartCount: 2,
+    cartTotal: 'Bs 80.00',
+    features: [
+      {
+        title: 'Gestión y reserva de mesas',
+        desc: 'maxinego.app/tienda/club-billar-imperial para consultar turnos y reservar mesas.',
+      },
+      {
+        title: 'Catálogo de bar y snacks',
+        desc: 'Bebidas, piqueos y consumos del club con precios transparentes.',
+      },
+      {
+        title: 'Torneos y categorías',
+        desc: 'Información de torneos y alquiler de equipamiento especializado.',
+      },
+      {
+        title: 'Reservas por WhatsApp',
+        desc: 'Los jugadores eligen su mesa o consumiciones y confirman su visita por WhatsApp.',
+      },
+    ],
+    mobilePreview: {
+      headline: 'Turno listo para WhatsApp',
+      items: ['1x Mesa Profesional (1 hr)', '1x Tabla de Piqueo & Bebidas'],
+      total: 'Bs 80.00',
+    },
+  },
+  general: {
+    id: 'general' as const,
+    name: 'Market Central • Variedades & Abarrotes',
+    shortName: 'Market Central',
+    slug: 'market-central',
+    initials: 'MC',
+    rubro: 'Comercio General & Despensa',
+    badge: 'Comercio General',
+    badgeClass: 'bg-sky-50 text-sky-800 border-sky-200 dark:bg-sky-950/70 dark:text-sky-300 dark:border-sky-800/60',
+    location: 'Mercado Nuevo, Puesto 45 • Envíos a domicilio',
+    schedule: '07:30 - 21:00 • Lun a Dom',
+    headerGradient: 'from-sky-500/15 via-blue-500/10 to-indigo-500/10 dark:from-sky-950/40 dark:via-blue-950/30 dark:to-indigo-950/30',
+    avatarBg: 'bg-gradient-to-br from-sky-600 to-blue-700 text-white',
+    categories: ['Despensa Básica', 'Bebidas & Lácteos', 'Limpieza & Hogar'],
+    products: [
+      {
+        id: 'g1',
+        name: 'Pack Abarrotes de la Semana',
+        desc: 'Arroz seleccionado, fideos premium, aceite vegetal y condimentos esenciales.',
+        price: 'Bs 65.00',
+        icon: Package,
+        iconBg: 'bg-sky-100 text-sky-700 dark:bg-sky-950/70 dark:text-sky-300 border-sky-200 dark:border-sky-800/60',
+      },
+      {
+        id: 'g2',
+        name: 'Cesta de Frutas & Verduras Frescas',
+        desc: 'Selección fresca del día empacada y lista para consumo en el hogar.',
+        price: 'Bs 40.00',
+        icon: ShoppingBag,
+        iconBg: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60',
+      },
+      {
+        id: 'g3',
+        name: 'Combo Bebidas & Refrescos',
+        desc: 'Variedad de jugos naturales y refrescos en presentación familiar.',
+        price: 'Bs 30.00',
+        icon: StoreIcon,
+        iconBg: 'bg-blue-100 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300 border-blue-200 dark:border-blue-800/60',
+      },
+    ],
+    cartCount: 2,
+    cartTotal: 'Bs 105.00',
+    features: [
+      {
+        title: 'Vitrina digital para tiendas de barrio',
+        desc: 'maxinego.app/tienda/market-central para que los vecinos compren por celular.',
+      },
+      {
+        title: 'Precios actualizados en tiempo real',
+        desc: 'Actualiza stocks y precios en Bs sin imprimir listas de papel.',
+      },
+      {
+        title: 'Variedad multirubro',
+        desc: 'Organiza abarrotes, artículos del hogar, bebidas y productos de temporada.',
+      },
+      {
+        title: 'Pedidos inmediatos',
+        desc: 'Llegan organizados al WhatsApp para preparar el despacho rápidamente.',
+      },
+    ],
+    mobilePreview: {
+      headline: 'Pedido listo para WhatsApp',
+      items: ['1x Pack Abarrotes Semana', '1x Cesta Frutas Frescas'],
+      total: 'Bs 105.00',
+    },
+  },
+};
+
 export const PortalHome: React.FC = () => {
   const { user, profile, signOut } = useAuth();
   const { navigate } = useRouter();
   const [stores, setStores] = useState<Store[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [rubroFiltro, setRubroFiltro] = useState<'todos' | 'restaurante' | 'moda' | 'servicios' | 'general'>('todos');
-  const [previewTab, setPreviewTab] = useState<'restaurante' | 'moda' | 'servicios'>('restaurante');
+  const [previewTab, setPreviewTab] = useState<'restaurante' | 'moda' | 'servicios' | 'billar' | 'general'>('restaurante');
+  const [showcaseAddedIds, setShowcaseAddedIds] = useState<Record<string, boolean>>({});
+
+  const handleShowcaseAddToCart = (productId: string) => {
+    setShowcaseAddedIds((prev) => ({ ...prev, [productId]: true }));
+    setTimeout(() => {
+      setShowcaseAddedIds((prev) => ({ ...prev, [productId]: false }));
+    }, 1500);
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -435,36 +894,7 @@ export const PortalHome: React.FC = () => {
     }, 1500);
   };
 
-  // Controles del Carrusel de Comercios
-  const carouselRef = useRef<HTMLDivElement>(null);
-  const [canScrollLeft, setCanScrollLeft] = useState<boolean>(false);
-  const [canScrollRight, setCanScrollRight] = useState<boolean>(true);
 
-  const updateScrollButtons = useCallback(() => {
-    if (carouselRef.current) {
-      const { scrollLeft, scrollWidth, clientWidth } = carouselRef.current;
-      setCanScrollLeft(scrollLeft > 10);
-      setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 10);
-    }
-  }, []);
-
-  useEffect(() => {
-    updateScrollButtons();
-    window.addEventListener('resize', updateScrollButtons);
-    return () => window.removeEventListener('resize', updateScrollButtons);
-  }, [stores, updateScrollButtons]);
-
-  const scrollPrev = () => {
-    if (carouselRef.current) {
-      carouselRef.current.scrollBy({ left: -340, behavior: 'smooth' });
-    }
-  };
-
-  const scrollNext = () => {
-    if (carouselRef.current) {
-      carouselRef.current.scrollBy({ left: 340, behavior: 'smooth' });
-    }
-  };
 
   const handleCreateStore = () => {
     const contactSection = document.getElementById('contacto');
@@ -511,14 +941,29 @@ export const PortalHome: React.FC = () => {
       {/* ========================================================================= */}
       <section
         id="hero-section"
-        className="pt-1 sm:pt-4 md:pt-6 w-full relative"
+        className="w-full relative rounded-3xl sm:rounded-[2.5rem] overflow-hidden bg-[#F4F8FF] dark:bg-gradient-to-b dark:from-[#080d1f] dark:via-[#050916] dark:to-[#03050d] border border-blue-100/90 dark:border-blue-900/35 shadow-xl shadow-blue-900/5 dark:shadow-2xl p-6 sm:p-8 md:p-10 lg:p-12 xl:p-14 text-slate-900 dark:text-white transition-colors"
       >
+        {/* Luces y Halos Ambientales: Atenuados y suaves en modo claro, intensos de neón en modo oscuro */}
+        <div className="absolute -top-32 -left-32 w-96 h-96 bg-blue-400/10 dark:bg-cyan-500/20 rounded-full blur-[110px] pointer-events-none" />
+        <div className="absolute top-1/4 -right-20 w-[600px] h-[600px] bg-indigo-400/10 dark:bg-blue-600/25 rounded-full blur-[130px] pointer-events-none" />
+        <div className="absolute -bottom-24 left-1/4 w-80 h-80 bg-violet-400/10 dark:bg-purple-600/15 rounded-full blur-[110px] pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-blue-500/[0.02] to-indigo-500/[0.03] dark:via-cyan-500/[0.03] dark:to-blue-500/[0.05] pointer-events-none" />
+
+        {/* Textura de puntos sutil: apenas perceptible en modo claro, cibernética en modo oscuro */}
+        <div
+          className="absolute inset-0 opacity-40 dark:opacity-100 pointer-events-none"
+          style={{
+            backgroundImage: 'radial-gradient(rgba(37, 99, 235, 0.12) 1px, transparent 1px)',
+            backgroundSize: '32px 32px',
+          }}
+        />
+
         {/* Estilos específicos y animaciones sutiles encapsuladas para el Hero */}
         <style>{`
           @keyframes heroFadeUp {
             from {
               opacity: 0;
-              transform: translateY(8px);
+              transform: translateY(12px);
             }
             to {
               opacity: 1;
@@ -544,101 +989,33 @@ export const PortalHome: React.FC = () => {
             }
           }
 
+          @keyframes floatSlow {
+            0%, 100% {
+              transform: translateY(0px);
+            }
+            50% {
+              transform: translateY(-8px);
+            }
+          }
+
           .hero-anim-item-1 { animation: heroFadeUp 0.45s cubic-bezier(0.16, 1, 0.3, 1) 0.05s both; }
           .hero-anim-item-2 { animation: heroFadeUp 0.45s cubic-bezier(0.16, 1, 0.3, 1) 0.15s both; }
           .hero-anim-item-3 { animation: heroFadeUp 0.45s cubic-bezier(0.16, 1, 0.3, 1) 0.25s both; }
           .hero-anim-item-4 { animation: heroFadeUp 0.45s cubic-bezier(0.16, 1, 0.3, 1) 0.35s both; }
           .hero-anim-item-5 { animation: heroFadeUp 0.45s cubic-bezier(0.16, 1, 0.3, 1) 0.45s both; }
-          .hero-anim-item-6 { animation: heroFadeUp 0.45s cubic-bezier(0.16, 1, 0.3, 1) 0.55s both; }
           .hero-anim-mockup { animation: heroFadeUp 0.55s cubic-bezier(0.16, 1, 0.3, 1) 0.35s both; }
 
-          .hero-benefit-stagger-1 { animation: heroFadeUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) 0.65s both; }
-          .hero-benefit-stagger-2 { animation: heroFadeUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) 0.75s both; }
-          .hero-benefit-stagger-3 { animation: heroFadeUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) 0.85s both; }
-          .hero-benefit-stagger-4 { animation: heroFadeUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) 0.95s both; }
-
           .hero-gradient-text-gleam {
-            background-image: linear-gradient(110deg, #2563eb 0%, #3b82f6 28%, #93c5fd 46%, #3b82f6 60%, #4f46e5 82%, #6366f1 100%);
+            background-image: linear-gradient(110deg, #1769ff 0%, #2563eb 30%, #7c3aed 60%, #1769ff 100%);
             background-size: 250% 100%;
             animation: heroGleamSweep 8s ease-in-out infinite;
           }
           :is(.dark .hero-gradient-text-gleam) {
-            background-image: linear-gradient(110deg, #60a5fa 0%, #93c5fd 28%, #e0e7ff 46%, #93c5fd 60%, #818cf8 82%, #a5b4fc 100%);
+            background-image: linear-gradient(110deg, #38bdf8 0%, #60a5fa 30%, #a78bfa 60%, #38bdf8 100%);
           }
 
           .hero-cta-sheen-sweep {
             animation: heroCtaSheen 7s ease-in-out infinite;
-          }
-
-          /* Animaciones ambientales sutiles compartidas para Descubrimiento y CTA Final */
-          @keyframes ambientDriftA {
-            0% {
-              transform: translate(0, 0) scale(1);
-              opacity: 0.65;
-            }
-            50% {
-              transform: translate(24px, -18px) scale(1.1);
-              opacity: 0.9;
-            }
-            100% {
-              transform: translate(-18px, 14px) scale(0.95);
-              opacity: 0.7;
-            }
-          }
-
-          @keyframes ambientDriftB {
-            0% {
-              transform: translate(0, 0) scale(1);
-              opacity: 0.6;
-            }
-            50% {
-              transform: translate(-26px, 18px) scale(1.12);
-              opacity: 0.85;
-            }
-            100% {
-              transform: translate(18px, -14px) scale(0.92);
-              opacity: 0.65;
-            }
-          }
-
-          @keyframes subtleRadarWave {
-            0% {
-              transform: scale(0.97);
-              opacity: 0.3;
-            }
-            50% {
-              transform: scale(1.02);
-              opacity: 0.5;
-            }
-            100% {
-              transform: scale(0.98);
-              opacity: 0.35;
-            }
-          }
-
-          @keyframes blockCtaSheen {
-            0%, 75% {
-              transform: translateX(-160%) skewX(-20deg);
-            }
-            85%, 100% {
-              transform: translateX(260%) skewX(-20deg);
-            }
-          }
-
-          .anim-ambient-glow-1 {
-            animation: ambientDriftA 20s ease-in-out infinite alternate;
-          }
-
-          .anim-ambient-glow-2 {
-            animation: ambientDriftB 24s ease-in-out infinite alternate;
-          }
-
-          .anim-radar-wave {
-            animation: subtleRadarWave 16s ease-in-out infinite alternate;
-          }
-
-          .anim-block-cta-sheen {
-            animation: blockCtaSheen 8s ease-in-out infinite;
           }
 
           @media (prefers-reduced-motion: reduce) {
@@ -647,18 +1024,9 @@ export const PortalHome: React.FC = () => {
             .hero-anim-item-3,
             .hero-anim-item-4,
             .hero-anim-item-5,
-            .hero-anim-item-6,
             .hero-anim-mockup,
-            .hero-benefit-stagger-1,
-            .hero-benefit-stagger-2,
-            .hero-benefit-stagger-3,
-            .hero-benefit-stagger-4,
             .hero-gradient-text-gleam,
-            .hero-cta-sheen-sweep,
-            .anim-ambient-glow-1,
-            .anim-ambient-glow-2,
-            .anim-radar-wave,
-            .anim-block-cta-sheen {
+            .hero-cta-sheen-sweep {
               animation: none !important;
               opacity: 1 !important;
               transform: none !important;
@@ -666,176 +1034,157 @@ export const PortalHome: React.FC = () => {
           }
         `}</style>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-center">
-          {/* Columna Izquierda: Mensaje Comercial Claro y Directo */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 sm:gap-12 lg:gap-10 xl:gap-14 items-center relative z-10">
+          {/* Columna Izquierda: Mensaje Comercial Claro, Directo y de Gran Escala */}
           <div className="lg:col-span-6 space-y-6 sm:space-y-7 text-left">
-            {/* 1. Distintivo de identidad */}
-            <div className="hero-anim-item-1 inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-50 dark:bg-blue-950/60 border border-blue-200/80 dark:border-blue-800/60 text-blue-700 dark:text-blue-300 text-xs font-semibold tracking-wide shadow-2xs">
-              <span className="w-2 h-2 rounded-full bg-blue-600 dark:bg-blue-400 animate-pulse" />
-              <span>Plataforma para Comercios y Negocios Locales</span>
+            {/* 1. Distintivo de identidad / Kicker elegante */}
+            <div className="hero-anim-item-1 inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-blue-50/90 dark:bg-blue-950/70 border border-blue-200/80 dark:border-cyan-400/35 text-blue-700 dark:text-cyan-300 text-xs font-semibold tracking-wide shadow-2xs dark:shadow-[0_0_15px_rgba(34,211,238,0.2)] backdrop-blur-md">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-600 dark:bg-cyan-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-600 dark:bg-cyan-400" />
+              </span>
+              <span className="flex items-center gap-1.5 font-bold">
+                <Sparkles className="w-3.5 h-3.5 text-blue-600 dark:text-cyan-400" />
+                Plataforma para comercios y negocios locales
+              </span>
             </div>
 
-            {/* 2. Mensaje Principal del Hero (Literal solicitado) */}
-            <h1 className="hero-anim-item-2 text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-slate-900 dark:text-white leading-[1.1]">
-              Tu comercio local,{' '}
-              <span className="relative inline-block hero-gradient-text-gleam bg-clip-text text-transparent font-extrabold">
-                ahora en digital.
-              </span>
+            {/* 2. Titular Principal (Máximo contraste y legibilidad inmediata en Modo Claro y Modo Oscuro) */}
+            <h1 className="hero-anim-item-2 text-3xl sm:text-4xl lg:text-5xl xl:text-[3.25rem] font-black tracking-tight text-[#14213D] dark:text-white leading-[1.12]">
+              Tu comercio local con{' '}
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#1769FF] via-[#2563EB] to-[#7C3AED] dark:from-cyan-400 dark:via-blue-400 dark:to-indigo-300 dark:drop-shadow-[0_0_25px_rgba(56,189,248,0.35)]">
+                tienda digital propia
+              </span>{' '}
+              y pedidos por WhatsApp.
             </h1>
 
-            {/* 3. Texto Complementario del Hero (Literal solicitado) */}
-            <p className="hero-anim-item-3 text-base sm:text-lg text-slate-600 dark:text-slate-300 leading-relaxed font-normal max-w-xl">
-              Crea tu tienda online, gestiona tu catálogo de productos y servicios, atiende a tus clientes y administra pedidos de forma ágil y moderna.
+            {/* 3. Subtítulo (Legible, nítido y balanceado) */}
+            <p className="hero-anim-item-3 text-base sm:text-lg text-[#475569] dark:text-slate-300 leading-relaxed font-normal max-w-xl">
+              Publica tu catálogo de productos y servicios, comparte tu propio enlace y atiende a tus clientes de manera directa, rápida y profesional.
             </p>
 
-            {/* 4. Botones de Acción (CTAs Principales) */}
-            <div className="hero-anim-item-4 pt-1 flex flex-wrap items-center gap-3.5">
+            {/* 4. Botones de Acción (CTAs Principales de Alto Contraste) */}
+            <div className="hero-anim-item-4 flex flex-col sm:flex-row items-stretch sm:items-center gap-3.5 pt-1">
               <button
                 type="button"
                 onClick={handleCreateStore}
-                className="group relative overflow-hidden inline-flex items-center gap-2.5 px-6 py-3.5 rounded-xl bg-blue-600 hover:bg-blue-700 hover:-translate-y-0.5 text-white text-sm font-semibold shadow-xs hover:shadow-lg hover:shadow-blue-500/25 active:translate-y-0 transition-all duration-200 cursor-pointer"
+                className="group relative overflow-hidden inline-flex items-center justify-center gap-2.5 px-7 py-3.5 sm:py-4 rounded-xl bg-[#1769FF] hover:bg-[#0f5adb] active:bg-[#0d4ec2] text-white text-sm sm:text-base font-bold shadow-[0_4px_16px_rgba(23,105,255,0.28)] hover:shadow-[0_6px_22px_rgba(23,105,255,0.38)] active:scale-[0.98] transition-all duration-200 cursor-pointer min-h-[48px] dark:bg-gradient-to-r dark:from-blue-600 dark:via-blue-500 dark:to-cyan-500 dark:hover:from-blue-500 dark:hover:to-cyan-400 dark:shadow-[0_0_25px_rgba(37,99,235,0.45)] dark:hover:shadow-[0_0_35px_rgba(34,211,238,0.6)]"
               >
-                {/* Reflejo de luz ocasional sutil */}
-                <span
-                  aria-hidden="true"
-                  className="pointer-events-none absolute inset-0 w-1/3 h-full bg-gradient-to-r from-transparent via-white/20 to-transparent hero-cta-sheen-sweep"
-                />
-                <StoreIcon className="w-4 h-4 relative z-10" />
-                <span className="relative z-10">Crear mi tienda</span>
-                <ArrowRight className="w-4 h-4 relative z-10 transition-transform duration-200 group-hover:translate-x-1" />
+                <StoreIcon className="w-4 h-4 shrink-0" />
+                <span>Crear mi tienda</span>
+                <ArrowRight className="w-4 h-4 shrink-0 transition-transform duration-200 group-hover:translate-x-1" />
+                <span className="hero-cta-sheen-sweep absolute inset-y-0 w-16 bg-gradient-to-r from-transparent via-white/30 to-transparent pointer-events-none" />
               </button>
 
               <button
                 type="button"
                 onClick={handleScrollToStores}
-                className="group inline-flex items-center gap-2 px-5 py-3.5 rounded-xl bg-slate-100 dark:bg-[#0e172d] hover:bg-slate-200/90 dark:hover:bg-[#14213d] text-slate-800 dark:text-slate-200 text-sm font-semibold border border-slate-200/90 dark:border-[#1d2d4e] transition-all duration-200 cursor-pointer active:scale-[0.98] hover:border-slate-300 dark:hover:border-[#273a62] hover:-translate-y-0.5 shadow-2xs"
+                className="group inline-flex items-center justify-center gap-2 px-6 py-3.5 sm:py-4 rounded-xl bg-white hover:bg-slate-50 text-[#14213D] hover:text-[#1769FF] text-sm sm:text-base font-semibold border border-slate-200/90 hover:border-slate-300 shadow-xs backdrop-blur-md transition-all duration-200 cursor-pointer min-h-[48px] dark:bg-slate-900/70 dark:hover:bg-slate-800/90 dark:text-slate-200 dark:hover:text-white dark:border-slate-700/80 dark:hover:border-slate-500/80"
               >
-                <Compass className="w-4 h-4 text-slate-500 dark:text-slate-400 transition-transform duration-300 group-hover:rotate-45" />
+                <Compass className="w-4 h-4 text-[#1769FF] dark:text-cyan-400 transition-transform duration-300 group-hover:rotate-45 shrink-0" />
                 <span>Explorar tiendas</span>
               </button>
             </div>
 
-            {/* 5. Micro-indicadores de valor para el comerciante (con micro-interacción visual sobre el mockup) */}
-            <div className="hero-anim-item-5 pt-2 grid grid-cols-3 gap-2 sm:gap-3 border-t border-slate-200/80 dark:border-[#1c2a47] text-xs text-slate-600 dark:text-slate-300">
-              <div
-                onMouseEnter={() => setMockupHighlightZone('brand')}
-                onMouseLeave={() => setMockupHighlightZone(null)}
-                className={`group flex items-center gap-1.5 p-1.5 rounded-lg transition-all duration-200 cursor-default ${
-                  mockupHighlightZone === 'brand'
-                    ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 ring-1 ring-blue-300 dark:ring-blue-700/60'
-                    : 'hover:bg-slate-50 dark:hover:bg-[#0e172d]'
-                }`}
-              >
-                <Check className={`w-4 h-4 shrink-0 transition-transform duration-200 ${mockupHighlightZone === 'brand' ? 'scale-110 text-blue-600 dark:text-blue-400' : 'text-emerald-500'}`} />
-                <span className="font-medium text-[11px] sm:text-xs">Tu marca propia</span>
-              </div>
-
-              <div
-                onMouseEnter={() => setMockupHighlightZone('whatsapp')}
-                onMouseLeave={() => setMockupHighlightZone(null)}
-                className={`group flex items-center gap-1.5 p-1.5 rounded-lg transition-all duration-200 cursor-default ${
-                  mockupHighlightZone === 'whatsapp'
-                    ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 ring-1 ring-emerald-300 dark:ring-emerald-700/60'
-                    : 'hover:bg-slate-50 dark:hover:bg-[#0e172d]'
-                }`}
-              >
-                <Check className={`w-4 h-4 shrink-0 transition-transform duration-200 ${mockupHighlightZone === 'whatsapp' ? 'scale-110 text-emerald-600 dark:text-emerald-400' : 'text-emerald-500'}`} />
-                <span className="font-medium text-[11px] sm:text-xs">Pedidos por WhatsApp</span>
-              </div>
-
-              <div
-                onMouseEnter={() => setMockupHighlightZone('commission')}
-                onMouseLeave={() => setMockupHighlightZone(null)}
-                className={`group flex items-center gap-1.5 p-1.5 rounded-lg transition-all duration-200 cursor-default ${
-                  mockupHighlightZone === 'commission'
-                    ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 ring-1 ring-blue-300 dark:ring-blue-700/60'
-                    : 'hover:bg-slate-50 dark:hover:bg-[#0e172d]'
-                }`}
-              >
-                <Check className={`w-4 h-4 shrink-0 transition-transform duration-200 ${mockupHighlightZone === 'commission' ? 'scale-110 text-blue-600 dark:text-blue-400' : 'text-emerald-500'}`} />
-                <span className="font-medium text-[11px] sm:text-xs">Sin comisiones por venta</span>
-              </div>
-            </div>
-
-            {/* 6. Nuevo Bloque Aprobado: "¿Qué ganas al tener tu negocio en digital?" */}
-            <div className="hero-anim-item-6 pt-2 border-t border-slate-200/80 dark:border-[#1c2a47] space-y-3">
-              <div className="flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-blue-600 dark:bg-blue-400" />
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                  ¿Qué ganas al tener tu negocio en digital?
-                </h3>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
-                {/* Beneficio 1 */}
-                <div className="hero-benefit-stagger-1 p-2.5 sm:p-3 rounded-xl bg-slate-50/80 dark:bg-[#0d162b] border border-slate-200/80 dark:border-[#1c2a47] hover:border-blue-200 dark:hover:border-blue-600/50 transition-colors flex items-start gap-2.5">
-                  <div className="w-7 h-7 rounded-lg bg-blue-100 dark:bg-blue-950/70 text-blue-700 dark:text-blue-300 dark:border dark:border-blue-800/60 flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
-                    <Clock className="w-3.5 h-3.5" />
+            {/* 5. Pilares de valor comercial interactivos con el mockup */}
+            <div className="hero-anim-item-5 pt-3 border-t border-slate-200/80 dark:border-slate-800/80">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3">
+                {/* Pilar 1: Marca propia */}
+                <div
+                  onMouseEnter={() => setMockupHighlightZone('brand')}
+                  onMouseLeave={() => setMockupHighlightZone(null)}
+                  className={`group p-3 rounded-xl border transition-all duration-200 cursor-default ${
+                    mockupHighlightZone === 'brand'
+                      ? 'bg-blue-50/90 border-[#1769FF] ring-1 ring-[#1769FF]/50 shadow-sm dark:bg-blue-950/80 dark:border-cyan-400/80 dark:shadow-[0_0_15px_rgba(34,211,238,0.25)] dark:ring-cyan-400/60'
+                      : 'bg-white border-slate-200/90 hover:border-blue-200 shadow-xs dark:bg-slate-900/60 dark:border-slate-800/80 dark:hover:border-slate-700'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <div
+                      className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
+                        mockupHighlightZone === 'brand'
+                          ? 'bg-[#1769FF] text-white dark:bg-cyan-500 dark:text-slate-950'
+                          : 'bg-blue-50 text-[#1769FF] border border-blue-100 dark:bg-blue-900/50 dark:text-cyan-400 dark:border-blue-700/50'
+                      }`}
+                    >
+                      <StoreIcon className="w-3.5 h-3.5" />
+                    </div>
+                    <h3 className="text-xs font-bold text-[#14213D] dark:text-white leading-tight">
+                      Tu marca propia
+                    </h3>
                   </div>
-                  <div className="min-w-0 space-y-0.5">
-                    <h4 className="text-xs font-bold text-slate-900 dark:text-white leading-snug">
-                      Tu negocio disponible 24/7
-                    </h4>
-                    <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-normal">
-                      Tus clientes pueden consultar tu tienda cuando quieran.
-                    </p>
-                  </div>
+                  <p className="text-[11px] text-[#475569] dark:text-slate-400 leading-snug">
+                    Logotipo, identidad visual y enlace web exclusivo para tu negocio.
+                  </p>
                 </div>
 
-                {/* Beneficio 2 */}
-                <div className="hero-benefit-stagger-2 p-2.5 sm:p-3 rounded-xl bg-slate-50/80 dark:bg-[#0d162b] border border-slate-200/80 dark:border-[#1c2a47] hover:border-blue-200 dark:hover:border-indigo-600/50 transition-colors flex items-start gap-2.5">
-                  <div className="w-7 h-7 rounded-lg bg-indigo-100 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 dark:border dark:border-indigo-800/60 flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
-                    <Search className="w-3.5 h-3.5" />
+                {/* Pilar 2: Pedidos por WhatsApp */}
+                <div
+                  onMouseEnter={() => setMockupHighlightZone('whatsapp')}
+                  onMouseLeave={() => setMockupHighlightZone(null)}
+                  className={`group p-3 rounded-xl border transition-all duration-200 cursor-default ${
+                    mockupHighlightZone === 'whatsapp'
+                      ? 'bg-emerald-50/90 border-emerald-400/80 ring-1 ring-emerald-400/60 shadow-sm dark:bg-emerald-950/80 dark:border-emerald-400/80 dark:shadow-[0_0_15px_rgba(52,211,153,0.25)] dark:ring-emerald-400/60'
+                      : 'bg-white border-slate-200/90 hover:border-emerald-200 shadow-xs dark:bg-slate-900/60 dark:border-slate-800/80 dark:hover:border-slate-700'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <div
+                      className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
+                        mockupHighlightZone === 'whatsapp'
+                          ? 'bg-emerald-600 text-white dark:bg-emerald-500 dark:text-slate-950'
+                          : 'bg-emerald-50 text-emerald-600 border border-emerald-100 dark:bg-emerald-900/50 dark:text-emerald-400 dark:border-emerald-700/50'
+                      }`}
+                    >
+                      <MessageCircle className="w-3.5 h-3.5" />
+                    </div>
+                    <h3 className="text-xs font-bold text-[#14213D] dark:text-white leading-tight">
+                      Pedidos por WhatsApp
+                    </h3>
                   </div>
-                  <div className="min-w-0 space-y-0.5">
-                    <h4 className="text-xs font-bold text-slate-900 dark:text-white leading-snug">
-                      Más oportunidades de ser encontrado
-                    </h4>
-                    <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-normal">
-                      Tu negocio puede mostrar sus productos y servicios online.
-                    </p>
-                  </div>
+                  <p className="text-[11px] text-[#475569] dark:text-slate-400 leading-snug">
+                    Detalle ordenado con productos y total, listo para despachar al instante.
+                  </p>
                 </div>
 
-                {/* Beneficio 3 */}
-                <div className="hero-benefit-stagger-3 p-2.5 sm:p-3 rounded-xl bg-slate-50/80 dark:bg-[#0d162b] border border-slate-200/80 dark:border-[#1c2a47] hover:border-blue-200 dark:hover:border-emerald-600/50 transition-colors flex items-start gap-2.5">
-                  <div className="w-7 h-7 rounded-lg bg-emerald-100 dark:bg-emerald-950/70 text-emerald-700 dark:text-emerald-300 dark:border dark:border-emerald-800/60 flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
-                    <MessageCircle className="w-3.5 h-3.5" />
+                {/* Pilar 3: Venta directa sin comisiones */}
+                <div
+                  onMouseEnter={() => setMockupHighlightZone('commission')}
+                  onMouseLeave={() => setMockupHighlightZone(null)}
+                  className={`group p-3 rounded-xl border transition-all duration-200 cursor-default ${
+                    mockupHighlightZone === 'commission'
+                      ? 'bg-purple-50/90 border-[#7C3AED] ring-1 ring-[#7C3AED]/50 shadow-sm dark:bg-blue-950/80 dark:border-cyan-400/80 dark:shadow-[0_0_15px_rgba(34,211,238,0.25)] dark:ring-cyan-400/60'
+                      : 'bg-white border-slate-200/90 hover:border-purple-200 shadow-xs dark:bg-slate-900/60 dark:border-slate-800/80 dark:hover:border-slate-700'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <div
+                      className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
+                        mockupHighlightZone === 'commission'
+                          ? 'bg-[#7C3AED] text-white dark:bg-cyan-500 dark:text-slate-950'
+                          : 'bg-purple-50 text-[#7C3AED] border border-purple-100 dark:bg-blue-900/50 dark:text-cyan-400 dark:border-blue-700/50'
+                      }`}
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                    </div>
+                    <h3 className="text-xs font-bold text-[#14213D] dark:text-white leading-tight">
+                      Sin comisiones
+                    </h3>
                   </div>
-                  <div className="min-w-0 space-y-0.5">
-                    <h4 className="text-xs font-bold text-slate-900 dark:text-white leading-snug">
-                      Atención directa
-                    </h4>
-                    <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-normal">
-                      Recibe consultas y pedidos directamente por WhatsApp.
-                    </p>
-                  </div>
-                </div>
-
-                {/* Beneficio 4 */}
-                <div className="hero-benefit-stagger-4 p-2.5 sm:p-3 rounded-xl bg-slate-50/80 dark:bg-[#0d162b] border border-slate-200/80 dark:border-[#1c2a47] hover:border-blue-200 dark:hover:border-amber-600/50 transition-colors flex items-start gap-2.5">
-                  <div className="w-7 h-7 rounded-lg bg-amber-100 dark:bg-amber-950/70 text-amber-700 dark:text-amber-300 dark:border dark:border-amber-800/60 flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
-                    <Sparkles className="w-3.5 h-3.5" />
-                  </div>
-                  <div className="min-w-0 space-y-0.5">
-                    <h4 className="text-xs font-bold text-slate-900 dark:text-white leading-snug">
-                      Tu propia identidad digital
-                    </h4>
-                    <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-normal">
-                      Tu marca, tus productos y tu forma de atender.
-                    </p>
-                  </div>
+                  <p className="text-[11px] text-[#475569] dark:text-slate-400 leading-snug">
+                    El 100% de tus ventas es tuyo, sin comisiones por producto ni cobros ocultos.
+                  </p>
                 </div>
               </div>
             </div>
 
             {/* Chip de sesión activa si existe usuario */}
             {user && (
-              <div className="p-3 rounded-xl bg-slate-50 dark:bg-[#0e172d] border border-slate-200 dark:border-[#1c2a47] flex items-center justify-between gap-3 text-xs">
+              <div className="p-3 rounded-xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 text-xs shadow-xs">
                 <div className="flex items-center gap-2 min-w-0">
-                  <UserCheck className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                  <UserCheck className="w-4 h-4 text-[#1769FF] dark:text-cyan-400 shrink-0" />
                   <span className="text-slate-500 dark:text-slate-400">Conectado como:</span>
-                  <span className="font-semibold text-slate-900 dark:text-white truncate">{user.email}</span>
+                  <span className="font-semibold text-[#14213D] dark:text-white truncate">{user.email}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   {profile === 'store_admin' && user.tenantId && (
@@ -848,7 +1197,7 @@ export const PortalHome: React.FC = () => {
                   )}
                   <button
                     onClick={() => signOut()}
-                    className="text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition cursor-pointer"
+                    className="text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition cursor-pointer"
                   >
                     Salir
                   </button>
@@ -857,421 +1206,352 @@ export const PortalHome: React.FC = () => {
             )}
           </div>
 
-          {/* Columna Derecha: Mockup Interactivo de Tienda Pública MAXINEGO */}
+          {/* Columna Derecha: Mockup de Computadora Portátil / Laptop con Badges Flotantes */}
           <div
-            className="lg:col-span-6 relative hero-anim-mockup"
+            className="lg:col-span-6 relative hero-anim-mockup w-full max-w-xl mx-auto lg:max-w-none pt-4 lg:pt-0"
             onMouseEnter={() => setIsHeroPaused(true)}
             onMouseLeave={() => setIsHeroPaused(false)}
           >
-            {/* Halo ambiental suave */}
-            <div className="absolute -inset-2 bg-gradient-to-tr from-blue-500/10 via-indigo-500/10 to-teal-500/10 rounded-3xl blur-2xl pointer-events-none opacity-80" />
+            {/* Halo ambiental suave y difuso detrás de la laptop */}
+            <div className="absolute -inset-4 bg-gradient-to-tr from-blue-400/15 via-indigo-400/10 to-violet-400/15 dark:from-cyan-500/20 dark:via-blue-600/25 dark:to-purple-600/20 rounded-3xl blur-2xl pointer-events-none opacity-70 dark:opacity-80" />
 
-            {/* Ventana tipo Navegador / Aplicación */}
-            <div className="relative rounded-2xl bg-white dark:bg-[#0b1326] border border-slate-200 dark:border-[#1c2a47] shadow-xl overflow-hidden">
-              {/* Barra superior tipo navegador */}
-              <div className="px-4 py-3 bg-slate-50 dark:bg-[#0e172d] border-b border-slate-200 dark:border-[#1c2a47] flex items-center justify-between gap-2">
-                {/* Tres controles visuales + URL simulada */}
-                <div className="flex items-center gap-2 min-w-0">
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <div className="w-3 h-3 rounded-full bg-rose-400/90" />
-                    <div className="w-3 h-3 rounded-full bg-amber-400/90" />
-                    <div className="w-3 h-3 rounded-full bg-emerald-400/90" />
-                  </div>
-                  <div className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-white dark:bg-[#080d1a] border border-slate-200/80 dark:border-[#1c2a47] text-[11px] font-mono text-slate-600 dark:text-slate-300 min-w-0 max-w-[170px] sm:max-w-[240px] truncate shadow-2xs">
-                    <Globe className="w-3 h-3 text-slate-400 shrink-0" />
-                    <span className="truncate">maxinego.app/tienda/{heroShowcase.slug}</span>
-                  </div>
+            {/* ================================================================= */}
+            {/* BADGE FLOTANTE 1 (Superior Derecho): Notificación WhatsApp        */}
+            {/* ================================================================= */}
+            <div className="absolute -top-4 -right-2 sm:-top-5 sm:-right-4 z-20 bg-white/95 dark:bg-[#0D1527]/95 backdrop-blur-xl border border-emerald-200/90 dark:border-emerald-500/30 rounded-2xl p-2.5 sm:p-3 shadow-[0_10px_25px_rgba(16,185,129,0.12)] dark:shadow-[0_16px_35px_rgba(0,0,0,0.7),0_0_15px_rgba(16,185,129,0.15)] flex items-center gap-3 animate-[floatSlow_6s_ease-in-out_infinite]">
+              <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400 flex items-center justify-center border border-emerald-200 dark:border-emerald-500/40 shrink-0 shadow-xs">
+                <MessageCircle className="w-5 h-5" />
+              </div>
+              <div className="text-left min-w-0 pr-1">
+                <div className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
+                  <span>Pedidos en tiempo real</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse" />
                 </div>
-
-                {/* Indicador "● Abierto ahora" */}
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/50">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    <span>Abierto ahora</span>
-                  </span>
+                <div className="text-xs font-semibold text-slate-900 dark:text-white truncate">
+                  Directo a tu WhatsApp
+                </div>
+                <div className="text-[10px] text-slate-500 dark:text-slate-400">
+                  Notificación instantánea
                 </div>
               </div>
+            </div>
 
-              {/* Contenido Visual de la Tienda (con Transición Suave Fade/Slide) */}
-              <div
-                className={`transition-all duration-350 ease-out ${
-                  isHeroTransitioning
-                    ? 'opacity-0 translate-y-2 scale-[0.995]'
-                    : 'opacity-100 translate-y-0 scale-100'
-                }`}
-              >
-                {/* Portada y Cabecera del Comercio (con realce visual interactivo para 'Tu marca propia') */}
-                <div
-                  className={`p-4 sm:p-5 bg-gradient-to-r ${heroShowcase.headerGradient} border-b border-slate-100 dark:border-[#1c2a47] transition-all duration-300 ${
-                    mockupHighlightZone === 'brand'
-                      ? 'ring-2 ring-blue-500/70 dark:ring-blue-400/80 bg-blue-50/60 dark:bg-blue-950/50 shadow-sm'
-                      : ''
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3.5 min-w-0">
-                      {/* Logo / Avatar con micro-realce sutil al interactuar con el beneficio */}
-                      <div
-                        className={`w-12 h-12 rounded-xl ${heroShowcase.avatarBg} font-extrabold text-base flex items-center justify-center shadow-sm shrink-0 transition-all duration-300 ${
-                          mockupHighlightZone === 'brand'
-                            ? 'scale-105 ring-2 ring-blue-500/80 shadow-md'
-                            : ''
-                        }`}
-                      >
-                        {heroShowcase.initials}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h3
-                            className={`text-base sm:text-lg font-bold truncate transition-colors duration-300 ${
-                              mockupHighlightZone === 'brand'
-                                ? 'text-blue-700 dark:text-blue-300'
-                                : 'text-slate-900 dark:text-white'
-                            }`}
-                          >
-                            {heroShowcase.name}
-                          </h3>
-                          <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase shrink-0 ${heroShowcase.badgeBg} ${heroShowcase.badgeText}`}>
-                            {heroShowcase.badge}
-                          </span>
-                        </div>
-                        <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-2 mt-0.5 flex-wrap">
-                          <span className="flex items-center gap-1 truncate">
-                            <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
-                            <span className="truncate">{heroShowcase.location}</span>
-                          </span>
-                          <span>•</span>
-                          <span className="flex items-center gap-1 shrink-0">
-                            <Clock className="w-3 h-3 text-slate-400 shrink-0" />
-                            <span>{heroShowcase.schedule}</span>
-                          </span>
-                        </div>
-                      </div>
-                    </div>
+            {/* ================================================================= */}
+            {/* BADGE FLOTANTE 2 (Lateral Izquierdo): 0% Comisiones              */}
+            {/* ================================================================= */}
+            <div className="absolute top-1/3 -left-3 sm:-left-5 z-20 hidden sm:flex bg-white/95 dark:bg-[#0D1527]/95 backdrop-blur-xl border border-blue-200/90 dark:border-cyan-500/30 rounded-2xl p-2.5 sm:p-3 shadow-[0_10px_25px_rgba(20,33,61,0.08)] dark:shadow-[0_16px_35px_rgba(0,0,0,0.7),0_0_15px_rgba(6,182,212,0.15)] items-center gap-2.5 animate-[floatSlow_7s_ease-in-out_infinite_1s]">
+              <div className="w-8 h-8 rounded-xl bg-blue-50 text-[#1769FF] border border-blue-200 dark:bg-cyan-500/20 dark:text-cyan-400 dark:border-cyan-500/40 flex items-center justify-center shrink-0">
+                <Zap className="w-4 h-4" />
+              </div>
+              <div className="text-left">
+                <div className="text-xs font-bold text-[#14213D] dark:text-white leading-tight">
+                  0% Comisiones
+                </div>
+                <div className="text-[10px] text-[#1769FF] dark:text-cyan-300 font-medium">
+                  100% de tus ventas es tuyo
+                </div>
+              </div>
+            </div>
 
-                    {/* Botón directo a la tienda pública */}
-                    {!heroShowcase.isDemo && (
-                      <button
-                        type="button"
-                        onClick={() => navigate(`/tienda/${heroShowcase.slug}`)}
-                        title="Abrir tienda completa"
-                        className="p-2 rounded-xl bg-white/80 dark:bg-[#121f3a] hover:bg-white dark:hover:bg-[#18294d] text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-[#21345d] shadow-2xs transition-all cursor-pointer shrink-0 hidden sm:flex items-center gap-1 text-[11px] font-semibold"
-                      >
-                        <span>Ver tienda</span>
-                        <ExternalLink className="w-3 h-3" />
-                      </button>
-                    )}
+            {/* ================================================================= */}
+            {/* HARDWARE MOCKUP: Computadora Portátil / Laptop                     */}
+            {/* ================================================================= */}
+            <div className="relative">
+              {/* Tapa Superior / Bisel de la Pantalla */}
+              <div className="relative rounded-t-2xl sm:rounded-t-3xl bg-slate-100 dark:bg-[#0B1120] border-2 border-slate-300/80 dark:border-slate-700/80 shadow-2xl dark:shadow-[0_25px_60px_rgba(0,0,0,0.85)] dark:ring-1 dark:ring-white/10 overflow-hidden transition-colors">
+                {/* Cámara Web en el centro del marco superior */}
+                <div className="w-2 h-2 rounded-full bg-slate-400 dark:bg-slate-800 ring-1 ring-slate-300 dark:ring-slate-700 mx-auto mt-1.5 mb-1" />
+
+                {/* Barra de Navegador dentro de la Pantalla */}
+                <div className="px-3 sm:px-4 py-2 sm:py-2.5 bg-slate-100/95 dark:bg-[#080D1A] border-b border-slate-200/90 dark:border-slate-800/90 flex items-center justify-between gap-2 transition-colors">
+                  {/* Botones de control de ventana de Mac */}
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-[#ff5f56] shadow-sm" />
+                    <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-[#ffbd2e] shadow-sm" />
+                    <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-[#27c93f] shadow-sm" />
+                  </div>
+
+                  {/* Barra de dirección URL */}
+                  <div className="flex items-center gap-1.5 px-3 py-1 rounded-md bg-white dark:bg-[#0F172A] border border-slate-200/90 dark:border-slate-700/70 text-[11px] font-mono text-slate-700 dark:text-slate-300 min-w-0 max-w-[200px] sm:max-w-[280px] truncate shadow-2xs">
+                    <Lock className="w-3 h-3 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                    <span className="truncate">maxinego.app/tienda/{heroShowcase.slug}</span>
+                  </div>
+
+                  {/* Indicador "● Abierto ahora" */}
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/80 dark:bg-emerald-950/70 dark:text-emerald-300 dark:border-emerald-700/50">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse" />
+                      <span>Abierto ahora</span>
+                    </span>
                   </div>
                 </div>
 
-                {/* Categorías de la Tienda */}
-                <div className="px-4 py-2.5 bg-slate-50/70 dark:bg-[#0e172d] border-b border-slate-100 dark:border-[#1c2a47] flex items-center gap-2 overflow-x-auto text-xs no-scrollbar">
-                  {heroShowcase.categories.map((catName, idx) => (
-                    <span
-                      key={idx}
-                      className={`px-3 py-1 rounded-lg text-xs font-semibold shrink-0 cursor-default transition ${
-                        idx === 0
-                          ? 'bg-blue-600 text-white shadow-2xs'
-                          : 'bg-white dark:bg-[#121f3a] text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-[#21345d]'
-                      }`}
-                    >
-                      {catName}
-                    </span>
-                  ))}
-                </div>
-
-                {/* Lista de Productos de la Vitrina (con micro-señal sutil de compra directa al interactuar con 'Sin comisiones por venta') */}
+                {/* Contenido Visual de la Tienda (con Transición Suave Fade/Slide) */}
                 <div
-                  className={`p-4 sm:p-5 space-y-3 transition-colors duration-300 ${
-                    mockupHighlightZone === 'commission' ? 'bg-blue-50/20 dark:bg-blue-950/20' : ''
+                  className={`bg-white dark:bg-[#0B1222] text-slate-900 dark:text-slate-100 transition-all duration-350 ease-out ${
+                    isHeroTransitioning
+                      ? 'opacity-0 translate-y-2 scale-[0.995]'
+                      : 'opacity-100 translate-y-0 scale-100'
                   }`}
                 >
-                  {heroShowcase.products.map((product) => {
-                    const Icon = product.icon;
-                    const isAdded = !!addedMockupIds[product.id];
-
-                    return (
-                      <div
-                        key={product.id}
-                        className={`p-3 rounded-xl bg-slate-50 dark:bg-[#0e172d] border border-slate-200/80 dark:border-[#1c2a47] flex items-center justify-between gap-3 transition-all duration-300 hover:border-slate-300 dark:hover:border-[#283e68] ${
-                          mockupHighlightZone === 'commission'
-                            ? 'border-blue-300/80 dark:border-blue-700/80 shadow-2xs'
-                            : ''
-                        }`}
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className={`w-11 h-11 sm:w-12 sm:h-12 rounded-lg border flex items-center justify-center shrink-0 ${product.iconBg}`}>
-                            <Icon className={`w-5 h-5 sm:w-6 sm:h-6 ${product.iconColor}`} />
-                          </div>
-                          <div className="min-w-0">
-                            <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
-                              {product.name}
-                            </h4>
-                            <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-1">
-                              {product.desc}
-                            </p>
-                            <span
-                              className={`text-xs font-extrabold text-blue-600 dark:text-blue-400 transition-all duration-300 ${
-                                mockupHighlightZone === 'commission'
-                                  ? 'text-emerald-600 dark:text-emerald-400 font-black'
-                                  : ''
+                  {/* Portada y Cabecera del Comercio */}
+                  <div
+                    className={`p-3.5 sm:p-4 bg-gradient-to-r from-blue-50/70 via-indigo-50/40 to-slate-50/70 dark:bg-gradient-to-r dark:from-slate-900/90 dark:via-[#101930] dark:to-slate-900/90 border-b border-slate-200/90 dark:border-slate-800/80 transition-all duration-300 ${
+                      mockupHighlightZone === 'brand'
+                        ? 'ring-2 ring-[#1769FF] bg-blue-50/90 dark:ring-cyan-400/80 dark:bg-blue-950/70 shadow-sm'
+                        : ''
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        {/* Logo / Avatar con micro-realce sutil */}
+                        <div
+                          className={`w-11 h-11 sm:w-12 sm:h-12 rounded-xl ${heroShowcase.avatarBg} font-extrabold text-base flex items-center justify-center shadow-md ring-2 ring-white/20 dark:ring-white/10 shrink-0 transition-all duration-300 ${
+                            mockupHighlightZone === 'brand'
+                              ? 'scale-105 ring-2 ring-[#1769FF] shadow-blue-500/30 dark:ring-cyan-400 dark:shadow-cyan-500/50'
+                              : ''
+                          }`}
+                        >
+                          {heroShowcase.initials}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3
+                              className={`text-sm sm:text-base font-bold truncate transition-colors duration-300 ${
+                                mockupHighlightZone === 'brand'
+                                  ? 'text-[#1769FF] dark:text-cyan-300'
+                                  : 'text-slate-900 dark:text-white'
                               }`}
                             >
-                              {product.price}
+                              {heroShowcase.name}
+                            </h3>
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide shrink-0 ${heroShowcase.badgeBg} ${heroShowcase.badgeText}`}>
+                              {heroShowcase.badge}
+                            </span>
+                          </div>
+                          <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-2 mt-0.5 flex-wrap">
+                            <span className="flex items-center gap-1 truncate">
+                              <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
+                              <span className="truncate">{heroShowcase.location}</span>
+                            </span>
+                            <span>•</span>
+                            <span className="flex items-center gap-1 shrink-0">
+                              <Clock className="w-3 h-3 text-slate-400 shrink-0" />
+                              <span>{heroShowcase.schedule}</span>
                             </span>
                           </div>
                         </div>
+                      </div>
+
+                      {/* Botón directo a la tienda pública */}
+                      {!heroShowcase.isDemo && (
                         <button
                           type="button"
-                          onClick={() => handleMockupAddToCart(product.id)}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0 transition-all cursor-pointer active:scale-95 shadow-2xs ${
-                            isAdded
-                              ? 'bg-emerald-600 text-white'
-                              : 'bg-blue-600 hover:bg-blue-700 text-white'
-                          }`}
+                          onClick={() => navigate(`/tienda/${heroShowcase.slug}`)}
+                          title="Abrir tienda completa"
+                          className="p-2 rounded-xl bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 border border-slate-200/90 shadow-2xs transition-all cursor-pointer shrink-0 hidden sm:flex items-center gap-1 text-[11px] font-semibold dark:bg-[#121B30] dark:hover:bg-[#182440] dark:text-slate-200 dark:hover:text-white dark:border-slate-700/70"
                         >
-                          {isAdded ? '✓ Agregado' : '+ Agregar'}
+                          <span>Ver tienda</span>
+                          <ExternalLink className="w-3 h-3" />
                         </button>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {/* Barra Inferior de Pedido por WhatsApp (con micro-realce interactivo para 'Pedidos por WhatsApp') */}
-                <div
-                  className={`p-3 sm:p-4 bg-emerald-50 dark:bg-emerald-950/50 border-t border-emerald-200 dark:border-emerald-800/60 flex items-center justify-between gap-2 transition-all duration-300 ${
-                    mockupHighlightZone === 'whatsapp'
-                      ? 'ring-2 ring-emerald-500/80 dark:ring-emerald-400/80 bg-emerald-100/90 dark:bg-emerald-900/50 shadow-md scale-[1.005]'
-                      : ''
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div
-                      className={`w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-2xs transition-transform duration-300 ${
-                        mockupHighlightZone === 'whatsapp'
-                          ? 'scale-110 shadow-emerald-500/40 ring-2 ring-emerald-300 dark:ring-emerald-600'
-                          : ''
-                      }`}
-                    >
-                      <MessageCircle className="w-4 h-4" />
-                    </div>
-                    <div className="text-left min-w-0">
-                      <p className="text-[11px] sm:text-xs font-bold text-emerald-950 dark:text-emerald-200 truncate">
-                        Pedido listo para WhatsApp
-                      </p>
-                      <p className="text-[10px] sm:text-[11px] text-emerald-700 dark:text-emerald-300 truncate">
-                        {heroShowcase.cartDefaultCount} productos • Total {heroShowcase.cartDefaultTotal}
-                      </p>
+                      )}
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!heroShowcase.isDemo) {
-                        navigate(`/tienda/${heroShowcase.slug}`);
-                      }
-                    }}
-                    className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-2xs flex items-center gap-1 shrink-0 transition cursor-pointer active:scale-95"
-                  >
-                    <span>Pedir ahora</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
 
-              {/* Barra de Control / Indicadores del Carrusel del Mockup */}
-              {heroStoreList.length > 1 && (
-                <div className="px-4 py-2 bg-slate-50 dark:bg-[#0e172d] border-t border-slate-200 dark:border-[#1c2a47] flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-ping shrink-0" />
-                    <span className="font-medium text-slate-700 dark:text-slate-300 truncate">
-                      {heroShowcase.name}
-                    </span>
-                    <span className="text-[10px] text-slate-400 shrink-0">
-                      ({heroIndex + 1}/{heroStoreList.length})
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    {heroStoreList.map((_, dotIdx) => (
-                      <button
-                        key={dotIdx}
-                        type="button"
-                        onClick={() => {
-                          if (dotIdx === heroIndex) return;
-                          setIsHeroTransitioning(true);
-                          setTimeout(() => {
-                            setHeroIndex(dotIdx);
-                            setIsHeroTransitioning(false);
-                          }, 150);
-                        }}
-                        aria-label={`Mostrar tienda ${dotIdx + 1}`}
-                        className={`h-1.5 rounded-full transition-all cursor-pointer ${
-                          dotIdx === heroIndex
-                            ? 'w-5 bg-blue-600 dark:bg-blue-400'
-                            : 'w-1.5 bg-slate-300 dark:bg-[#273a62] hover:bg-slate-400'
+                  {/* Categorías de la Tienda */}
+                  <div className="px-3.5 sm:px-4 py-2 bg-slate-50/90 dark:bg-[#080E1B] border-b border-slate-200/80 dark:border-slate-800/80 flex items-center gap-2 overflow-x-auto text-xs no-scrollbar transition-colors">
+                    {heroShowcase.categories.map((catName, idx) => (
+                      <span
+                        key={idx}
+                        className={`px-3 py-1 rounded-lg text-xs font-semibold shrink-0 cursor-default transition ${
+                          idx === 0
+                            ? 'bg-[#1769FF] text-white shadow-xs dark:bg-blue-600 dark:shadow-[0_2px_8px_rgba(37,99,235,0.4)]'
+                            : 'bg-white text-slate-600 border border-slate-200/90 dark:bg-[#0F172A] dark:text-slate-300 dark:border-slate-800 hover:dark:bg-[#16223B]'
                         }`}
-                      />
+                      >
+                        {catName}
+                      </span>
                     ))}
                   </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </section>
 
-      {/* Divisor Visual Sutil */}
-      <div className="w-full h-px bg-slate-200/70 dark:bg-[#16223b]" />
+                  {/* Lista de Productos de la Vitrina */}
+                  <div
+                    className={`p-3 sm:p-3.5 space-y-2.5 transition-colors duration-300 ${
+                      mockupHighlightZone === 'commission' ? 'bg-blue-50/40 dark:bg-blue-950/30' : ''
+                    }`}
+                  >
+                    {heroShowcase.products.map((product) => {
+                      const Icon = product.icon;
+                      const isAdded = !!addedMockupIds[product.id];
 
-      {/* ========================================================================= */}
-      {/* 2. CARRUSEL DE COMERCIOS (Ubicación Original: Inmediatamente tras el Hero)   */}
-      {/* ========================================================================= */}
-      <section id="carrusel-comercios" className="w-full space-y-4 sm:space-y-5 scroll-mt-20">
-        {/* Cabecera del Carrusel con Controles de Navegación */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] font-bold tracking-wider text-blue-600 dark:text-blue-400 uppercase">
-                Vitrina Activa
-              </span>
-              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-200/70 dark:border-emerald-800/50">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                <span>En vivo</span>
-              </span>
-            </div>
-            <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-              Comercios destacados en MAXINEGO
-            </h2>
-          </div>
-
-          {/* Controles de Navegación Anterior / Siguiente */}
-          <div className="flex items-center gap-2 self-end sm:self-auto">
-            <button
-              type="button"
-              onClick={scrollPrev}
-              disabled={!canScrollLeft}
-              aria-label="Anterior comercio"
-              className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-center ${
-                canScrollLeft
-                  ? 'bg-white dark:bg-[#0d162b] border-slate-200 dark:border-[#1c2a47] text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#132042] hover:text-blue-600 dark:hover:text-blue-400 shadow-2xs hover:shadow-xs active:scale-95'
-                  : 'bg-slate-50/80 dark:bg-[#090f20]/50 border-slate-200/50 dark:border-[#16223b]/50 text-slate-300 dark:text-slate-700 cursor-not-allowed'
-              }`}
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-
-            <button
-              type="button"
-              onClick={scrollNext}
-              disabled={!canScrollRight}
-              aria-label="Siguiente comercio"
-              className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-center ${
-                canScrollRight
-                  ? 'bg-white dark:bg-[#0d162b] border-slate-200 dark:border-[#1c2a47] text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#132042] hover:text-blue-600 dark:hover:text-blue-400 shadow-2xs hover:shadow-xs active:scale-95'
-                  : 'bg-slate-50/80 dark:bg-[#090f20]/50 border-slate-200/50 dark:border-[#16223b]/50 text-slate-300 dark:text-slate-700 cursor-not-allowed'
-              }`}
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
-        {/* Pista de Desplazamiento Horizontal del Carrusel */}
-        {isLoading ? (
-          <div className="flex gap-4 overflow-hidden py-2">
-            {[1, 2, 3, 4].map((i) => (
-              <div
-                key={i}
-                className="min-w-[280px] sm:min-w-[320px] max-w-[340px] rounded-2xl bg-white dark:bg-[#0d162b] border border-slate-200 dark:border-[#1c2a47] p-5 animate-pulse space-y-3 shrink-0"
-              >
-                <div className="h-12 w-12 rounded-xl bg-slate-100 dark:bg-[#16223b]" />
-                <div className="h-4 bg-slate-100 dark:bg-[#16223b] rounded w-1/2" />
-                <div className="h-3 bg-slate-100 dark:bg-[#16223b] rounded w-3/4" />
-                <div className="h-9 bg-slate-100 dark:bg-[#16223b] rounded-xl mt-4" />
-              </div>
-            ))}
-          </div>
-        ) : stores.length === 0 ? (
-          <div className="p-8 text-center rounded-2xl bg-white dark:bg-[#0d162b] border border-slate-200/80 dark:border-[#1c2a47] text-xs text-slate-500 dark:text-slate-400">
-            No hay comercios registrados en este momento.
-          </div>
-        ) : (
-          <div
-            ref={carouselRef}
-            onScroll={updateScrollButtons}
-            className="flex gap-4 sm:gap-5 overflow-x-auto pb-4 pt-1 px-0.5 no-scrollbar snap-x snap-mandatory scroll-smooth"
-          >
-            {stores.map((store) => {
-              const meta = getCardMetadata(store);
-              const Icon = meta.icon;
-
-              return (
-                <div
-                  key={store.id}
-                  className="min-w-[280px] sm:min-w-[320px] max-w-[340px] shrink-0 snap-start rounded-2xl bg-white dark:bg-[#0d162b] border border-slate-200/80 dark:border-[#1c2a47] p-5 flex flex-col justify-between gap-4 shadow-2xs hover:shadow-md hover:border-blue-300/80 dark:hover:border-blue-600/70 transition-all duration-200 group hover:-translate-y-0.5"
-                >
-                  <div className="space-y-3">
-                    {/* Fila Superior: Logo + Nombre + Badge */}
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white font-extrabold text-sm flex items-center justify-center shadow-xs shrink-0 group-hover:scale-105 transition-transform">
-                          {store.name.slice(0, 2).toUpperCase()}
+                      return (
+                        <div
+                          key={product.id}
+                          className={`p-3 rounded-xl bg-slate-50/80 dark:bg-[#0F182B] border border-slate-200/90 dark:border-slate-800/80 flex items-center justify-between gap-3 transition-all duration-300 hover:border-slate-300 dark:hover:border-slate-700/80 dark:shadow-[0_4px_12px_rgba(0,0,0,0.3)] shadow-2xs ${
+                            mockupHighlightZone === 'commission'
+                              ? 'border-[#1769FF] ring-1 ring-[#1769FF]/40 shadow-sm dark:border-cyan-400/80 dark:ring-1 dark:ring-cyan-400/50 dark:shadow-[0_0_15px_rgba(34,211,238,0.2)]'
+                              : ''
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-xl border flex items-center justify-center shrink-0 ${product.iconBg}`}>
+                              <Icon className={`w-5 h-5 ${product.iconColor}`} />
+                            </div>
+                            <div className="min-w-0">
+                              <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
+                                {product.name}
+                              </h4>
+                              <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-1 mt-0.5">
+                                {product.desc}
+                              </p>
+                              <span
+                                className={`inline-block mt-1 text-xs font-extrabold text-[#1769FF] dark:text-emerald-400 transition-all duration-300 ${
+                                  mockupHighlightZone === 'commission'
+                                    ? 'text-emerald-600 dark:text-emerald-300 font-black'
+                                    : ''
+                                }`}
+                              >
+                                {product.price}
+                              </span>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleMockupAddToCart(product.id)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0 transition-all cursor-pointer active:scale-95 shadow-xs min-h-[32px] flex items-center justify-center gap-1 ${
+                              isAdded
+                                ? 'bg-emerald-600 text-white dark:bg-emerald-500 dark:text-slate-950 font-bold shadow-[0_2px_8px_rgba(16,185,129,0.3)]'
+                                : 'bg-[#1769FF] hover:bg-[#0f5adb] text-white dark:bg-blue-600 dark:hover:bg-blue-500 dark:text-white shadow-[0_2px_8px_rgba(37,99,235,0.25)]'
+                            }`}
+                          >
+                            {isAdded ? '✓ Agregado' : '+ Agregar'}
+                          </button>
                         </div>
-                        <div className="min-w-0">
-                          <h3 className="text-sm font-bold text-slate-900 dark:text-white truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                            {store.name}
-                          </h3>
-                          <span className="text-[11px] text-slate-500 dark:text-slate-400 truncate block font-mono">
-                            /{store.slug}
-                          </span>
-                        </div>
-                      </div>
-
-                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border shrink-0 ${meta.accentBg} ${meta.accentBorder} ${meta.accentText}`}>
-                        {meta.badge}
-                      </span>
-                    </div>
-
-                    {/* Metadato de Vertical y Estado */}
-                    <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
-                      <span className="inline-flex items-center gap-1 font-medium bg-slate-50 dark:bg-[#090f20] px-2 py-0.5 rounded-md border border-slate-100 dark:border-[#16223b]">
-                        <Icon className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                        <span>{meta.cat}</span>
-                      </span>
-                      <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium">
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>En línea</span>
-                      </span>
-                    </div>
+                      );
+                    })}
                   </div>
 
-                  {/* Botón de Acción a Vitrina Pública */}
-                  <div className="pt-2 border-t border-slate-100 dark:border-[#16223b]">
+                  {/* Barra Inferior de Pedido por WhatsApp */}
+                  <div
+                    className={`p-3 sm:p-3.5 bg-gradient-to-r from-emerald-50 via-teal-50/60 to-emerald-50/90 dark:bg-gradient-to-r dark:from-[#062318] dark:via-[#092d20] dark:to-[#062318] border-t border-emerald-200/90 dark:border-emerald-600/30 flex items-center justify-between gap-2 transition-all duration-300 backdrop-blur-md ${
+                      mockupHighlightZone === 'whatsapp'
+                        ? 'ring-2 ring-emerald-500/80 bg-emerald-100/90 shadow-md scale-[1.005] dark:ring-emerald-400/90 dark:shadow-[0_0_20px_rgba(52,211,153,0.25)]'
+                        : ''
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div
+                        className={`w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-sm shadow-emerald-600/25 transition-transform duration-300 dark:bg-emerald-500 dark:text-slate-950 dark:shadow-emerald-500/30 ${
+                          mockupHighlightZone === 'whatsapp'
+                            ? 'scale-110 shadow-emerald-400/40 ring-2 ring-emerald-300'
+                            : ''
+                        }`}
+                      >
+                        <MessageCircle className="w-4 h-4" />
+                      </div>
+                      <div className="text-left min-w-0">
+                        <p className="text-[11px] sm:text-xs font-bold text-emerald-950 dark:text-emerald-200 truncate">
+                          Pedido listo para WhatsApp
+                        </p>
+                        <p className="text-[10px] sm:text-[11px] text-emerald-700 dark:text-emerald-300 font-medium truncate">
+                          {heroShowcase.cartDefaultCount} productos • Total {heroShowcase.cartDefaultTotal}
+                        </p>
+                      </div>
+                    </div>
                     <button
                       type="button"
-                      onClick={() => navigate(`/tienda/${store.slug}`)}
-                      className="w-full py-2 px-3.5 rounded-xl text-xs font-bold transition flex items-center justify-between cursor-pointer bg-slate-900 hover:bg-blue-600 text-white dark:bg-[#152342] dark:hover:bg-blue-600 dark:border dark:border-[#22355e] shadow-2xs group-hover:shadow-xs active:scale-[0.99]"
+                      onClick={() => {
+                        if (!heroShowcase.isDemo) {
+                          navigate(`/tienda/${heroShowcase.slug}`);
+                        }
+                      }}
+                      className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm shadow-emerald-600/25 flex items-center gap-1.5 shrink-0 transition cursor-pointer active:scale-95 min-h-[32px] dark:bg-emerald-500 dark:hover:bg-emerald-400 dark:text-slate-950 dark:shadow-emerald-500/30"
                     >
-                      <span className="flex items-center gap-1.5">
-                        <StoreIcon className="w-3.5 h-3.5 text-blue-400" />
-                        <span>Visitar tienda</span>
-                      </span>
-                      <ChevronRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
+                      <span>Pedir ahora</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>
-              );
-            })}
+
+                {/* Barra de Control / Indicadores del Carrusel del Mockup */}
+                {heroStoreList.length > 1 && (
+                  <div className="px-3.5 sm:px-4 py-2 bg-slate-100/90 dark:bg-[#080D1A] border-t border-slate-200/90 dark:border-slate-800/90 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 transition-colors">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#1769FF] dark:bg-cyan-400 animate-ping shrink-0" />
+                      <span className="font-medium text-slate-800 dark:text-slate-300 truncate">
+                        {heroShowcase.name}
+                      </span>
+                      <span className="text-[10px] text-slate-400 dark:text-slate-500 shrink-0">
+                        ({heroIndex + 1}/{heroStoreList.length})
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {heroStoreList.map((_, dotIdx) => (
+                        <button
+                          key={dotIdx}
+                          type="button"
+                          onClick={() => {
+                            if (dotIdx === heroIndex) return;
+                            setIsHeroTransitioning(true);
+                            setTimeout(() => {
+                              setHeroIndex(dotIdx);
+                              setIsHeroTransitioning(false);
+                            }, 150);
+                          }}
+                          aria-label={`Mostrar tienda ${dotIdx + 1}`}
+                          className={`h-1.5 rounded-full transition-all cursor-pointer ${
+                            dotIdx === heroIndex
+                              ? 'w-5 bg-[#1769FF] shadow-[0_0_8px_rgba(23,105,255,0.4)] dark:bg-cyan-400 dark:shadow-[0_0_8px_rgba(34,211,238,0.5)]'
+                              : 'w-1.5 bg-slate-300 hover:bg-slate-400 dark:bg-slate-700 dark:hover:bg-slate-500'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Chasis Base de la Computadora Portátil (Keyboard deck & lip) */}
+              <div className="relative h-3.5 sm:h-4 bg-gradient-to-b from-slate-200 via-slate-300 to-slate-400 dark:from-slate-700 dark:via-slate-800 dark:to-slate-900 rounded-b-xl border-t border-slate-300 dark:border-slate-700/80 shadow-[0_16px_35px_rgba(20,33,61,0.12)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.85)] transition-colors">
+                {/* Muesca central para apertura de tapa */}
+                <div className="w-20 sm:w-24 h-1.5 mx-auto bg-slate-400/80 dark:bg-slate-900 rounded-b-sm border-b border-slate-300 dark:border-slate-700/60" />
+              </div>
+
+              {/* ================================================================= */}
+              {/* BADGE FLOTANTE 3 (Inferior Derecho): Agente Max Asistente IA     */}
+              {/* ================================================================= */}
+              <div className="absolute -bottom-6 -right-2 sm:-bottom-7 sm:-right-4 z-20 bg-white/95 dark:bg-[#0D1527]/95 backdrop-blur-xl border border-blue-100 dark:border-blue-500/30 rounded-2xl p-3 sm:p-3.5 shadow-[0_16px_35px_rgba(20,33,61,0.12)] dark:shadow-[0_16px_40px_rgba(0,0,0,0.7),0_0_20px_rgba(59,130,246,0.2)] flex items-center gap-3 sm:gap-3.5 max-w-[280px] sm:max-w-xs animate-[floatSlow_8s_ease-in-out_infinite_2s]">
+                <AgenteMaxAvatar className="w-11 h-11 sm:w-12 sm:h-12" />
+                <div className="text-left min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-black text-[#14213D] dark:text-white truncate">
+                      Conoce a Agente Max
+                    </span>
+                    <span className="px-1.5 py-0.5 rounded-full text-[9px] font-black bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-500 dark:to-cyan-400 text-white dark:text-slate-950 uppercase shadow-2xs">
+                      IA
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-[#475569] dark:text-slate-300 leading-tight mt-0.5">
+                    Tu asistente inteligente para mejorar tu catálogo y hacer crecer tu negocio.
+                  </p>
+                  <div className="flex items-center gap-1.5 mt-1 text-[10px] text-[#1769FF] dark:text-cyan-400 font-semibold">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400" />
+                    <span>Disponible en tu panel</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-        )}
+        </div>
       </section>
 
       {/* Divisor Visual Sutil */}
       <div className="w-full h-px bg-slate-200/70 dark:bg-[#16223b]" />
 
       {/* ========================================================================= */}
-      {/* 3. ¿QUÉ ES MAXINEGO?                                                      */}
+      {/* BLOQUE 1: ¿QUÉ ES MAXINEGO?                                               */}
+      {/* Propósito comercial claro, sin repetir WhatsApp/0% comisiones del Hero     */}
       {/* ========================================================================= */}
       <section id="que-es-maxinego" className="w-full space-y-6 sm:space-y-8 scroll-mt-20">
         <div className="max-w-3xl space-y-2.5">
@@ -1283,45 +1563,45 @@ export const PortalHome: React.FC = () => {
             ¿Qué es MAXINEGO?
           </h2>
           <p className="text-sm sm:text-base lg:text-lg text-slate-600 dark:text-slate-300 leading-relaxed">
-            MAXINEGO es la plataforma que permite a los comercios locales dar el salto al mundo digital. Aquí puedes abrir tu propia tienda online, mostrar tus productos y servicios con claridad y recibir pedidos directamente de tus clientes sin intermediarios ni complicaciones.
+            MAXINEGO es la plataforma que permite a los comercios y negocios locales abrir su propia tienda en internet, exhibir sus catálogos con fotos y precios y conectar directamente con sus clientes de forma moderna, ágil y sin intermediarios.
           </p>
         </div>
 
-        {/* 3 Pilares Fundamentales de MAXINEGO */}
+        {/* 3 Pilares distintivos sobre qué es MAXINEGO */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5 sm:gap-6">
           <div className="p-6 rounded-2xl bg-white dark:bg-[#0d162b] border border-slate-200/80 dark:border-[#1c2a47] shadow-2xs hover:shadow-md hover:border-blue-300/80 dark:hover:border-blue-600/60 transition-all duration-200 space-y-3 group">
             <div className="w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-950/70 border border-blue-200 dark:border-blue-800/60 flex items-center justify-center text-blue-600 dark:text-blue-400 group-hover:scale-105 transition-transform">
               <StoreIcon className="w-6 h-6" />
             </div>
             <h3 className="text-base font-bold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-              Tu tienda propia en internet
+              Tu tienda digital propia
             </h3>
             <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-              Un espacio digital exclusivo para tu negocio con tu nombre, tu logotipo, tus colores y un enlace directo para compartir en tus redes sociales y tarjetas.
+              Un espacio web exclusivo con el nombre y logotipo de tu negocio, accesible desde cualquier teléfono o computadora sin obligar a tus clientes a instalar aplicaciones.
             </p>
           </div>
 
           <div className="p-6 rounded-2xl bg-white dark:bg-[#0d162b] border border-slate-200/80 dark:border-[#1c2a47] shadow-2xs hover:shadow-md hover:border-emerald-300/80 dark:hover:border-emerald-600/60 transition-all duration-200 space-y-3 group">
             <div className="w-12 h-12 rounded-xl bg-emerald-50 dark:bg-emerald-950/70 border border-emerald-200 dark:border-emerald-800/60 flex items-center justify-center text-emerald-600 dark:text-emerald-400 group-hover:scale-105 transition-transform">
-              <MessageCircle className="w-6 h-6" />
+              <Package className="w-6 h-6" />
             </div>
             <h3 className="text-base font-bold text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
-              Atención directa por WhatsApp
+              Catálogo claro y ordenado
             </h3>
             <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-              Tus clientes seleccionan lo que desean y el pedido llega a tu WhatsApp organizado con detalle, cantidades y precios. Tú gestionas el pago y la entrega como siempre.
+              Muestra productos y servicios con fotografías, precios actualizados en Bolivianos y categorías organizadas para que tus clientes encuentren lo que buscan rápidamente.
             </p>
           </div>
 
           <div className="p-6 rounded-2xl bg-white dark:bg-[#0d162b] border border-slate-200/80 dark:border-[#1c2a47] shadow-2xs hover:shadow-md hover:border-amber-300/80 dark:hover:border-amber-600/60 transition-all duration-200 space-y-3 group">
             <div className="w-12 h-12 rounded-xl bg-amber-50 dark:bg-amber-950/70 border border-amber-200 dark:border-amber-800/60 flex items-center justify-center text-amber-600 dark:text-amber-400 group-hover:scale-105 transition-transform">
-              <Sparkles className="w-6 h-6" />
+              <Layers className="w-6 h-6" />
             </div>
             <h3 className="text-base font-bold text-slate-900 dark:text-white group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">
-              Sencillo, rápido y moderno
+              Control total y autonomía
             </h3>
             <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-              Sin procesos complejos. Administra tu catálogo, actualiza precios y activa o pausa artículos desde cualquier celular o computadora en pocos toques.
+              Administra tu inventario, ajusta precios y activa o pausa artículos desde tu propio panel comercial de forma sencilla y en pocos segundos.
             </p>
           </div>
         </div>
@@ -1331,11 +1611,13 @@ export const PortalHome: React.FC = () => {
       <div className="w-full h-px bg-slate-200/70 dark:bg-[#16223b]" />
 
       {/* ========================================================================= */}
-      {/* 4. ASÍ SE VE TU TIENDA                                                    */}
+      {/* BLOQUE 2: ASÍ SE VE TU TIENDA                                             */}
+      {/* Visualización del producto con tabs Gastronomía / Moda / Servicios         */}
       {/* ========================================================================= */}
       <section id="asi-se-ve-tu-tienda" className="w-full space-y-6 sm:space-y-8 scroll-mt-20">
+        {/* Encabezado de la Sección con Selector de Verticales Compacto y Estético */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-          <div className="max-w-2xl space-y-2">
+          <div className="max-w-2xl space-y-1.5">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-950/60 border border-blue-200/80 dark:border-blue-800/60 text-blue-700 dark:text-blue-300 text-xs font-bold uppercase tracking-wider">
               <StoreIcon className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
               <span>Tu Negocio en Digital</span>
@@ -1343,337 +1625,488 @@ export const PortalHome: React.FC = () => {
             <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight">
               Así se ve tu tienda en MAXINEGO
             </h2>
-            <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 leading-relaxed">
-              Tu comercio contará con una vitrina pública profesional diseñada para que tus clientes naveguen cómodamente, descubran lo que ofreces y compren con total facilidad.
+            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+              Tu comercio contará con una vitrina pública profesional diseñada para que tus clientes naveguen cómodamente, descubran lo que ofreces y hagan pedidos directos por WhatsApp.
             </p>
           </div>
 
-          {/* Selector de Verticales para el Comerciante */}
-          <div className="flex items-center gap-1.5 p-1 bg-slate-100/90 dark:bg-[#0e172d] rounded-xl border border-slate-200 dark:border-[#1c2a47] text-xs shadow-2xs self-start md:self-auto">
+          {/* 1. Recuadro Superior de Categorías: Compacto, estético, no dominante */}
+          <div className="inline-flex flex-wrap items-center gap-1 p-1 bg-slate-100/80 dark:bg-[#0c152a] rounded-xl border border-slate-200/80 dark:border-[#1a2846] text-xs self-start md:self-auto shadow-2xs">
             <button
               type="button"
               onClick={() => setPreviewTab('restaurante')}
-              className={`px-3 py-1.5 rounded-lg font-semibold transition cursor-pointer flex items-center gap-1.5 ${
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
                 previewTab === 'restaurante'
                   ? 'bg-white dark:bg-[#152342] text-blue-600 dark:text-blue-400 shadow-2xs'
-                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
-              <Utensils className="w-3.5 h-3.5" />
+              <Utensils className="w-3 h-3 text-amber-500" />
               <span>Gastronomía</span>
             </button>
             <button
               type="button"
               onClick={() => setPreviewTab('moda')}
-              className={`px-3 py-1.5 rounded-lg font-semibold transition cursor-pointer flex items-center gap-1.5 ${
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
                 previewTab === 'moda'
                   ? 'bg-white dark:bg-[#152342] text-blue-600 dark:text-blue-400 shadow-2xs'
-                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
-              <Shirt className="w-3.5 h-3.5" />
-              <span>Moda & Calzado</span>
+              <Shirt className="w-3 h-3 text-rose-500" />
+              <span>Moda</span>
             </button>
             <button
               type="button"
               onClick={() => setPreviewTab('servicios')}
-              className={`px-3 py-1.5 rounded-lg font-semibold transition cursor-pointer flex items-center gap-1.5 ${
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
                 previewTab === 'servicios'
                   ? 'bg-white dark:bg-[#152342] text-blue-600 dark:text-blue-400 shadow-2xs'
-                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
-              <Briefcase className="w-3.5 h-3.5" />
+              <Briefcase className="w-3 h-3 text-teal-500" />
               <span>Servicios</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setPreviewTab('billar')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
+                previewTab === 'billar'
+                  ? 'bg-white dark:bg-[#152342] text-emerald-600 dark:text-emerald-400 shadow-2xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <span className="text-xs">🎱</span>
+              <span>Billar</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setPreviewTab('general')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
+                previewTab === 'general'
+                  ? 'bg-white dark:bg-[#152342] text-sky-600 dark:text-sky-400 shadow-2xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <StoreIcon className="w-3 h-3 text-sky-500" />
+              <span>General</span>
             </button>
           </div>
         </div>
 
-        {/* Demostración Visual de la Tienda según el Rubro */}
-        <div className="rounded-2xl bg-white dark:bg-[#0b1326] border border-slate-200/90 dark:border-[#1c2a47] shadow-sm hover:shadow-md transition-shadow overflow-hidden">
-          {/* Cabecera dinámica de la tienda de ejemplo */}
-          <div className="p-6 sm:p-8 bg-gradient-to-r from-slate-50 via-blue-50/30 to-slate-50 dark:from-[#0d162b] dark:via-[#132042] dark:to-[#0d162b] border-b border-slate-200/80 dark:border-[#1c2a47]">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white font-extrabold text-xl flex items-center justify-center shadow-md shrink-0">
-                  {previewTab === 'restaurante' ? 'TR' : previewTab === 'moda' ? 'BM' : 'ZS'}
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">
-                      {previewTab === 'restaurante' && 'Trattoria Roma • Menú & Pastas'}
-                      {previewTab === 'moda' && 'Boutique Milano • Tendencias'}
-                      {previewTab === 'servicios' && 'Zenit Studio • Spa & Estética'}
-                    </h3>
+        {/* ========================================================================= */}
+        {/* PRODUCT SHOWCASE: Layout Dual (~35% Identidad y Valor / ~65% Mockup SaaS)  */}
+        {/* ========================================================================= */}
+        {(() => {
+          const activeShowcase = SHOWCASE_VERTICALS[previewTab];
+          const itemsList = activeShowcase.mobilePreview?.items?.length
+            ? `\n\nProductos:\n${activeShowcase.mobilePreview.items.map((it) => `• ${it}`).join('\n')}`
+            : '';
+          const orderMsg = `Hola ${activeShowcase.shortName}, me gustaría ordenar los productos de mi carrito en MAXINEGO:${itemsList}\n\nTotal estimado: ${activeShowcase.cartTotal}`;
+          const waUrl = `https://wa.me/59163527099?text=${encodeURIComponent(orderMsg)}`;
+
+          return (
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start">
+              {/* Columna Izquierda (~35% en desktop, orden 2 en móvil): Identidad y Puntos de Valor */}
+              <div className="order-2 lg:order-1 lg:col-span-5 space-y-4">
+                {/* 3. Ficha Principal del Negocio con Indicadores ("Catálogo Activo" y "WhatsApp") Integrados Arriba */}
+                <div className="rounded-2xl bg-white dark:bg-[#0c152a] border border-slate-200/90 dark:border-[#1c2a47] p-5 sm:p-6 shadow-sm space-y-3.5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3.5 min-w-0">
+                      <div className={`w-12 h-12 rounded-xl ${activeShowcase.avatarBg} font-extrabold text-base flex items-center justify-center shadow-md shrink-0 transition-transform duration-300 hover:scale-105`}>
+                        {activeShowcase.initials}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${activeShowcase.badgeClass}`}>
+                            {activeShowcase.badge}
+                          </span>
+                        </div>
+                        <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white mt-0.5 truncate">
+                          {activeShowcase.shortName}
+                        </h3>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 font-medium truncate">
+                          {activeShowcase.rubro}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Indicadores Operativos Integrados Naturalmente en la Cabecera Superior */}
+                    <div className="flex flex-col items-end gap-1.5 shrink-0 self-start">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/50 text-[10px] font-semibold">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+                        <span>Catálogo Activo</span>
+                      </span>
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/50 text-[10px] font-semibold">
+                        <MessageCircle className="w-3 h-3 text-blue-500" />
+                        <span>WhatsApp</span>
+                      </span>
+                    </div>
                   </div>
-                  <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 flex flex-wrap items-center gap-3">
-                    <span className="flex items-center gap-1">
-                      <MapPin className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                      Av. Principal #450, Centro Comercial
-                    </span>
-                    <span>•</span>
-                    <span className="flex items-center gap-1">
-                      <Clock className="w-3.5 h-3.5 text-emerald-500" />
-                      Atención: Lunes a Sábado
-                    </span>
-                  </p>
+
+                  {/* Micro-datos de Ubicación y Horario */}
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 pt-3 border-t border-slate-100 dark:border-[#17243f] text-xs text-slate-600 dark:text-slate-300">
+                    <div className="flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
+                      <span className="truncate">{activeShowcase.location}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                      <span>{activeShowcase.schedule}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Cuadro Rojo Eliminado Completamente: sección mucho más limpia y armónica */}
+
+                {/* Tarjeta de Valor: Lo que incluye tu tienda pública */}
+                <div className="rounded-2xl bg-white dark:bg-[#0c152a] border border-slate-200/90 dark:border-[#1c2a47] p-5 sm:p-6 shadow-sm space-y-4">
+                  <h4 className="text-xs font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wider">
+                    Lo que incluye tu tienda pública
+                  </h4>
+
+                  <div className="space-y-3">
+                    {/* Item 1 */}
+                    <div className="flex items-start gap-3">
+                      <div className="w-7 h-7 rounded-lg bg-blue-50 dark:bg-blue-950/70 border border-blue-200 dark:border-blue-800/60 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0 mt-0.5">
+                        <StoreIcon className="w-3.5 h-3.5" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
+                          Identidad y URL propia
+                        </div>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 leading-snug mt-0.5">
+                          Enlace directo para compartir en redes sociales, perfiles y estados de WhatsApp.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Item 2 */}
+                    <div className="flex items-start gap-3">
+                      <div className="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-950/70 border border-emerald-200 dark:border-emerald-800/60 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5">
+                        <Package className="w-3.5 h-3.5" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
+                          Catálogo con precios en Bs
+                        </div>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 leading-snug mt-0.5">
+                          Precios transparentes y fotos claras para que el cliente decida sin preguntar por privado.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Item 3 */}
+                    <div className="flex items-start gap-3">
+                      <div className="w-7 h-7 rounded-lg bg-amber-50 dark:bg-amber-950/70 border border-amber-200 dark:border-amber-800/60 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0 mt-0.5">
+                        <Layers className="w-3.5 h-3.5" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
+                          Categorías organizadas
+                        </div>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 leading-snug mt-0.5">
+                          Filtros rápidos para que tu cliente explore tu oferta en segundos sin aburrirse.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Item 4 */}
+                    <div className="flex items-start gap-3">
+                      <div className="w-7 h-7 rounded-lg bg-teal-50 dark:bg-teal-950/70 border border-teal-200 dark:border-teal-800/60 flex items-center justify-center text-teal-600 dark:text-teal-400 shrink-0 mt-0.5">
+                        <ShoppingCart className="w-3.5 h-3.5" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
+                          Pedidos directos a WhatsApp
+                        </div>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 leading-snug mt-0.5">
+                          Carrito ágil que envía la orden desglosada y el total listo para coordinar el cobro.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Botón Inferior Completamente Funcional */}
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const target = document.getElementById('comercios') || document.getElementById('carrusel-comercios');
+                        if (target) {
+                          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                          window.history.pushState(null, '', '#comercios');
+                        }
+                      }}
+                      className="w-full inline-flex items-center justify-center gap-2.5 px-4 py-3 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-500 hover:via-indigo-500 hover:to-blue-600 text-white font-bold text-xs sm:text-sm shadow-md hover:shadow-lg hover:shadow-blue-500/20 active:scale-[0.98] transition-all duration-150 cursor-pointer border border-blue-500/30 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-[#0c152a]"
+                    >
+                      <span>Explorar comercios activos en MAXINEGO</span>
+                      <ArrowRight className="w-4 h-4 text-blue-100 transition-transform group-hover:translate-x-1" />
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 self-start sm:self-auto">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/50 text-xs font-semibold">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                  <span>Catálogo Activo</span>
-                </span>
-                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/50 text-xs font-semibold">
-                  <MessageCircle className="w-4 h-4 text-blue-500" />
-                  <span>WhatsApp Vinculado</span>
-                </span>
-              </div>
-            </div>
-          </div>
+              {/* Columna Derecha (~65% en desktop, orden 1 en móvil): Vitrina Protagonista de la Tienda (Browser Window) */}
+              <div className="order-1 lg:order-2 lg:col-span-7 rounded-2xl bg-white dark:bg-[#090f1d] border border-slate-200 dark:border-[#1e2e4f] shadow-lg overflow-hidden">
+                {/* Barra de Navegador Superior (Chrome Window Header) */}
+                <div className="px-4 py-2.5 bg-slate-100/90 dark:bg-[#0e162a] border-b border-slate-200 dark:border-[#1c2c4d] flex items-center justify-between gap-3">
+                  {/* Botones de Ventana macOS */}
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <div className="w-2.5 h-2.5 rounded-full bg-red-400/90" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-amber-400/90" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-400/90" />
+                  </div>
 
-          {/* Grilla con 4 Elementos de Valor Visible */}
-          <div className="p-6 sm:p-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {/* Elemento 1: Identidad del Negocio */}
-            <div className="space-y-2.5 p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-[#0e172d]/70 transition-colors">
-              <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/70 border border-blue-200 dark:border-blue-800/60 flex items-center justify-center text-blue-600 dark:text-blue-400">
-                <StoreIcon className="w-4 h-4" />
-              </div>
-              <h4 className="text-sm font-bold text-slate-900 dark:text-white">
-                Identidad y Marca
-              </h4>
-              <p className="text-xs text-slate-500 dark:text-slate-300 leading-relaxed">
-                Tu logotipo, descripción, ubicación y horarios de atención destacados para que tus clientes confíen en tu negocio.
-              </p>
-            </div>
+                  {/* Barra de Dirección URL con Candado Seguro */}
+                  <div className="flex-1 max-w-sm mx-auto">
+                    <div className="flex items-center justify-center gap-1.5 px-3 py-1 rounded-lg bg-white dark:bg-[#070d18] border border-slate-200/90 dark:border-[#1a2845] text-[11px] text-slate-600 dark:text-slate-300 font-mono truncate">
+                      <Lock className="w-3 h-3 text-emerald-500 shrink-0" />
+                      <span className="text-slate-400 dark:text-slate-400">maxinego.app/tienda/</span>
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">{activeShowcase.slug}</span>
+                    </div>
+                  </div>
 
-            {/* Elemento 2: Productos y Servicios */}
-            <div className="space-y-2.5 p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-[#0e172d]/70 transition-colors">
-              <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/70 border border-emerald-200 dark:border-emerald-800/60 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
-                <Package className="w-4 h-4" />
-              </div>
-              <h4 className="text-sm font-bold text-slate-900 dark:text-white">
-                Catálogo con Precios Claros
-              </h4>
-              <p className="text-xs text-slate-500 dark:text-slate-300 leading-relaxed">
-                Muestra fotos atractivas, descripciones precisas, precios vigentes en Bolivianos y opciones o variantes de productos.
-              </p>
-            </div>
+                  {/* Estado "Abierto Ahora" */}
+                  <div className="hidden sm:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/50 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300 shrink-0">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                    </span>
+                    <span>Abierto ahora</span>
+                  </div>
+                </div>
 
-            {/* Elemento 3: Categorías Inteligentes */}
-            <div className="space-y-2.5 p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-[#0e172d]/70 transition-colors">
-              <div className="w-9 h-9 rounded-xl bg-amber-50 dark:bg-amber-950/70 border border-amber-200 dark:border-amber-800/60 flex items-center justify-center text-amber-600 dark:text-amber-400">
-                <Layers className="w-4 h-4" />
-              </div>
-              <h4 className="text-sm font-bold text-slate-900 dark:text-white">
-                Categorías Ordenadas
-              </h4>
-              <p className="text-xs text-slate-500 dark:text-slate-300 leading-relaxed">
-                Tus clientes pueden filtrar por categorías y encontrar rápidamente lo que buscan sin perderse ni abandonar la tienda.
-              </p>
-            </div>
+                {/* Cabecera Interna de la Tienda de Ejemplo */}
+                <div className={`p-4 sm:p-5 bg-gradient-to-r ${activeShowcase.headerGradient} border-b border-slate-200/80 dark:border-[#1c2a47]`}>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className={`w-11 h-11 rounded-xl ${activeShowcase.avatarBg} font-extrabold text-sm flex items-center justify-center shadow-md shrink-0`}>
+                        {activeShowcase.initials}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-white truncate">
+                            {activeShowcase.name}
+                          </h4>
+                        </div>
+                        <p className="text-[11px] text-slate-600 dark:text-slate-300 truncate">
+                          {activeShowcase.rubro} • {activeShowcase.location}
+                        </p>
+                      </div>
+                    </div>
 
-            {/* Elemento 4: Carrito y Pedido */}
-            <div className="space-y-2.5 p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-[#0e172d]/70 transition-colors">
-              <div className="w-9 h-9 rounded-xl bg-teal-50 dark:bg-teal-950/70 border border-teal-200 dark:border-teal-800/60 flex items-center justify-center text-teal-600 dark:text-teal-400">
-                <ShoppingCart className="w-4 h-4" />
+                    <div className="hidden md:flex items-center gap-2 shrink-0">
+                      {/* Reflejo Tecnológico de IA en la cabecera del producto */}
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-md bg-white/90 dark:bg-[#0c152a]/90 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800/60 shadow-2xs">
+                        <Sparkles className="w-3 h-3 text-indigo-500" />
+                        <span>Impulsado por IA</span>
+                      </span>
+                      <span className="text-[11px] font-semibold px-2 py-1 rounded-md bg-white/80 dark:bg-[#0c152a]/80 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-[#1c2a47]">
+                        {activeShowcase.schedule}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Categorías de la Tienda (Pills de Navegación) */}
+                  <div className="flex items-center gap-1.5 mt-3 pt-3 border-t border-slate-200/50 dark:border-white/10 overflow-x-auto pb-1 scrollbar-none">
+                    <span className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-blue-600 text-white shadow-2xs shrink-0 cursor-default">
+                      Todos los productos
+                    </span>
+                    {activeShowcase.categories.map((cat, idx) => (
+                      <span
+                        key={idx}
+                        className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-white/90 dark:bg-[#121c33] text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-[#1c2c4d] shrink-0 cursor-default hover:border-slate-300 dark:hover:border-slate-600"
+                      >
+                        {cat}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Grilla de Productos Auténticos de la Tienda de Ejemplo */}
+                <div className="p-4 sm:p-5 bg-slate-50/60 dark:bg-[#070c17]">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3.5">
+                    {activeShowcase.products.map((prod) => {
+                      const ProdIcon = prod.icon;
+                      const isAdded = !!showcaseAddedIds[prod.id];
+                      return (
+                        <div
+                          key={prod.id}
+                          className="bg-white dark:bg-[#0d162a] border border-slate-200/90 dark:border-[#1c2c4d] rounded-xl p-3.5 flex flex-col justify-between hover:border-blue-400/60 dark:hover:border-blue-500/60 transition-all shadow-2xs group"
+                        >
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className={`w-8 h-8 rounded-lg flex items-center justify-center border ${prod.iconBg}`}>
+                                <ProdIcon className="w-4 h-4" />
+                              </div>
+                              <span className="text-[10px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wider">
+                                Disponible
+                              </span>
+                            </div>
+                            <div>
+                              <div className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white line-clamp-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                                {prod.name}
+                              </div>
+                              <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug line-clamp-2 mt-1">
+                                {prod.desc}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-[#17243f] flex items-center justify-between gap-2">
+                            <span className="text-xs sm:text-sm font-extrabold text-blue-600 dark:text-blue-400">
+                              {prod.price}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleShowcaseAddToCart(prod.id)}
+                              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1 cursor-pointer ${
+                                isAdded
+                                  ? 'bg-emerald-500 text-white shadow-2xs scale-95'
+                                  : 'bg-blue-50 hover:bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:hover:bg-blue-900/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800/60 active:scale-95'
+                              }`}
+                            >
+                              {isAdded ? (
+                                <>
+                                  <Check className="w-3 h-3" />
+                                  <span>Agregado</span>
+                                </>
+                              ) : (
+                                <>
+                                  <span>+ Agregar</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Barra Inferior del Carrito y Envío Directo a WhatsApp (Completamente Funcional) */}
+                <div className="px-4 py-3 bg-white dark:bg-[#0c152a] border-t border-slate-200 dark:border-[#1c2a47] flex flex-col sm:flex-row items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5 text-xs text-slate-700 dark:text-slate-300 w-full sm:w-auto">
+                    <div className="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-950/70 border border-emerald-200 dark:border-emerald-800/60 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
+                      <ShoppingCart className="w-3.5 h-3.5" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="font-bold text-slate-900 dark:text-white truncate">
+                        {activeShowcase.mobilePreview.headline}
+                      </div>
+                      <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                        {activeShowcase.cartCount} items seleccionados • Total: {activeShowcase.cartTotal}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="w-full sm:w-auto flex items-center justify-end">
+                    <a
+                      href={waUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-colors shadow-sm cursor-pointer active:scale-95"
+                    >
+                      <MessageCircle className="w-3.5 h-3.5" />
+                      <span>Enviar pedido por WhatsApp ({activeShowcase.cartTotal})</span>
+                    </a>
+                  </div>
+                </div>
+
+                {/* 4. Opción B: Franja "Impulsado por IA Agente Max" integrada bajo el botón de WhatsApp */}
+                <div className="px-4 py-2.5 bg-gradient-to-r from-cyan-50/90 via-sky-50/60 to-blue-50/90 dark:from-[#08182b] dark:via-[#0c223c] dark:to-[#08182b] border-t border-cyan-200/80 dark:border-cyan-800/40 flex items-center justify-between gap-3 relative overflow-hidden">
+                  <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-400/60 to-transparent" />
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="relative flex h-2 w-2 shrink-0">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500" />
+                    </span>
+                    <span className="text-xs font-extrabold text-cyan-950 dark:text-cyan-100 tracking-tight flex items-center gap-1.5 truncate">
+                      <Sparkles className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400 shrink-0" />
+                      <span>Impulsado por IA Agente Max</span>
+                    </span>
+                    <span className="hidden sm:inline-block text-[11px] text-cyan-800/70 dark:text-cyan-300/70 truncate">
+                      • Catálogos optimizados en tiempo real
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1 text-[10px] font-bold text-cyan-800 dark:text-cyan-300 bg-white/80 dark:bg-[#071626]/80 px-2 py-0.5 rounded-md border border-cyan-200 dark:border-cyan-800/60 shrink-0 shadow-2xs">
+                    <Zap className="w-3 h-3 text-cyan-600 dark:text-cyan-400" />
+                    <span>Activo</span>
+                  </div>
+                </div>
               </div>
-              <h4 className="text-sm font-bold text-slate-900 dark:text-white">
-                Experiencia de Compra Ágil
-              </h4>
-              <p className="text-xs text-slate-500 dark:text-slate-300 leading-relaxed">
-                El comprador añade artículos al carrito con un clic y confirma su solicitud directamente en WhatsApp en segundos.
-              </p>
             </div>
-          </div>
-        </div>
+          );
+        })()}
       </section>
 
       {/* Divisor Visual Sutil */}
       <div className="w-full h-px bg-slate-200/70 dark:bg-[#16223b]" />
 
       {/* ========================================================================= */}
-      {/* 5. TODO LO QUE PUEDES HACER                                               */}
+      {/* BLOQUE 3: FUNCIONALIDADES EXISTENTES                                      */}
+      {/* Responde: ¿Qué puedo hacer con MAXINEGO? Sin duplicaciones                */}
       {/* ========================================================================= */}
       <section id="capacidades" className="w-full space-y-6 sm:space-y-8 scroll-mt-20">
         <div className="max-w-2xl space-y-2">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-950/60 border border-blue-200/80 dark:border-blue-800/60 text-blue-700 dark:text-blue-300 text-xs font-bold uppercase tracking-wider">
             <Package className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-            <span>Herramientas para el Comercio</span>
+            <span>Herramientas para tu negocio</span>
           </div>
           <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-            Todo lo que puedes hacer con MAXINEGO
+            Tu negocio bajo control, desde un solo lugar.
           </h2>
           <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 leading-relaxed">
-            MAXINEGO te brinda las herramientas esenciales para administrar tu comercio y vender con facilidad, sin complicaciones técnicas.
+            Administra tus productos, organiza la atención y realiza el seguimiento de tus pedidos desde MAXINEGO.
           </p>
         </div>
 
-        {/* Grilla de 6 Capacidades Reales */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
-          {/* Capacidad 1 */}
-          <div className="p-6 rounded-2xl bg-white dark:bg-[#0d162b] border border-slate-200/80 dark:border-[#1c2a47] shadow-2xs hover:shadow-md hover:border-blue-300/80 dark:hover:border-blue-600/60 transition-all duration-200 space-y-3 group">
-            <div className="w-11 h-11 rounded-xl bg-blue-50 dark:bg-blue-950/70 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-200 dark:border-blue-800/60 group-hover:scale-105 transition-transform">
-              <Globe className="w-5 h-5" />
-            </div>
-            <h3 className="text-base font-bold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-              Crear y mostrar tu tienda online
-            </h3>
-            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-              Tu tienda disponible las 24 horas del día, con dirección web propia para que tus clientes puedan entrar desde cualquier dispositivo.
-            </p>
-          </div>
-
-          {/* Capacidad 2 */}
-          <div className="p-6 rounded-2xl bg-white dark:bg-[#0d162b] border border-slate-200/80 dark:border-[#1c2a47] shadow-2xs hover:shadow-md hover:border-emerald-300/80 dark:hover:border-emerald-600/60 transition-all duration-200 space-y-3 group">
-            <div className="w-11 h-11 rounded-xl bg-emerald-50 dark:bg-emerald-950/70 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-200 dark:border-emerald-800/60 group-hover:scale-105 transition-transform">
-              <Package className="w-5 h-5" />
-            </div>
-            <h3 className="text-base font-bold text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
-              Gestionar productos y servicios
-            </h3>
-            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-              Publica fotos, precios, descripciones detalladas y actualiza la disponibilidad de cada artículo en tiempo real.
-            </p>
-          </div>
-
-          {/* Capacidad 3 */}
-          <div className="p-6 rounded-2xl bg-white dark:bg-[#0d162b] border border-slate-200/80 dark:border-[#1c2a47] shadow-2xs hover:shadow-md hover:border-amber-300/80 dark:hover:border-amber-600/60 transition-all duration-200 space-y-3 group">
-            <div className="w-11 h-11 rounded-xl bg-amber-50 dark:bg-amber-950/70 text-amber-600 dark:text-amber-400 flex items-center justify-center border border-amber-200 dark:border-amber-800/60 group-hover:scale-105 transition-transform">
-              <Tag className="w-5 h-5" />
-            </div>
-            <h3 className="text-base font-bold text-slate-900 dark:text-white group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">
-              Organizar tu catálogo comercial
-            </h3>
-            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-              Crea categorías personalizadas según tu rubro para que los compradores encuentren exactamente lo que necesitan.
-            </p>
-          </div>
-
-          {/* Capacidad 4 */}
-          <div className="p-6 rounded-2xl bg-white dark:bg-[#0d162b] border border-slate-200/80 dark:border-[#1c2a47] shadow-2xs hover:shadow-md hover:border-rose-300/80 dark:hover:border-rose-600/60 transition-all duration-200 space-y-3 group">
-            <div className="w-11 h-11 rounded-xl bg-rose-50 dark:bg-rose-950/70 text-rose-600 dark:text-rose-400 flex items-center justify-center border border-rose-200 dark:border-rose-800/60 group-hover:scale-105 transition-transform">
-              <Smartphone className="w-5 h-5" />
-            </div>
-            <h3 className="text-base font-bold text-slate-900 dark:text-white group-hover:text-rose-600 dark:group-hover:text-rose-400 transition-colors">
-              Atender a tus clientes con cercanía
-            </h3>
-            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-              Ofrece información clara de ubicación, horarios de atención, formas de pago aceptadas y métodos de entrega.
-            </p>
-          </div>
-
-          {/* Capacidad 5 */}
-          <div className="p-6 rounded-2xl bg-white dark:bg-[#0d162b] border border-slate-200/80 dark:border-[#1c2a47] shadow-2xs hover:shadow-md hover:border-indigo-300/80 dark:hover:border-indigo-600/60 transition-all duration-200 space-y-3 group">
-            <div className="w-11 h-11 rounded-xl bg-indigo-50 dark:bg-indigo-950/70 text-indigo-600 dark:text-indigo-400 flex items-center justify-center border border-indigo-200 dark:border-indigo-800/60 group-hover:scale-105 transition-transform">
-              <ShoppingCart className="w-5 h-5" />
-            </div>
-            <h3 className="text-base font-bold text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
-              Administrar pedidos entrantes
-            </h3>
-            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-              Revisa los pedidos de tus clientes de forma ordenada y controla su estado (pendiente, en preparación o entregado).
-            </p>
-          </div>
-
-          {/* Capacidad 6 */}
-          <div className="p-6 rounded-2xl bg-white dark:bg-[#0d162b] border border-slate-200/80 dark:border-[#1c2a47] shadow-2xs hover:shadow-md hover:border-emerald-300/80 dark:hover:border-emerald-600/60 transition-all duration-200 space-y-3 group">
-            <div className="w-11 h-11 rounded-xl bg-emerald-50 dark:bg-emerald-950/70 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-200 dark:border-emerald-800/60 group-hover:scale-105 transition-transform">
-              <MessageCircle className="w-5 h-5" />
-            </div>
-            <h3 className="text-base font-bold text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
-              Ventas directas por WhatsApp
-            </h3>
-            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-              El cliente arma su compra en el catálogo y te envía la orden lista para coordinar pago y entrega en tu chat.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* Divisor Visual Sutil */}
-      <div className="w-full h-px bg-slate-200/70 dark:bg-[#16223b]" />
-
-      {/* ========================================================================= */}
-      {/* 6. MAXINEGO TE AYUDA A SER DESCUBIERTO                                    */}
-      {/* ========================================================================= */}
-      <section id="ecosistema-descubrimiento" className="w-full">
-        <div className="rounded-3xl sm:rounded-[32px] bg-gradient-to-br from-[#060c23] via-[#0b163b] to-[#171242] text-white p-7 sm:p-10 lg:p-12 border border-blue-500/25 shadow-2xl shadow-blue-950/60 ring-1 ring-white/10 relative overflow-hidden">
-          {/* Iluminación ambiental y profundidad atmosférica */}
-          <div className="pointer-events-none absolute -top-24 -right-20 w-96 h-96 bg-blue-500/18 rounded-full blur-3xl anim-ambient-glow-1" />
-          <div className="pointer-events-none absolute -bottom-24 -left-20 w-96 h-96 bg-violet-600/14 rounded-full blur-3xl anim-ambient-glow-2" />
-          <div className="pointer-events-none absolute top-1/2 left-1/3 -translate-y-1/2 w-80 h-80 bg-indigo-500/10 rounded-full blur-2xl" />
-
-          {/* Gráfico decorativo vectorial sutil: ondas de alcance y descubrimiento de comercio local */}
-          <svg
-            aria-hidden="true"
-            className="pointer-events-none absolute -right-16 -bottom-16 w-88 h-88 sm:w-96 sm:h-96 text-blue-400 opacity-[0.08] anim-radar-wave select-none"
-            viewBox="0 0 400 400"
-            fill="none"
-            stroke="currentColor"
-          >
-            <circle cx="200" cy="200" r="55" strokeWidth="1.2" strokeDasharray="3 3" />
-            <circle cx="200" cy="200" r="105" strokeWidth="1.2" />
-            <circle cx="200" cy="200" r="155" strokeWidth="1.2" strokeDasharray="4 4" />
-            <circle cx="200" cy="200" r="205" strokeWidth="1.2" />
-            <line x1="200" y1="20" x2="200" y2="380" strokeWidth="1" strokeDasharray="2 2" />
-            <line x1="20" y1="200" x2="380" y2="200" strokeWidth="1" strokeDasharray="2 2" />
-          </svg>
-
-          <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-            <div className="lg:col-span-8 space-y-4">
-              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-500/15 border border-blue-400/25 text-blue-200 text-xs font-semibold tracking-wide backdrop-blur-xs">
-                <Compass className="w-3.5 h-3.5 text-blue-300" />
-                <span>Ecosistema de Comercios</span>
+        {/* Grilla Compacta de 3 Tarjetas de Administración */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 sm:gap-6">
+          {/* Tarjeta 1: Productos */}
+          <div className="p-6 sm:p-7 rounded-2xl bg-white dark:bg-[#0d162b] border border-slate-200/80 dark:border-[#1c2a47] shadow-2xs hover:shadow-md hover:border-blue-400/60 dark:hover:border-blue-500/60 transition-all duration-200 hover:-translate-y-0.5 space-y-3.5 group flex flex-col justify-between">
+            <div className="space-y-3.5">
+              <div className="w-11 h-11 rounded-xl bg-blue-50 dark:bg-blue-950/70 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-200 dark:border-blue-800/60 transition-colors">
+                <Package className="w-5 h-5" />
               </div>
-
-              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white tracking-tight leading-tight">
-                MAXINEGO te ayuda a ser descubierto
-              </h2>
-
-              <p className="text-base sm:text-lg text-slate-200 leading-relaxed max-w-2xl">
-                <strong>Tu tienda es tu negocio digital.</strong> MAXINEGO es el ecosistema donde los comercios locales pueden mostrar lo que ofrecen y ser descubiertos por nuevos clientes.
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                Productos
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+                Actualiza tus productos, precios y disponibilidad.
               </p>
-
-              <div className="pt-2 grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs sm:text-sm text-slate-200">
-                <div className="flex items-start gap-3 p-3.5 rounded-2xl bg-white/[0.04] border border-white/[0.08] backdrop-blur-xs transition-colors duration-200 hover:bg-white/[0.07] hover:border-white/[0.14]">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                  <span className="leading-snug">
-                    <strong className="text-white">Identidad 100% tuya:</strong> Tu comercio mantiene su autonomía, marca y relación directa con cada comprador.
-                  </span>
-                </div>
-                <div className="flex items-start gap-3 p-3.5 rounded-2xl bg-white/[0.04] border border-white/[0.08] backdrop-blur-xs transition-colors duration-200 hover:bg-white/[0.07] hover:border-white/[0.14]">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                  <span className="leading-snug">
-                    <strong className="text-white">Mayor visibilidad:</strong> Forma parte de un escaparate donde personas de tu ciudad pueden conocerte por rubro.
-                  </span>
-                </div>
-              </div>
             </div>
+          </div>
 
-            <div className="lg:col-span-4 flex flex-col sm:flex-row lg:flex-col gap-3 justify-center">
-              <button
-                type="button"
-                onClick={handleCreateStore}
-                className="group relative overflow-hidden px-6 py-3.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-sm transition-all duration-200 shadow-md hover:shadow-lg hover:shadow-blue-500/25 hover:-translate-y-0.5 flex items-center justify-center gap-2 cursor-pointer active:translate-y-0"
-              >
-                <span
-                  aria-hidden="true"
-                  className="pointer-events-none absolute inset-0 w-1/3 h-full bg-gradient-to-r from-transparent via-white/20 to-transparent anim-block-cta-sheen"
-                />
-                <StoreIcon className="w-4 h-4 relative z-10" />
-                <span className="relative z-10">Crear mi tienda ahora</span>
-                <ArrowRight className="w-4 h-4 relative z-10 transition-transform duration-200 group-hover:translate-x-1" />
-              </button>
-              <button
-                type="button"
-                onClick={handleScrollToStores}
-                className="group px-6 py-3.5 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 hover:border-white/30 text-white font-semibold text-sm transition-all duration-200 hover:-translate-y-0.5 flex items-center justify-center gap-2 cursor-pointer active:translate-y-0 shadow-2xs"
-              >
-                <Compass className="w-4 h-4 text-blue-200 transition-transform duration-300 group-hover:rotate-45" />
-                <span>Ver vitrina de comercios</span>
-              </button>
+          {/* Tarjeta 2: Atención */}
+          <div className="p-6 sm:p-7 rounded-2xl bg-white dark:bg-[#0d162b] border border-slate-200/80 dark:border-[#1c2a47] shadow-2xs hover:shadow-md hover:border-emerald-400/60 dark:hover:border-emerald-500/60 transition-all duration-200 hover:-translate-y-0.5 space-y-3.5 group flex flex-col justify-between">
+            <div className="space-y-3.5">
+              <div className="w-11 h-11 rounded-xl bg-emerald-50 dark:bg-emerald-950/70 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-200 dark:border-emerald-800/60 transition-colors">
+                <Clock className="w-5 h-5" />
+              </div>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+                Atención
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+                Configura horarios, entregas y datos de tu negocio.
+              </p>
+            </div>
+          </div>
+
+          {/* Tarjeta 3: Pedidos */}
+          <div className="p-6 sm:p-7 rounded-2xl bg-white dark:bg-[#0d162b] border border-slate-200/80 dark:border-[#1c2a47] shadow-2xs hover:shadow-md hover:border-purple-400/60 dark:hover:border-purple-500/60 transition-all duration-200 hover:-translate-y-0.5 space-y-3.5 group flex flex-col justify-between">
+            <div className="space-y-3.5">
+              <div className="w-11 h-11 rounded-xl bg-purple-50 dark:bg-purple-950/70 text-purple-600 dark:text-purple-400 flex items-center justify-center border border-purple-200 dark:border-purple-800/60 transition-colors">
+                <ShoppingBag className="w-5 h-5" />
+              </div>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
+                Pedidos
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+                Consulta y gestiona los pedidos recibidos.
+              </p>
             </div>
           </div>
         </div>
@@ -1683,30 +2116,63 @@ export const PortalHome: React.FC = () => {
       <div className="w-full h-px bg-slate-200/70 dark:bg-[#16223b]" />
 
       {/* ========================================================================= */}
-      {/* 7. DESCUBRE TIENDAS EN MAXINEGO (#descubre-tiendas)                        */}
+      {/* BLOQUE 4: COMERCIOS EN MAXINEGO                                           */}
+      {/* Vitrina unificada de comercios: mantiene todos los comercios reales,       */}
+      {/* categorías, filtros y enlaces, eliminando listados duplicados.            */}
       {/* ========================================================================= */}
       <section
-        id="descubre-tiendas"
+        id="carrusel-comercios"
         className="w-full space-y-6 sm:space-y-8 scroll-mt-20"
       >
-        {/* Encabezado comercial de la vitrina */}
+        {/* Anclas de compatibilidad para enlaces del Navbar y botones */}
+        <div id="descubre-tiendas" className="scroll-mt-20" />
+        <div id="comercios" className="scroll-mt-20" />
+
+        {/* Encabezado comercial de la vitrina con explicación de tiendas independientes */}
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-          <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-950/60 border border-blue-200/80 dark:border-blue-800/60 text-blue-700 dark:text-blue-300 text-xs font-bold uppercase tracking-wider">
-              <StoreIcon className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-              <span>Vitrina Comercial</span>
+          <div className="max-w-3xl space-y-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[11px] font-bold tracking-wider text-blue-600 dark:text-blue-400 uppercase">
+                Vitrina de Comercios Locales
+              </span>
+              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-200/70 dark:border-emerald-800/50">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span>Tiendas 100% Independientes</span>
+              </span>
             </div>
             <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-              Descubre tiendas en MAXINEGO
+              Comercios en MAXINEGO
             </h2>
-            <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300">
-              Explora los comercios locales que ya forman parte de la plataforma y conoce sus catálogos:
+            <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 leading-relaxed">
+              Descubre negocios locales en MAXINEGO. Cada comercio cuenta con su propia tienda digital, catálogo y experiencia de compra independiente, sin navegación directa hacia otros negocios desde su interior.
             </p>
           </div>
 
-          <span className="px-3.5 py-1.5 rounded-full text-xs font-semibold bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/50 self-start sm:self-auto shadow-2xs">
+          <span className="px-3.5 py-1.5 rounded-full text-xs font-semibold bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/50 self-start sm:self-auto shadow-2xs shrink-0">
             {stores.length} {stores.length === 1 ? 'comercio activo' : 'comercios activos'}
           </span>
+        </div>
+
+        {/* Barra de 3 Atributos de Independencia */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 rounded-2xl bg-slate-50/90 dark:bg-[#0c152a] border border-slate-200/80 dark:border-[#1c2a47] text-xs text-slate-700 dark:text-slate-300">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-blue-100 dark:bg-blue-950/80 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+              <StoreIcon className="w-3.5 h-3.5" />
+            </div>
+            <span className="font-semibold">Vitrina exclusiva para cada negocio</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-emerald-100 dark:bg-emerald-950/80 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+              <Package className="w-3.5 h-3.5" />
+            </div>
+            <span className="font-semibold">Catálogo y pedidos independientes</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-indigo-100 dark:bg-indigo-950/80 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+              <ShieldCheck className="w-3.5 h-3.5" />
+            </div>
+            <span className="font-semibold">Sin cruce entre comercios</span>
+          </div>
         </div>
 
         {/* Filtros de Rubro */}
@@ -1736,7 +2202,7 @@ export const PortalHome: React.FC = () => {
           })}
         </div>
 
-        {/* Listado de Tarjetas de Comercios Públicos */}
+        {/* Listado de Tarjetas de Comercios */}
         {isLoading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {[1, 2, 3].map((i) => (
@@ -1744,9 +2210,9 @@ export const PortalHome: React.FC = () => {
                 key={i}
                 className="rounded-2xl bg-white dark:bg-[#0d162b] border border-slate-200 dark:border-[#1c2a47] p-6 animate-pulse space-y-4"
               >
-                <div className="h-16 bg-slate-100 dark:bg-[#16223b] rounded-xl" />
+                <div className="h-14 bg-slate-100 dark:bg-[#16223b] rounded-xl" />
                 <div className="h-4 bg-slate-100 dark:bg-[#16223b] rounded w-1/3" />
-                <div className="h-6 bg-slate-100 dark:bg-[#16223b] rounded w-2/3" />
+                <div className="h-5 bg-slate-100 dark:bg-[#16223b] rounded w-2/3" />
                 <div className="h-10 bg-slate-100 dark:bg-[#16223b] rounded-xl mt-4" />
               </div>
             ))}
@@ -1786,58 +2252,76 @@ export const PortalHome: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {comerciosFiltrados.map((store) => {
               const meta = getCardMetadata(store);
-              const Icon = meta.icon;
 
               return (
                 <div
                   key={store.id}
-                  className="rounded-2xl bg-white dark:bg-[#0d162b] border border-slate-200/85 dark:border-[#1c2a47] p-6 flex flex-col justify-between gap-5 transition-all duration-200 hover:shadow-lg hover:border-blue-300 dark:hover:border-blue-600/70 group hover:-translate-y-0.5"
+                  className="rounded-2xl bg-white dark:bg-[#0c152a] border border-slate-200/90 dark:border-[#1c2a47] p-6 flex flex-col justify-between gap-5 transition-all duration-200 hover:shadow-xl hover:border-blue-400 dark:hover:border-blue-500/70 group hover:-translate-y-1 relative"
                 >
-                  {/* Encabezado e Identidad de la Tienda */}
+                  {/* Encabezado e Identidad Clara de Tienda Independiente */}
                   <div className="space-y-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white font-extrabold text-base flex items-center justify-center shadow-xs shrink-0 group-hover:scale-105 transition-transform">
-                          {store.name.slice(0, 2).toUpperCase()}
-                        </div>
-                        <div>
-                          <h3 className="text-base font-bold text-slate-900 dark:text-white leading-tight group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                            {store.name}
-                          </h3>
-                          <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                            {meta.cat}
-                          </span>
-                        </div>
-                      </div>
+                    {/* Barra Superior de la Tarjeta con Etiqueta de Tienda Independiente */}
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-50 dark:bg-blue-950/70 text-blue-700 dark:text-blue-300 border border-blue-200/80 dark:border-blue-800/60">
+                        <ShieldCheck className="w-3 h-3 text-blue-500" />
+                        <span>Tienda independiente</span>
+                      </span>
 
-                      <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full border ${meta.accentBg} ${meta.accentBorder} ${meta.accentText}`}>
+                      <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border shrink-0 ${meta.accentBg} ${meta.accentBorder} ${meta.accentText}`}>
                         {meta.badge}
                       </span>
                     </div>
 
-                    <div className="p-3 rounded-xl bg-slate-50/80 dark:bg-[#090f20] border border-slate-100 dark:border-[#16223b] text-xs text-slate-600 dark:text-slate-300 flex items-center justify-between">
-                      <div className="flex items-center gap-1.5">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                        <span className="font-medium">Tienda activa</span>
+                    {/* Logo/Avatar Principal y Nombre Destacado */}
+                    <div className="flex items-start gap-3.5">
+                      <StoreCardLogo store={store} />
+                      <div className="min-w-0 flex-1">
+                        <h3 className="text-lg font-extrabold text-slate-900 dark:text-white leading-tight truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                          {store.name}
+                        </h3>
+                        <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-1 truncate flex items-center gap-1.5">
+                          <Tag className="w-3 h-3 text-blue-500 shrink-0" />
+                          <span>{meta.cat}</span>
+                        </p>
                       </div>
-                      <span className="text-[11px] font-semibold text-blue-600 dark:text-blue-400">
-                        Catálogo listo
-                      </span>
+                    </div>
+
+                    {/* Ficha de Independencia: Enlace propio y catálogo individual */}
+                    <div className="p-3 rounded-xl bg-slate-50/90 dark:bg-[#081022] border border-slate-100 dark:border-[#16233f] text-xs space-y-1.5">
+                      <div className="flex items-center justify-between gap-2 text-[11px] font-mono text-slate-500 dark:text-slate-400 truncate">
+                        <span className="flex items-center gap-1.5 truncate">
+                          <Lock className="w-3 h-3 text-emerald-500 shrink-0" />
+                          <span className="truncate">maxinego.app/tienda/{store.slug}</span>
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-[11px] text-slate-600 dark:text-slate-300 pt-1.5 border-t border-slate-200/50 dark:border-white/5">
+                        <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                          <span>Catálogo propio</span>
+                        </span>
+                        <span className="text-slate-400 dark:text-slate-400 text-[10px] font-medium">
+                          Sin cruce entre comercios
+                        </span>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Acciones de la Tarjeta */}
-                  <div className="pt-2 border-t border-slate-100 dark:border-[#16223b] flex items-center gap-2">
+                  {/* Acciones y Entrada Clara a la Tienda Específica */}
+                  <div className="pt-3 border-t border-slate-100 dark:border-[#16223b] space-y-2">
+                    <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400 flex items-center justify-between">
+                      <span className="truncate">Explora la vitrina de {store.name}</span>
+                      <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold shrink-0">100% directa</span>
+                    </div>
                     <button
                       type="button"
                       onClick={() => navigate(`/tienda/${store.slug}`)}
-                      className="w-full py-2.5 px-4 rounded-xl text-xs font-bold transition flex items-center justify-between cursor-pointer bg-slate-900 hover:bg-blue-600 text-white dark:bg-[#152342] dark:hover:bg-blue-600 dark:border dark:border-[#22355e] shadow-xs active:scale-[0.99]"
+                      className="w-full py-2.5 px-4 rounded-xl text-xs font-bold transition flex items-center justify-between cursor-pointer bg-slate-900 hover:bg-blue-600 text-white dark:bg-[#152342] dark:hover:bg-blue-600 dark:border dark:border-[#22355e] shadow-xs active:scale-[0.99] group/btn"
                     >
-                      <span className="flex items-center gap-1.5">
-                        <StoreIcon className="w-3.5 h-3.5 text-blue-400" />
+                      <span className="flex items-center gap-2">
+                        <StoreIcon className="w-3.5 h-3.5 text-blue-400 group-hover/btn:scale-110 transition-transform" />
                         <span>Ver tienda y catálogo</span>
                       </span>
-                      <ChevronRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
+                      <ChevronRight className="w-4 h-4 transition-transform group-hover/btn:translate-x-1" />
                     </button>
                   </div>
                 </div>
@@ -1851,7 +2335,8 @@ export const PortalHome: React.FC = () => {
       <div className="w-full h-px bg-slate-200/70 dark:bg-[#16223b]" />
 
       {/* ========================================================================= */}
-      {/* 8. PREGUNTAS FRECUENTES (FAQ)                                             */}
+      {/* BLOQUE 5: PREGUNTAS FRECUENTES (FAQ)                                      */}
+      {/* Conserva todas las 6 preguntas y respuestas originales                    */}
       {/* ========================================================================= */}
       <section id="faq" className="w-full space-y-6 sm:space-y-8 scroll-mt-20">
         <div className="max-w-2xl space-y-2">
@@ -1940,74 +2425,8 @@ export const PortalHome: React.FC = () => {
       <div className="w-full h-px bg-slate-200/70 dark:bg-[#16223b]" />
 
       {/* ========================================================================= */}
-      {/* 9. CTA FINAL                                                              */}
-      {/* ========================================================================= */}
-      <section id="cta-final" className="w-full pb-4 sm:pb-6">
-        <div className="rounded-3xl sm:rounded-[32px] bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700 text-white p-8 sm:p-12 lg:p-16 text-center space-y-6 shadow-2xl shadow-indigo-950/30 border border-white/20 ring-1 ring-white/15 relative overflow-hidden">
-          {/* Iluminación ambiental y profundidad dinámica */}
-          <div className="pointer-events-none absolute -top-24 -right-20 w-96 h-96 bg-white/15 rounded-full blur-3xl anim-ambient-glow-1" />
-          <div className="pointer-events-none absolute -bottom-24 -left-20 w-96 h-96 bg-indigo-900/40 rounded-full blur-3xl anim-ambient-glow-2" />
-          <div className="pointer-events-none absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-xl h-36 bg-white/10 rounded-full blur-2xl" />
-
-          {/* Forma curva suave decorativa en segundo plano */}
-          <svg
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-0 w-full h-full text-white opacity-[0.08] select-none"
-            preserveAspectRatio="none"
-            viewBox="0 0 1000 400"
-            fill="none"
-          >
-            <path d="M0,200 C250,120 450,280 700,160 C850,90 950,180 1000,150 L1000,400 L0,400 Z" fill="currentColor" />
-            <path d="M0,240 C300,180 500,320 750,200 C900,140 980,210 1000,190" stroke="currentColor" strokeWidth="1.5" strokeDasharray="6 6" />
-          </svg>
-
-          <div className="relative z-10 max-w-3xl mx-auto space-y-4">
-            <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/15 border border-white/25 text-white text-xs font-semibold uppercase tracking-wider backdrop-blur-xs shadow-2xs">
-              <Sparkles className="w-3.5 h-3.5 text-blue-100" />
-              <span>Presencia Digital para tu Negocio</span>
-            </span>
-
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight leading-tight">
-              Tu comercio ya existe. Ahora también puede estar en digital.
-            </h2>
-
-            <p className="text-base sm:text-lg text-blue-50/95 leading-relaxed max-w-2xl mx-auto">
-              Crea tu tienda online, publica tus productos y servicios y atiende a tus clientes de manera moderna, ágil y directa.
-            </p>
-
-            <div className="pt-4 flex flex-wrap items-center justify-center gap-3.5">
-              <button
-                type="button"
-                onClick={handleCreateStore}
-                className="group relative overflow-hidden px-7 py-3.5 rounded-xl bg-white hover:bg-blue-50/95 text-blue-700 font-bold text-sm transition-all duration-200 shadow-md hover:shadow-xl hover:shadow-black/15 hover:-translate-y-0.5 active:translate-y-0 cursor-pointer flex items-center justify-center gap-2.5"
-              >
-                <span
-                  aria-hidden="true"
-                  className="pointer-events-none absolute inset-0 w-1/3 h-full bg-gradient-to-r from-transparent via-blue-500/10 to-transparent anim-block-cta-sheen"
-                />
-                <StoreIcon className="w-4 h-4 text-blue-600 relative z-10 transition-transform duration-200 group-hover:scale-110" />
-                <span className="relative z-10">Crear mi tienda</span>
-                <ArrowRight className="w-4 h-4 relative z-10 transition-transform duration-200 group-hover:translate-x-1" />
-              </button>
-
-              <button
-                type="button"
-                onClick={handleScrollToStores}
-                className="group px-6 py-3.5 rounded-xl bg-white/15 hover:bg-white/20 border border-white/30 hover:border-white/40 text-white font-semibold text-sm transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 cursor-pointer flex items-center justify-center gap-2 shadow-2xs"
-              >
-                <Compass className="w-4 h-4 text-blue-100 transition-transform duration-300 group-hover:rotate-45" />
-                <span>Explorar tiendas</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Divisor Visual Sutil */}
-      <div className="w-full h-px bg-slate-200/70 dark:bg-[#16223b]" />
-
-      {/* ========================================================================= */}
-      {/* 10. CREAR MI TIENDA / CONTACTO                                            */}
+      {/* BLOQUE 6: CIERRE COMERCIAL Y CONTACTO                                     */}
+      {/* Formulario íntegro de contacto con WhatsApp oficial y llamada clara a la acción */}
       {/* ========================================================================= */}
       <ContactSection />
     </div>
