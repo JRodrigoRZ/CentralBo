@@ -263,7 +263,10 @@ export function onManifestChange(cb: ManifestChangeListener): () => void {
  * Aplica activamente un manifiesto Web App al documento DOM
  * Garantiza aislamiento eliminando cualquier manifiesto residual previo y actualizando metadatos visuales.
  */
-export function applyPWAManifest(manifestObj: ReturnType<typeof buildStoreManifest>): void {
+export function applyPWAManifest(
+  manifestObj: ReturnType<typeof buildStoreManifest>,
+  storeSeoImageUrl?: string | null
+): void {
   if (typeof document === 'undefined') return;
 
   try {
@@ -291,11 +294,10 @@ export function applyPWAManifest(manifestObj: ReturnType<typeof buildStoreManife
     });
 
     // 3. Título de la página
-    if (manifestObj.id === '/') {
-      document.title = 'MAXINEGO — Plataforma para Comercios y Negocios Locales';
-    } else {
-      document.title = `${manifestObj.name} — MAXINEGO`;
-    }
+    const pageTitle = manifestObj.id === '/'
+      ? 'MAXINEGO — Plataforma para Comercios y Negocios Locales'
+      : `${manifestObj.name} — MAXINEGO`;
+    document.title = pageTitle;
 
     // 4. Meta theme-color
     let metaTheme = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
@@ -346,7 +348,52 @@ export function applyPWAManifest(manifestObj: ReturnType<typeof buildStoreManife
     }
     metaOgUrl.content = canonicalUrl;
 
-    // 8. Iconos apple-touch-icon y favicon aislados por tenant
+    // 8. Open Graph específico de la tienda y restauración al volver a la plataforma
+    if (manifestObj.id === '/' || manifestObj.id.startsWith('/tienda/')) {
+      let metaOgTitle = document.querySelector<HTMLMetaElement>('meta[property="og:title"]');
+      if (!metaOgTitle) {
+        metaOgTitle = document.createElement('meta');
+        metaOgTitle.setAttribute('property', 'og:title');
+        document.head.appendChild(metaOgTitle);
+      }
+      metaOgTitle.content = pageTitle;
+
+      let metaOgDescription = document.querySelector<HTMLMetaElement>(
+        'meta[property="og:description"]'
+      );
+      if (!metaOgDescription) {
+        metaOgDescription = document.createElement('meta');
+        metaOgDescription.setAttribute('property', 'og:description');
+        document.head.appendChild(metaOgDescription);
+      }
+      metaOgDescription.content = manifestObj.description;
+
+      const existingOgImage = document.querySelector<HTMLMetaElement>('meta[property="og:image"]');
+      let normalizedOgImage: string | null = null;
+      if (manifestObj.id.startsWith('/tienda/') && storeSeoImageUrl?.trim()) {
+        try {
+          const imageUrl = new URL(storeSeoImageUrl, window.location.origin);
+          if (['http:', 'https:'].includes(imageUrl.protocol)) {
+            normalizedOgImage = imageUrl.href;
+          }
+        } catch {
+          normalizedOgImage = null;
+        }
+      }
+
+      if (normalizedOgImage) {
+        const metaOgImage = existingOgImage || document.createElement('meta');
+        if (!existingOgImage) {
+          metaOgImage.setAttribute('property', 'og:image');
+          document.head.appendChild(metaOgImage);
+        }
+        metaOgImage.content = normalizedOgImage;
+      } else {
+        existingOgImage?.remove();
+      }
+    }
+
+    // 9. Iconos apple-touch-icon y favicon aislados por tenant
     if (manifestObj.icons && manifestObj.icons.length > 0) {
       const topIcon = manifestObj.icons[0].src;
       let appleIcon = document.querySelector<HTMLLinkElement>('link[rel="apple-touch-icon"]');
@@ -377,7 +424,7 @@ export function useStorePWA(config: StorePWAConfig | null): void {
     if (!config) return;
 
     const storeManifest = buildStoreManifest(config);
-    applyPWAManifest(storeManifest);
+    applyPWAManifest(storeManifest, config.logoUrl);
 
     return () => {
       // Al salir de la tienda, restaurar el manifiesto base de MAXINEGO

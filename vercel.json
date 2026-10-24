@@ -1,4 +1,9 @@
 {
+  "functions": {
+    "api/store-page.ts": {
+      "includeFiles": "dist/index.html"
+    }
+  },
   "headers": [
     {
       "source": "/robots.txt",
@@ -130,6 +135,10 @@
     }
   ],
   "rewrites": [
+    {
+      "source": "/tienda/:slug",
+      "destination": "/api/store-page?slug=:slug"
+    },
     {
       "source": "/api/(.*)",
       "destination": "/api/$1"

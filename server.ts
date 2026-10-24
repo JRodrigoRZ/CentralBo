@@ -1,5 +1,6 @@
 import express, { Request, Response } from 'express';
 import path from 'path';
+import { readFile } from 'fs/promises';
 import dotenv from 'dotenv';
 import { createServer as createViteServer } from 'vite';
 import healthHandler from './api/health.js';
@@ -10,6 +11,11 @@ import createAppointmentHandler from './api/appointments/create-appointment.js';
 import appointmentAvailabilityHandler from './api/appointments/availability.js';
 import activePromotionsHandler from './api/promotions/active.js';
 import chatHandler from './api/chat.js';
+import {
+  fetchPublicStoreSeoMetadata,
+  injectStoreSeoFailureMetadata,
+  injectStoreSeoMetadata,
+} from './src/lib/storeSeoService.js';
 
 dotenv.config();
 
@@ -65,15 +71,77 @@ app.all('/api/chat', (req: Request, res: Response) => {
 // ----------------------------------------------------------------------------
 // CONFIGURACIÓN DE VITE / PRODUCCIÓN
 // ----------------------------------------------------------------------------
+interface PublicStoreHtmlResult {
+  status: 200 | 404 | 503;
+  html: string;
+}
+
+async function renderPublicStoreHtml(
+  slug: string,
+  indexHtml: string
+): Promise<PublicStoreHtmlResult> {
+  try {
+    const metadata = await fetchPublicStoreSeoMetadata(slug);
+    if (!metadata) {
+      return {
+        status: 404,
+        html: injectStoreSeoFailureMetadata(indexHtml, 'not_found'),
+      };
+    }
+
+    return {
+      status: 200,
+      html: injectStoreSeoMetadata(indexHtml, metadata),
+    };
+  } catch (error) {
+    console.error('[MAXINEGO SEO] No se pudieron cargar los metadatos de la tienda:', error);
+    return {
+      status: 503,
+      html: injectStoreSeoFailureMetadata(indexHtml, 'query_error'),
+    };
+  }
+}
+
+function sendPublicStoreHtml(res: Response, result: PublicStoreHtmlResult): void {
+  if (result.status !== 200) {
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+  }
+  res.status(result.status).type('html').send(result.html);
+}
+
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
     });
+
+    app.get('/tienda/:slug', async (req: Request, res: Response, next) => {
+      try {
+        const sourceHtml = await readFile(path.join(process.cwd(), 'index.html'), 'utf8');
+        const transformedHtml = await vite.transformIndexHtml(req.originalUrl, sourceHtml);
+        const result = await renderPublicStoreHtml(req.params.slug, transformedHtml);
+        sendPublicStoreHtml(res, result);
+      } catch (error) {
+        next(error);
+      }
+    });
+
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
+
+    app.get('/tienda/:slug', async (req: Request, res: Response, next) => {
+      try {
+        const indexHtml = await readFile(path.join(distPath, 'index.html'), 'utf8');
+        const result = await renderPublicStoreHtml(req.params.slug, indexHtml);
+        sendPublicStoreHtml(res, result);
+      } catch (error) {
+        next(error);
+      }
+    });
+
     app.use(express.static(distPath));
     app.get('*', (_req: Request, res: Response) => {
       res.sendFile(path.join(distPath, 'index.html'));
