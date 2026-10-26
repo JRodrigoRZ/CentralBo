@@ -151,13 +151,13 @@ export const MiTiendaHorarios: React.FC<MiTiendaHorariosProps> = ({ store }) => 
   return (
     <form onSubmit={handleSave} className="space-y-6">
       {/* Encabezado */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[#DEE7F2] dark:border-[#263653]">
         <div>
-          <h2 className="text-lg font-bold text-white flex items-center gap-2">
-            <Clock className="w-5 h-5 text-indigo-400" />
+          <h2 className="text-lg font-bold text-[#14213D] dark:text-[#F8FAFC] flex items-center gap-2">
+            <Clock className="w-5 h-5 text-[#1769FF] dark:text-[#3B82F6]" />
             <span>Horarios de Atención Comercial</span>
           </h2>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-xs text-[#52627A] dark:text-[#B8C6DA] mt-0.5">
             Configura turnos matutinos, vespertinos y días laborables para pedidos en línea
           </p>
         </div>
@@ -165,7 +165,7 @@ export const MiTiendaHorarios: React.FC<MiTiendaHorariosProps> = ({ store }) => 
         <button
           type="submit"
           disabled={isSaving || isLoading}
-          className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-semibold shadow-md transition cursor-pointer self-start sm:self-auto"
+          className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-[#1769FF] hover:bg-blue-700 dark:bg-[#3B82F6] dark:hover:bg-[#2563EB] disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-semibold shadow-2xs transition cursor-pointer self-start sm:self-auto"
         >
           {isSaving ? (
             <>
@@ -182,28 +182,28 @@ export const MiTiendaHorarios: React.FC<MiTiendaHorariosProps> = ({ store }) => 
       </div>
 
       {savedSuccess && (
-        <div className="p-3.5 rounded-xl bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 text-xs flex items-center gap-2 animate-fadeIn">
-          <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-emerald-400" />
+        <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 dark:bg-[#102A24] dark:border-[#34D399]/40 dark:text-[#34D399] text-xs flex items-center gap-2 animate-fadeIn">
+          <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-emerald-600 dark:text-[#34D399]" />
           <span>Horarios de atención guardados y sincronizados en tiempo real con Supabase.</span>
         </div>
       )}
 
       {saveError && (
-        <div className="p-3.5 rounded-xl bg-rose-950/60 border border-rose-500/40 text-rose-300 text-xs flex items-center gap-2 animate-fadeIn">
-          <AlertCircle className="w-4 h-4 flex-shrink-0 text-rose-400" />
+        <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 dark:bg-[#2E141E] dark:border-[#F87171]/40 dark:text-[#F87171] text-xs flex items-center gap-2 animate-fadeIn">
+          <AlertCircle className="w-4 h-4 flex-shrink-0 text-rose-600 dark:text-[#F87171]" />
           <span>{saveError}</span>
         </div>
       )}
 
       {loadingError && (
-        <div className="p-3.5 rounded-xl bg-amber-950/60 border border-amber-500/40 text-amber-300 text-xs flex items-center gap-2 animate-fadeIn">
-          <AlertCircle className="w-4 h-4 flex-shrink-0 text-amber-400" />
+        <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 dark:bg-[#241C12] dark:border-[#FBBF24]/40 dark:text-[#FBBF24] text-xs flex items-center gap-2 animate-fadeIn">
+          <AlertCircle className="w-4 h-4 flex-shrink-0 text-amber-600 dark:text-[#FBBF24]" />
           <span>{loadingError}</span>
         </div>
       )}
 
       {/* Indicador en Vivo de Estado del Comercio */}
-      <div className="p-4 rounded-2xl bg-slate-950/70 border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      <div className="p-4 rounded-2xl bg-[#F8FAFC] dark:bg-[#101B32] border border-[#DEE7F2] dark:border-[#263653] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs">
         <div className="flex items-center gap-3">
           <div
             className={`w-3.5 h-3.5 rounded-full animate-pulse ${
@@ -212,32 +212,32 @@ export const MiTiendaHorarios: React.FC<MiTiendaHorariosProps> = ({ store }) => 
           />
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
+              <span className="text-xs font-bold uppercase tracking-wider text-[#52627A] dark:text-[#B8C6DA]">
                 Estado en Vivo:
               </span>
               <span
                 className={`text-xs font-black uppercase px-2 py-0.5 rounded-md border ${
                   liveStatus.isOpenNow
-                    ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
-                    : 'bg-rose-500/15 text-rose-300 border-rose-500/30'
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30'
+                    : 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-500/15 dark:text-rose-300 dark:border-rose-500/30'
                 }`}
               >
                 {liveStatus.statusLabel}
               </span>
             </div>
-            <p className="text-xs text-slate-300 mt-0.5">{liveStatus.nextOpeningInfo}</p>
+            <p className="text-xs text-[#52627A] dark:text-[#B8C6DA] mt-0.5">{liveStatus.nextOpeningInfo}</p>
           </div>
         </div>
 
-        <span className="text-[11px] text-slate-400 font-mono bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-800">
+        <span className="text-[11px] text-[#52627A] dark:text-[#B8C6DA] font-mono bg-white dark:bg-[#17243D] px-3 py-1.5 rounded-xl border border-[#DEE7F2] dark:border-[#263653] shadow-2xs">
           Hora Local: {new Date().toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit' })}
         </span>
       </div>
 
       {/* Lista de Días (Lunes a Domingo con soporte para múltiples períodos) */}
-      <div className="p-5 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-3">
-        <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
-          <Calendar className="w-4 h-4 text-slate-400" />
+      <div className="p-5 rounded-2xl bg-white dark:bg-[#101B32] border border-[#DEE7F2] dark:border-[#263653] space-y-3 shadow-2xs">
+        <h3 className="text-xs font-bold text-[#14213D] dark:text-[#F8FAFC] uppercase tracking-wider flex items-center gap-2">
+          <Calendar className="w-4 h-4 text-[#1769FF] dark:text-[#3B82F6]" />
           <span>Configuración Semanal Detallada</span>
         </h3>
 
@@ -247,8 +247,8 @@ export const MiTiendaHorarios: React.FC<MiTiendaHorariosProps> = ({ store }) => 
               key={day.dayOfWeek}
               className={`p-3.5 rounded-xl border transition ${
                 day.isOpen
-                  ? 'bg-slate-900/80 border-slate-800'
-                  : 'bg-slate-950/40 border-slate-900 opacity-60'
+                  ? 'bg-[#F8FAFC] dark:bg-[#17243D] border-[#DEE7F2] dark:border-[#263653]'
+                  : 'bg-[#F1F5F9]/60 dark:bg-[#0E1726]/60 border-[#DEE7F2] dark:border-[#1F2C45] opacity-60'
               }`}
             >
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -258,19 +258,19 @@ export const MiTiendaHorarios: React.FC<MiTiendaHorariosProps> = ({ store }) => 
                     id={`day-${day.dayOfWeek}`}
                     checked={day.isOpen}
                     onChange={() => handleToggleDay(day.dayOfWeek)}
-                    className="w-4 h-4 rounded text-indigo-600 bg-slate-800 border-slate-700 cursor-pointer"
+                    className="w-4 h-4 rounded text-[#1769FF] accent-[#1769FF] bg-white dark:bg-slate-800 border-[#DEE7F2] dark:border-slate-700 cursor-pointer"
                   />
                   <label
                     htmlFor={`day-${day.dayOfWeek}`}
-                    className="text-xs font-bold text-white w-24 cursor-pointer"
+                    className="text-xs font-bold text-[#14213D] dark:text-[#F8FAFC] w-24 cursor-pointer"
                   >
                     {day.dayName}
                   </label>
                   <span
-                    className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
                       day.isOpen
-                        ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20'
-                        : 'bg-slate-800 text-slate-400'
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/20'
+                        : 'bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'
                     }`}
                   >
                     {day.isOpen ? 'Atiende' : 'Cerrado'}
@@ -283,9 +283,9 @@ export const MiTiendaHorarios: React.FC<MiTiendaHorariosProps> = ({ store }) => 
                     {day.periods.map((period, pIdx) => (
                       <div
                         key={pIdx}
-                        className="flex items-center gap-1.5 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800"
+                        className="flex items-center gap-1.5 bg-white dark:bg-[#101B32] px-2.5 py-1 rounded-lg border border-[#DEE7F2] dark:border-[#263653] shadow-2xs"
                       >
-                        <span className="text-[10px] text-slate-400 font-mono">
+                        <span className="text-[10px] text-[#52627A] dark:text-[#B8C6DA] font-mono">
                           T{pIdx + 1}:
                         </span>
                         <input
@@ -294,23 +294,23 @@ export const MiTiendaHorarios: React.FC<MiTiendaHorariosProps> = ({ store }) => 
                           onChange={(e) =>
                             handlePeriodChange(day.dayOfWeek, pIdx, 'open', e.target.value)
                           }
-                          className="px-1.5 py-0.5 rounded bg-slate-900 text-white text-xs font-mono border border-slate-700 focus:outline-none"
+                          className="px-1.5 py-0.5 rounded bg-[#F8FAFC] dark:bg-slate-900 text-[#14213D] dark:text-white text-xs font-mono border border-[#DEE7F2] dark:border-slate-700 focus:outline-none focus:border-[#1769FF]"
                         />
-                        <span className="text-slate-400 text-xs">-</span>
+                        <span className="text-[#52627A] dark:text-slate-400 text-xs">-</span>
                         <input
                           type="time"
                           value={period.close}
                           onChange={(e) =>
                             handlePeriodChange(day.dayOfWeek, pIdx, 'close', e.target.value)
                           }
-                          className="px-1.5 py-0.5 rounded bg-slate-900 text-white text-xs font-mono border border-slate-700 focus:outline-none"
+                          className="px-1.5 py-0.5 rounded bg-[#F8FAFC] dark:bg-slate-900 text-[#14213D] dark:text-white text-xs font-mono border border-[#DEE7F2] dark:border-slate-700 focus:outline-none focus:border-[#1769FF]"
                         />
 
                         {day.periods.length > 1 && (
                           <button
                             type="button"
                             onClick={() => handleRemovePeriod(day.dayOfWeek, pIdx)}
-                            className="text-slate-400 hover:text-rose-400 p-0.5 transition cursor-pointer"
+                            className="text-[#94A3B8] hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400 p-0.5 transition cursor-pointer"
                             title="Eliminar turno"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -322,7 +322,7 @@ export const MiTiendaHorarios: React.FC<MiTiendaHorariosProps> = ({ store }) => 
                     <button
                       type="button"
                       onClick={() => handleAddPeriod(day.dayOfWeek)}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-600/15 hover:bg-indigo-600/25 border border-indigo-500/30 text-indigo-300 text-[11px] font-semibold transition cursor-pointer"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#EEF4FF] hover:bg-[#DEE7F2] border border-[#DEE7F2] dark:bg-[#17243D] dark:hover:bg-[#1E2D4A] dark:border-[#263653] text-[#1769FF] dark:text-[#3B82F6] text-[11px] font-semibold transition cursor-pointer"
                     >
                       <Plus className="w-3 h-3" />
                       <span>Agregar Turno</span>

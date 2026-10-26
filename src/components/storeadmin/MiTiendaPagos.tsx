@@ -87,19 +87,19 @@ export const MiTiendaPagos: React.FC<MiTiendaPagosProps> = ({ store }) => {
   return (
     <form onSubmit={handleSave} className="space-y-6">
       {/* Encabezado */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[#DEE7F2] dark:border-[#263653]">
         <div>
-          <h2 className="text-lg font-bold text-white flex items-center gap-2">
-            <CreditCard className="w-5 h-5 text-indigo-400" />
+          <h2 className="text-lg font-bold text-[#14213D] dark:text-[#F8FAFC] flex items-center gap-2">
+            <CreditCard className="w-5 h-5 text-[#1769FF] dark:text-[#3B82F6]" />
             <span>Métodos de Pago Aceptados</span>
             {isLoading && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-800 text-slate-400 border border-slate-700">
-                <Loader2 className="w-2.5 h-2.5 animate-spin text-indigo-400" />
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-[#EEF4FF] text-[#1769FF] border border-[#DEE7F2] dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700">
+                <Loader2 className="w-2.5 h-2.5 animate-spin text-[#1769FF] dark:text-indigo-400" />
                 <span>Sincronizando...</span>
               </span>
             )}
           </h2>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-xs text-[#52627A] dark:text-[#B8C6DA] mt-0.5">
             Configura los métodos de pago que acepta tu comercio. Activa o desactiva individualmente cada opción.
           </p>
         </div>
@@ -107,7 +107,7 @@ export const MiTiendaPagos: React.FC<MiTiendaPagosProps> = ({ store }) => {
         <button
           type="submit"
           disabled={isSaving}
-          className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-semibold shadow-md transition cursor-pointer self-start sm:self-auto"
+          className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-[#1769FF] hover:bg-blue-700 dark:bg-[#3B82F6] dark:hover:bg-[#2563EB] disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-semibold shadow-2xs transition cursor-pointer self-start sm:self-auto"
         >
           {isSaving ? (
             <>
@@ -124,59 +124,59 @@ export const MiTiendaPagos: React.FC<MiTiendaPagosProps> = ({ store }) => {
       </div>
 
       {savedSuccess && (
-        <div className="p-3.5 rounded-xl bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 text-xs flex items-center gap-2 animate-fadeIn">
-          <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-emerald-400" />
+        <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 dark:bg-[#102A24] dark:border-[#34D399]/40 dark:text-[#34D399] text-xs flex items-center gap-2 animate-fadeIn">
+          <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-emerald-600 dark:text-[#34D399]" />
           <span>Configuración de métodos de pago guardada exitosamente para {store.name}.</span>
         </div>
       )}
 
       {saveError && (
-        <div className="p-3.5 rounded-xl bg-rose-950/60 border border-rose-500/40 text-rose-300 text-xs flex items-center gap-2 animate-fadeIn">
-          <AlertCircle className="w-4 h-4 flex-shrink-0 text-rose-400" />
+        <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 dark:bg-[#2E141E] dark:border-[#F87171]/40 dark:text-[#F87171] text-xs flex items-center gap-2 animate-fadeIn">
+          <AlertCircle className="w-4 h-4 flex-shrink-0 text-rose-600 dark:text-[#F87171]" />
           <span>{saveError}</span>
         </div>
       )}
 
       {loadingError && (
-        <div className="p-3 rounded-xl bg-amber-950/40 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 flex-shrink-0 text-amber-400" />
+        <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 dark:bg-[#241C12] dark:border-[#FBBF24]/30 dark:text-[#FBBF24] text-xs flex items-center gap-2 animate-fadeIn">
+          <AlertCircle className="w-4 h-4 flex-shrink-0 text-amber-600 dark:text-[#FBBF24]" />
           <span>{loadingError}</span>
         </div>
       )}
 
       {/* CANAL OBLIGATORIO: WHATSAPP (No modificable ni deshabilitable) */}
-      <div className="p-5 rounded-2xl bg-emerald-950/20 border border-emerald-500/40 space-y-3">
+      <div className="p-5 rounded-2xl bg-emerald-50/70 border border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-500/40 space-y-3 shadow-2xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+            <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400 flex items-center justify-center shrink-0">
               <MessageCircle className="w-6 h-6" />
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="text-sm font-bold text-white">WhatsApp — Canal Obligatorio</h3>
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                <h3 className="text-sm font-bold text-[#14213D] dark:text-white">WhatsApp — Canal Obligatorio</h3>
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-500/30">
                   <Lock className="w-2.5 h-2.5" />
                   <span>Siempre Activo</span>
                 </span>
               </div>
-              <p className="text-xs text-emerald-300/80 mt-0.5">
+              <p className="text-xs text-emerald-800/80 dark:text-emerald-300/80 mt-0.5">
                 Canal permanente de coordinación y confirmación directa de pedidos y reservas
               </p>
             </div>
           </div>
 
-          <div className="text-xs text-slate-300 bg-slate-900/80 px-3 py-2 rounded-xl border border-emerald-500/20">
-            <span className="text-slate-400 text-[11px] block">Número de atención:</span>
-            <span className="font-mono font-bold text-white">
+          <div className="text-xs text-[#14213D] dark:text-slate-300 bg-white dark:bg-slate-900/80 px-3 py-2 rounded-xl border border-emerald-200 dark:border-emerald-500/20 shadow-2xs">
+            <span className="text-[#52627A] dark:text-slate-400 text-[11px] block">Número de atención:</span>
+            <span className="font-mono font-bold text-[#14213D] dark:text-white">
               {profile.whatsapp || profile.phone || 'Configura tu número en Mi Tienda > Contacto'}
             </span>
           </div>
         </div>
 
-        <div className="pt-2 border-t border-emerald-500/20 text-xs text-slate-300 leading-relaxed flex items-start gap-2">
-          <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+        <div className="pt-2 border-t border-emerald-200 dark:border-emerald-500/20 text-xs text-[#52627A] dark:text-slate-300 leading-relaxed flex items-start gap-2">
+          <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
           <span>
-            En MAXINEGO, <strong>WhatsApp es obligatorio</strong> y no se trata como un método de pago opcional.
+            En MAXINEGO, <strong className="text-[#14213D] dark:text-white">WhatsApp es obligatorio</strong> y no se trata como un método de pago opcional.
             No puede ser deshabilitado, ocultado ni desactivado desde la configuración.
             Al finalizar un pedido, el cliente siempre dispondrá del botón para enviar el detalle completo por WhatsApp a este comercio.
           </span>
@@ -186,37 +186,37 @@ export const MiTiendaPagos: React.FC<MiTiendaPagosProps> = ({ store }) => {
       {/* MÉTODOS DE PAGO CONFIGURABLES */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-[#52627A] dark:text-slate-400">
             Métodos Configurables por el Comercio
           </h3>
-          <span className="text-[11px] text-slate-400">
+          <span className="text-[11px] text-[#52627A] dark:text-slate-400">
             Activa o desactiva según la operativa de tu negocio
           </span>
         </div>
 
         {/* 1. QR SIMPLE */}
-        <div className={`p-4 sm:p-5 rounded-2xl border transition ${
+        <div className={`p-4 sm:p-5 rounded-2xl border transition shadow-2xs ${
           settings.qrSimple
-            ? 'bg-slate-900/90 border-indigo-500/50'
-            : 'bg-slate-950/60 border-slate-800 opacity-80'
+            ? 'bg-white dark:bg-slate-900/90 border-[#1769FF]/50 dark:border-indigo-500/50'
+            : 'bg-[#F8FAFC] dark:bg-slate-950/60 border-[#DEE7F2] dark:border-slate-800 opacity-80'
         }`}>
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 flex items-center justify-center shrink-0">
+              <div className="w-10 h-10 rounded-xl bg-[#EEF4FF] text-[#1769FF] dark:bg-indigo-500/10 dark:text-indigo-400 border border-[#DEE7F2] dark:border-indigo-500/20 flex items-center justify-center shrink-0">
                 <QrCode className="w-5 h-5" />
               </div>
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
-                  <h4 className="text-sm font-bold text-white">Cobro con QR Simple</h4>
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                  <h4 className="text-sm font-bold text-[#14213D] dark:text-white">Cobro con QR Simple</h4>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
                     settings.qrSimple
-                      ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
-                      : 'bg-slate-800 text-slate-400'
+                      ? 'bg-[#EEF4FF] text-[#1769FF] border-[#DEE7F2] dark:bg-indigo-500/20 dark:text-indigo-300 dark:border-indigo-500/30'
+                      : 'bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400'
                   }`}>
                     {settings.qrSimple ? 'Habilitado' : 'Deshabilitado'}
                   </span>
                 </div>
-                <p className="text-xs text-slate-400 leading-relaxed">
+                <p className="text-xs text-[#52627A] dark:text-slate-400 leading-relaxed">
                   Permite a tus clientes pagar escaneando un código QR desde cualquier aplicación bancaria boliviana.
                 </p>
               </div>
@@ -229,34 +229,34 @@ export const MiTiendaPagos: React.FC<MiTiendaPagosProps> = ({ store }) => {
                 onChange={(e) => setSettings({ ...settings, qrSimple: e.target.checked })}
                 className="sr-only peer"
               />
-              <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+              <div className="w-11 h-6 bg-slate-200 dark:bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#1769FF] dark:peer-checked:bg-indigo-600"></div>
             </label>
           </div>
         </div>
 
         {/* 2. TRANSFERENCIA BANCARIA */}
-        <div className={`p-4 sm:p-5 rounded-2xl border transition space-y-3 ${
+        <div className={`p-4 sm:p-5 rounded-2xl border transition space-y-3 shadow-2xs ${
           settings.bankTransfer
-            ? 'bg-slate-900/90 border-cyan-500/50'
-            : 'bg-slate-950/60 border-slate-800 opacity-80'
+            ? 'bg-white dark:bg-slate-900/90 border-cyan-500/40 dark:border-cyan-500/50'
+            : 'bg-[#F8FAFC] dark:bg-slate-950/60 border-[#DEE7F2] dark:border-slate-800 opacity-80'
         }`}>
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 flex items-center justify-center shrink-0">
+              <div className="w-10 h-10 rounded-xl bg-cyan-50 text-cyan-600 dark:bg-cyan-500/10 dark:text-cyan-400 border border-cyan-200 dark:border-cyan-500/20 flex items-center justify-center shrink-0">
                 <Building2 className="w-5 h-5" />
               </div>
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
-                  <h4 className="text-sm font-bold text-white">Transferencia Bancaria</h4>
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                  <h4 className="text-sm font-bold text-[#14213D] dark:text-white">Transferencia Bancaria</h4>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
                     settings.bankTransfer
-                      ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
-                      : 'bg-slate-800 text-slate-400'
+                      ? 'bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-500/20 dark:text-cyan-300 dark:border-cyan-500/30'
+                      : 'bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400'
                   }`}>
                     {settings.bankTransfer ? 'Habilitado' : 'Deshabilitado'}
                   </span>
                 </div>
-                <p className="text-xs text-slate-400 leading-relaxed">
+                <p className="text-xs text-[#52627A] dark:text-slate-400 leading-relaxed">
                   Permite a tus clientes pagar mediante transferencia interbancaria directa. (Sin pasarelas automáticas ni cobro de comisiones).
                 </p>
               </div>
@@ -269,14 +269,14 @@ export const MiTiendaPagos: React.FC<MiTiendaPagosProps> = ({ store }) => {
                 onChange={(e) => setSettings({ ...settings, bankTransfer: e.target.checked })}
                 className="sr-only peer"
               />
-              <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-600"></div>
+              <div className="w-11 h-6 bg-slate-200 dark:bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-600"></div>
             </label>
           </div>
 
           {settings.bankTransfer && (
-            <div className="pt-3 border-t border-slate-800 grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="pt-3 border-t border-[#DEE7F2] dark:border-slate-800 grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <label className="block text-[11px] text-slate-400 mb-1">Banco (opcional)</label>
+                <label className="block text-[11px] text-[#52627A] dark:text-slate-400 mb-1">Banco (opcional)</label>
                 <input
                   type="text"
                   value={settings.bankDetails?.bankName || ''}
@@ -290,11 +290,11 @@ export const MiTiendaPagos: React.FC<MiTiendaPagosProps> = ({ store }) => {
                     })
                   }
                   placeholder="Ej: Banco BNB, BCP..."
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:border-cyan-500"
+                  className="w-full px-3 py-2 rounded-xl bg-[#F8FAFC] dark:bg-slate-950 border border-[#DEE7F2] dark:border-slate-700 text-[#14213D] dark:text-white text-xs focus:outline-none focus:border-cyan-500 shadow-2xs"
                 />
               </div>
               <div>
-                <label className="block text-[11px] text-slate-400 mb-1">Nº de Cuenta (opcional)</label>
+                <label className="block text-[11px] text-[#52627A] dark:text-slate-400 mb-1">Nº de Cuenta (opcional)</label>
                 <input
                   type="text"
                   value={settings.bankDetails?.accountNumber || ''}
@@ -308,11 +308,11 @@ export const MiTiendaPagos: React.FC<MiTiendaPagosProps> = ({ store }) => {
                     })
                   }
                   placeholder="Ej: 150-1234567-0-1"
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs font-mono focus:outline-none focus:border-cyan-500"
+                  className="w-full px-3 py-2 rounded-xl bg-[#F8FAFC] dark:bg-slate-950 border border-[#DEE7F2] dark:border-slate-700 text-[#14213D] dark:text-white text-xs font-mono focus:outline-none focus:border-cyan-500 shadow-2xs"
                 />
               </div>
               <div>
-                <label className="block text-[11px] text-slate-400 mb-1">Titular (opcional)</label>
+                <label className="block text-[11px] text-[#52627A] dark:text-slate-400 mb-1">Titular (opcional)</label>
                 <input
                   type="text"
                   value={settings.bankDetails?.accountHolder || ''}
@@ -326,7 +326,7 @@ export const MiTiendaPagos: React.FC<MiTiendaPagosProps> = ({ store }) => {
                     })
                   }
                   placeholder="Ej: Nombre de la Empresa o Persona"
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:border-cyan-500"
+                  className="w-full px-3 py-2 rounded-xl bg-[#F8FAFC] dark:bg-slate-950 border border-[#DEE7F2] dark:border-slate-700 text-[#14213D] dark:text-white text-xs focus:outline-none focus:border-cyan-500 shadow-2xs"
                 />
               </div>
             </div>
@@ -334,32 +334,32 @@ export const MiTiendaPagos: React.FC<MiTiendaPagosProps> = ({ store }) => {
         </div>
 
         {/* 3. EFECTIVO CONTRAENTREGA */}
-        <div className={`p-4 sm:p-5 rounded-2xl border transition ${
+        <div className={`p-4 sm:p-5 rounded-2xl border transition shadow-2xs ${
           settings.cashOnDelivery
-            ? 'bg-slate-900/90 border-emerald-500/50'
-            : 'bg-slate-950/60 border-slate-800 opacity-80'
+            ? 'bg-white dark:bg-slate-900/90 border-emerald-500/40 dark:border-emerald-500/50'
+            : 'bg-[#F8FAFC] dark:bg-slate-950/60 border-[#DEE7F2] dark:border-slate-800 opacity-80'
         }`}>
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center shrink-0">
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20 flex items-center justify-center shrink-0">
                 <Banknote className="w-5 h-5" />
               </div>
               <div className="space-y-1">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h4 className="text-sm font-bold text-white">Efectivo Contraentrega</h4>
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                  <h4 className="text-sm font-bold text-[#14213D] dark:text-white">Efectivo Contraentrega</h4>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
                     settings.cashOnDelivery
-                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                      : 'bg-slate-800 text-slate-400'
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-500/30'
+                      : 'bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400'
                   }`}>
                     {settings.cashOnDelivery ? 'Habilitado' : 'Deshabilitado (Por Defecto)'}
                   </span>
                 </div>
-                <p className="text-xs text-slate-400 leading-relaxed">
+                <p className="text-xs text-[#52627A] dark:text-slate-400 leading-relaxed">
                   El cliente paga en efectivo cuando el pedido es entregado a domicilio o retirado en el local.
                 </p>
-                <div className="pt-1 flex items-center gap-1.5 text-[11px] text-amber-300/90">
-                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                <div className="pt-1 flex items-center gap-1.5 text-[11px] text-amber-700 dark:text-amber-300/90">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
                   <span>No aparece automáticamente en el checkout; solo estará disponible para tus clientes si activas este interruptor.</span>
                 </div>
               </div>
@@ -372,30 +372,32 @@ export const MiTiendaPagos: React.FC<MiTiendaPagosProps> = ({ store }) => {
                 onChange={(e) => setSettings({ ...settings, cashOnDelivery: e.target.checked })}
                 className="sr-only peer"
               />
-              <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+              <div className="w-11 h-6 bg-slate-200 dark:bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
             </label>
           </div>
         </div>
       </div>
 
       {/* Resumen de configuración para el checkout */}
-      <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-800 text-xs text-slate-300 space-y-2">
-        <h4 className="font-bold text-slate-200">Impacto en la Tienda Pública:</h4>
-        <ul className="list-disc list-inside space-y-1 text-slate-400">
+      <div className="p-4 rounded-xl bg-[#F8FAFC] dark:bg-slate-950/70 border border-[#DEE7F2] dark:border-slate-800 text-xs text-[#52627A] dark:text-slate-300 space-y-2 shadow-2xs">
+        <h4 className="font-bold text-[#14213D] dark:text-slate-200">Impacto en la Tienda Pública:</h4>
+        <ul className="list-disc list-inside space-y-1 text-[#52627A] dark:text-slate-400">
           <li>
             Tus clientes solo podrán seleccionar en el checkout los métodos que tengas habilitados (
-            {[
-              settings.qrSimple && 'QR Simple',
-              settings.bankTransfer && 'Transferencia',
-              settings.cashOnDelivery && 'Efectivo Contraentrega',
-            ].filter(Boolean).join(', ') || 'Ninguno seleccionado: la coordinación de pago se indicará por WhatsApp'}
+            <span className="font-semibold text-[#14213D] dark:text-slate-200">
+              {[
+                settings.qrSimple && 'QR Simple',
+                settings.bankTransfer && 'Transferencia',
+                settings.cashOnDelivery && 'Efectivo Contraentrega',
+              ].filter(Boolean).join(', ') || 'Ninguno seleccionado: la coordinación de pago se indicará por WhatsApp'}
+            </span>
             ).
           </li>
           <li>
-            WhatsApp se mantiene <strong>siempre disponible</strong> en el checkout y al finalizar el pedido para que el cliente te envíe el resumen.
+            WhatsApp se mantiene <strong className="text-[#14213D] dark:text-white">siempre disponible</strong> en el checkout y al finalizar el pedido para que el cliente te envíe el resumen.
           </li>
           <li>
-            Esta configuración es completamente <strong>independiente y aislada</strong> para <strong>{store.name}</strong>.
+            Esta configuración es completamente <strong className="text-[#14213D] dark:text-white">independiente y aislada</strong> para <strong className="text-[#14213D] dark:text-white">{store.name}</strong>.
           </li>
         </ul>
       </div>

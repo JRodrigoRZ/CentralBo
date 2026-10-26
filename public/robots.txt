@@ -3,8 +3,11 @@ User-agent: *
 Allow: /
 Allow: /tienda/
 
-# Rutas privadas y administrativas
+# Rutas privadas y administrativas protegidas
 Disallow: /api/
+Disallow: /admin/
+Disallow: /superadmin/
+Disallow: /login
 
 # Ubicación canónica del mapa del sitio
 Sitemap: https://www.maxinego.app/sitemap.xml

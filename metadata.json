@@ -1,6 +1,6 @@
 {
   "name": "MAXINEGO",
-  "description": "Plataforma para Comercios y Negocios Locales",
+  "description": "Crea tu tienda digital con MAXINEGO, presenta tus productos y servicios y recibe pedidos directamente por WhatsApp. Sin comisiones por venta.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

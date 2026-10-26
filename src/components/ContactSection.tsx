@@ -20,6 +20,7 @@ import {
   Globe,
   Zap,
 } from 'lucide-react';
+import { trackCommercialEvent } from '../lib/commercialTrackingService';
 
 interface ContactFormData {
   businessName: string;
@@ -101,9 +102,22 @@ export const ContactSection: React.FC = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Registrar clic en "Solicitar información" e intento de envío del formulario comercial
+    trackCommercialEvent('click_solicitar_informacion', { origin: 'formulario_contacto' });
+    trackCommercialEvent('intento_formulario_comercial', { origin: 'formulario_contacto' });
+
     if (!validate()) {
+      // Registrar fallo de validación sin contar como solicitud comercial válida
+      trackCommercialEvent('validacion_formulario_fallida', {
+        origin: 'formulario_contacto',
+        reason: 'campos_incompletos',
+      });
       return;
     }
+
+    // Registrar solicitud comercial válida y apertura de WhatsApp (sin almacenar datos personales)
+    trackCommercialEvent('solicitud_comercial_valida', { origin: 'formulario_contacto' });
+    trackCommercialEvent('apertura_whatsapp_comercial', { origin: 'formulario_contacto' });
 
     // Construcción estructurada del mensaje según especificación
     const messageLines = [
@@ -378,9 +392,13 @@ export const ContactSection: React.FC = () => {
 
               {/* Mensaje de Confirmación al Enviar */}
               {isSubmitted && (
-                <div className="mb-6 p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div
+                  role="status"
+                  aria-live="polite"
+                  className="mb-6 p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
+                >
                   <div className="flex items-center gap-2.5 text-emerald-800 dark:text-emerald-200 text-xs sm:text-sm font-medium">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" aria-hidden="true" />
                     <span>
                       Solicitud lista. WhatsApp se abrirá para continuar la conversación con el número oficial <strong>63527099</strong>.
                     </span>
@@ -390,17 +408,22 @@ export const ContactSection: React.FC = () => {
                       href={lastGeneratedUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shrink-0 shadow-2xs cursor-pointer"
+                      onClick={() =>
+                        trackCommercialEvent('apertura_whatsapp_comercial', {
+                          origin: 'formulario_contacto_reabrir',
+                        })
+                      }
+                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shrink-0 shadow-2xs cursor-pointer focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none"
                     >
                       <span>Abrir WhatsApp</span>
-                      <ExternalLink className="w-3.5 h-3.5" />
+                      <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
                     </a>
                   )}
                 </div>
               )}
 
               {/* Formulario Estrictamente de 5 Campos */}
-              <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5" noValidate>
+              <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5" noValidate aria-label="Formulario para solicitar información comercial">
                 
                 {/* 1. Nombre del negocio * */}
                 <div className="space-y-1.5">
@@ -408,10 +431,10 @@ export const ContactSection: React.FC = () => {
                     htmlFor="businessName"
                     className="block text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-200"
                   >
-                    Nombre del negocio <span className="text-rose-500">*</span>
+                    Nombre del negocio <span className="text-rose-500" aria-hidden="true">*</span>
                   </label>
                   <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 dark:text-slate-500">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 dark:text-slate-500" aria-hidden="true">
                       <Building2 className="w-4 h-4" />
                     </div>
                     <input
@@ -423,16 +446,20 @@ export const ContactSection: React.FC = () => {
                       onFocus={() => setActiveField('businessName')}
                       onBlur={() => setActiveField(null)}
                       placeholder="Ej. Trattoria Roma, Boutique Milano..."
-                      className={`w-full pl-10 pr-3.5 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm transition-all outline-hidden border ${
+                      required
+                      aria-required="true"
+                      aria-invalid={!!errors.businessName}
+                      aria-describedby={errors.businessName ? 'businessName-error' : undefined}
+                      className={`w-full pl-10 pr-3.5 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm transition-all border outline-none ${
                         errors.businessName
-                          ? 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-300 dark:border-rose-700 text-rose-900 dark:text-rose-200 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20'
-                          : 'bg-slate-50/80 dark:bg-[#0b1224] border-slate-200 dark:border-[#1c2a47] text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:focus:border-blue-500 dark:focus:ring-blue-500/30'
+                          ? 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-300 dark:border-rose-700 text-rose-900 dark:text-rose-200 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20 focus-visible:ring-rose-500'
+                          : 'bg-slate-50/80 dark:bg-[#0b1224] border-slate-200 dark:border-[#1c2a47] text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:focus:border-blue-500 dark:focus:ring-blue-500/30 focus-visible:ring-blue-500'
                       }`}
                     />
                   </div>
                   {errors.businessName && (
-                    <p className="text-[11px] sm:text-xs text-rose-600 dark:text-rose-400 flex items-center gap-1 mt-1">
-                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    <p id="businessName-error" role="alert" className="text-[11px] sm:text-xs text-rose-600 dark:text-rose-400 flex items-center gap-1 mt-1 font-medium">
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
                       <span>{errors.businessName}</span>
                     </p>
                   )}
@@ -444,10 +471,10 @@ export const ContactSection: React.FC = () => {
                     htmlFor="personName"
                     className="block text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-200"
                   >
-                    Nombre de la persona <span className="text-rose-500">*</span>
+                    Nombre de la persona <span className="text-rose-500" aria-hidden="true">*</span>
                   </label>
                   <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 dark:text-slate-500">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 dark:text-slate-500" aria-hidden="true">
                       <User className="w-4 h-4" />
                     </div>
                     <input
@@ -459,16 +486,20 @@ export const ContactSection: React.FC = () => {
                       onFocus={() => setActiveField('personName')}
                       onBlur={() => setActiveField(null)}
                       placeholder="Ej. Roberto Mendoza"
-                      className={`w-full pl-10 pr-3.5 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm transition-all outline-hidden border ${
+                      required
+                      aria-required="true"
+                      aria-invalid={!!errors.personName}
+                      aria-describedby={errors.personName ? 'personName-error' : undefined}
+                      className={`w-full pl-10 pr-3.5 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm transition-all border outline-none ${
                         errors.personName
-                          ? 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-300 dark:border-rose-700 text-rose-900 dark:text-rose-200 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20'
-                          : 'bg-slate-50/80 dark:bg-[#0b1224] border-slate-200 dark:border-[#1c2a47] text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:focus:border-blue-500 dark:focus:ring-blue-500/30'
+                          ? 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-300 dark:border-rose-700 text-rose-900 dark:text-rose-200 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20 focus-visible:ring-rose-500'
+                          : 'bg-slate-50/80 dark:bg-[#0b1224] border-slate-200 dark:border-[#1c2a47] text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:focus:border-blue-500 dark:focus:ring-blue-500/30 focus-visible:ring-blue-500'
                       }`}
                     />
                   </div>
                   {errors.personName && (
-                    <p className="text-[11px] sm:text-xs text-rose-600 dark:text-rose-400 flex items-center gap-1 mt-1">
-                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    <p id="personName-error" role="alert" className="text-[11px] sm:text-xs text-rose-600 dark:text-rose-400 flex items-center gap-1 mt-1 font-medium">
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
                       <span>{errors.personName}</span>
                     </p>
                   )}
@@ -480,10 +511,10 @@ export const ContactSection: React.FC = () => {
                     htmlFor="phone"
                     className="block text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-200"
                   >
-                    WhatsApp / teléfono <span className="text-rose-500">*</span>
+                    WhatsApp / teléfono <span className="text-rose-500" aria-hidden="true">*</span>
                   </label>
                   <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 dark:text-slate-500">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 dark:text-slate-500" aria-hidden="true">
                       <Phone className="w-4 h-4" />
                     </div>
                     <input
@@ -495,16 +526,20 @@ export const ContactSection: React.FC = () => {
                       onFocus={() => setActiveField('phone')}
                       onBlur={() => setActiveField(null)}
                       placeholder="Ej. 71234567 o 63527099"
-                      className={`w-full pl-10 pr-3.5 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm transition-all outline-hidden border ${
+                      required
+                      aria-required="true"
+                      aria-invalid={!!errors.phone}
+                      aria-describedby={errors.phone ? 'phone-error' : undefined}
+                      className={`w-full pl-10 pr-3.5 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm transition-all border outline-none ${
                         errors.phone
-                          ? 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-300 dark:border-rose-700 text-rose-900 dark:text-rose-200 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20'
-                          : 'bg-slate-50/80 dark:bg-[#0b1224] border-slate-200 dark:border-[#1c2a47] text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:focus:border-blue-500 dark:focus:ring-blue-500/30'
+                          ? 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-300 dark:border-rose-700 text-rose-900 dark:text-rose-200 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20 focus-visible:ring-rose-500'
+                          : 'bg-slate-50/80 dark:bg-[#0b1224] border-slate-200 dark:border-[#1c2a47] text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:focus:border-blue-500 dark:focus:ring-blue-500/30 focus-visible:ring-blue-500'
                       }`}
                     />
                   </div>
                   {errors.phone && (
-                    <p className="text-[11px] sm:text-xs text-rose-600 dark:text-rose-400 flex items-center gap-1 mt-1">
-                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    <p id="phone-error" role="alert" className="text-[11px] sm:text-xs text-rose-600 dark:text-rose-400 flex items-center gap-1 mt-1 font-medium">
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
                       <span>{errors.phone}</span>
                     </p>
                   )}
@@ -519,7 +554,7 @@ export const ContactSection: React.FC = () => {
                     Correo electrónico <span className="text-xs font-normal text-slate-500 dark:text-slate-400">(opcional)</span>
                   </label>
                   <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 dark:text-slate-500">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 dark:text-slate-500" aria-hidden="true">
                       <Mail className="w-4 h-4" />
                     </div>
                     <input
@@ -531,16 +566,18 @@ export const ContactSection: React.FC = () => {
                       onFocus={() => setActiveField('email')}
                       onBlur={() => setActiveField(null)}
                       placeholder="Ej. contacto@tunegocio.com"
-                      className={`w-full pl-10 pr-3.5 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm transition-all outline-hidden border ${
+                      aria-invalid={!!errors.email}
+                      aria-describedby={errors.email ? 'email-error' : undefined}
+                      className={`w-full pl-10 pr-3.5 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm transition-all border outline-none ${
                         errors.email
-                          ? 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-300 dark:border-rose-700 text-rose-900 dark:text-rose-200 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20'
-                          : 'bg-slate-50/80 dark:bg-[#0b1224] border-slate-200 dark:border-[#1c2a47] text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:focus:border-blue-500 dark:focus:ring-blue-500/30'
+                          ? 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-300 dark:border-rose-700 text-rose-900 dark:text-rose-200 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20 focus-visible:ring-rose-500'
+                          : 'bg-slate-50/80 dark:bg-[#0b1224] border-slate-200 dark:border-[#1c2a47] text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:focus:border-blue-500 dark:focus:ring-blue-500/30 focus-visible:ring-blue-500'
                       }`}
                     />
                   </div>
                   {errors.email && (
-                    <p className="text-[11px] sm:text-xs text-rose-600 dark:text-rose-400 flex items-center gap-1 mt-1">
-                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    <p id="email-error" role="alert" className="text-[11px] sm:text-xs text-rose-600 dark:text-rose-400 flex items-center gap-1 mt-1 font-medium">
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
                       <span>{errors.email}</span>
                     </p>
                   )}
@@ -564,7 +601,7 @@ export const ContactSection: React.FC = () => {
                       onFocus={() => setActiveField('message')}
                       onBlur={() => setActiveField(null)}
                       placeholder="Cuéntanos brevemente sobre tus productos o servicios, horarios o cualquier duda que tengas sobre tu tienda online..."
-                      className="w-full px-3.5 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm transition-all outline-hidden border bg-slate-50/80 dark:bg-[#0b1224] border-slate-200 dark:border-[#1c2a47] text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:focus:border-blue-500 dark:focus:ring-blue-500/30 resize-y"
+                      className="w-full px-3.5 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm transition-all border bg-slate-50/80 dark:bg-[#0b1224] border-slate-200 dark:border-[#1c2a47] text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:focus:border-blue-500 dark:focus:ring-blue-500/30 focus-visible:ring-blue-500 outline-none resize-y"
                     />
                   </div>
                 </div>
@@ -573,7 +610,7 @@ export const ContactSection: React.FC = () => {
                 <div className="pt-2 space-y-3">
                   <button
                     type="submit"
-                    className="w-full group relative overflow-hidden py-3.5 sm:py-4 px-6 rounded-2xl font-bold text-sm sm:text-base text-white bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 hover:from-blue-500 hover:via-indigo-500 hover:to-violet-500 active:scale-[0.99] shadow-lg shadow-indigo-600/25 hover:shadow-xl hover:shadow-indigo-600/35 hover:-translate-y-0.5 transition-all duration-200 cursor-pointer flex items-center justify-center gap-2.5"
+                    className="w-full group relative overflow-hidden py-3.5 sm:py-4 px-6 rounded-2xl font-bold text-sm sm:text-base text-white bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 hover:from-blue-500 hover:via-indigo-500 hover:to-violet-500 active:scale-[0.99] shadow-lg shadow-indigo-600/25 hover:shadow-xl hover:shadow-indigo-600/35 hover:-translate-y-0.5 transition-all duration-200 cursor-pointer flex items-center justify-center gap-2.5 focus:outline-none focus-visible:ring-4 focus-visible:ring-indigo-500/40"
                   >
                     {/* Brillo lineal ocasional que atraviesa el botón suavemente */}
                     <span
@@ -581,9 +618,9 @@ export const ContactSection: React.FC = () => {
                       className="pointer-events-none absolute inset-0 w-1/3 h-full bg-gradient-to-r from-transparent via-white/25 to-transparent cb-anim-sheen"
                     />
 
-                    <MessageCircle className="w-5 h-5 relative z-10 transition-transform duration-200 group-hover:scale-110" />
+                    <MessageCircle className="w-5 h-5 relative z-10 transition-transform duration-200 group-hover:scale-110" aria-hidden="true" />
                     <span className="relative z-10">Solicitar información</span>
-                    <ArrowRight className="w-4 h-4 relative z-10 transition-transform duration-200 group-hover:translate-x-1" />
+                    <ArrowRight className="w-4 h-4 relative z-10 transition-transform duration-200 group-hover:translate-x-1" aria-hidden="true" />
                   </button>
 
                   {/* Mensaje de apoyo obligatorio con el número oficial 63527099 */}

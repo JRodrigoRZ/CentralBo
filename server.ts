@@ -11,6 +11,9 @@ import createAppointmentHandler from './api/appointments/create-appointment.js';
 import appointmentAvailabilityHandler from './api/appointments/availability.js';
 import activePromotionsHandler from './api/promotions/active.js';
 import chatHandler from './api/chat.js';
+import commercialEventsHandler from './api/commercial/events.js';
+import commercialMetricsHandler from './api/commercial/metrics.js';
+import { syncWithCloudStorage } from './src/lib/commercialStore.js';
 import {
   fetchPublicStoreSeoMetadata,
   injectStoreSeoFailureMetadata,
@@ -68,9 +71,19 @@ app.all('/api/chat', (req: Request, res: Response) => {
   chatHandler(req as any, res as any);
 });
 
+// 8. Medición y Métricas Comerciales Centralizadas (Módulo 7 Persistente)
+app.all('/api/commercial/events', (req: Request, res: Response) => {
+  commercialEventsHandler(req as any, res as any);
+});
+
+app.all('/api/commercial/metrics', (req: Request, res: Response) => {
+  commercialMetricsHandler(req as any, res as any);
+});
+
 // ----------------------------------------------------------------------------
-// CONFIGURACIÓN DE VITE / PRODUCCIÓN
+// SEO DINÁMICO PARA TIENDAS PÚBLICAS (/tienda/:slug)
 // ----------------------------------------------------------------------------
+
 interface PublicStoreHtmlResult {
   status: 200 | 404 | 503;
   html: string;
@@ -82,6 +95,7 @@ async function renderPublicStoreHtml(
 ): Promise<PublicStoreHtmlResult> {
   try {
     const metadata = await fetchPublicStoreSeoMetadata(slug);
+
     if (!metadata) {
       return {
         status: 404,
@@ -107,8 +121,13 @@ function sendPublicStoreHtml(res: Response, result: PublicStoreHtmlResult): void
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('X-Robots-Tag', 'noindex, nofollow');
   }
+
   res.status(result.status).type('html').send(result.html);
 }
+
+// ----------------------------------------------------------------------------
+// CONFIGURACIÓN DE VITE / PRODUCCIÓN
+// ----------------------------------------------------------------------------
 
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
@@ -117,6 +136,7 @@ async function startServer() {
       appType: 'spa',
     });
 
+    // Inyección de SEO dinámico en modo desarrollo antes de Vite
     app.get('/tienda/:slug', async (req: Request, res: Response, next) => {
       try {
         const sourceHtml = await readFile(path.join(process.cwd(), 'index.html'), 'utf8');
@@ -132,6 +152,7 @@ async function startServer() {
   } else {
     const distPath = path.join(process.cwd(), 'dist');
 
+    // Inyección de SEO dinámico en modo producción
     app.get('/tienda/:slug', async (req: Request, res: Response, next) => {
       try {
         const indexHtml = await readFile(path.join(distPath, 'index.html'), 'utf8');
@@ -146,6 +167,14 @@ async function startServer() {
     app.get('*', (_req: Request, res: Response) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
+  }
+
+  // Sincronización duradera inicial de métricas comerciales con Supabase Storage
+  try {
+    await syncWithCloudStorage();
+    console.log('[CentralBo Server] Métricas comerciales sincronizadas con Supabase Cloud Storage');
+  } catch (err) {
+    console.warn('[CentralBo Server] Sincronización inicial de métricas:', err);
   }
 
   app.listen(PORT, '0.0.0.0', () => {

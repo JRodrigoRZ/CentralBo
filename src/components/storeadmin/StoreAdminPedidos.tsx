@@ -38,44 +38,44 @@ const ORDER_STATUS_META: Record<
   pendiente: {
     label: 'Pendiente',
     icon: Clock,
-    color: 'text-amber-400',
-    bg: 'bg-amber-500/10 border-amber-500/20',
+    color: 'text-amber-800 dark:text-amber-400',
+    bg: 'bg-amber-50 border-amber-200 dark:bg-amber-500/10 dark:border-amber-500/20',
   },
   recibido: {
     label: 'Recibido',
     icon: AlertCircle,
-    color: 'text-blue-400',
-    bg: 'bg-blue-500/10 border-blue-500/20',
+    color: 'text-blue-800 dark:text-blue-400',
+    bg: 'bg-blue-50 border-blue-200 dark:bg-blue-500/10 dark:border-blue-500/20',
   },
   pagado: {
     label: 'Pagado',
     icon: CreditCard,
-    color: 'text-emerald-400',
-    bg: 'bg-emerald-500/10 border-emerald-500/20',
+    color: 'text-emerald-800 dark:text-emerald-400',
+    bg: 'bg-emerald-50 border-emerald-200 dark:bg-emerald-500/10 dark:border-emerald-500/20',
   },
   en_preparacion: {
     label: 'En preparación',
     icon: ChefHat,
-    color: 'text-indigo-400',
-    bg: 'bg-indigo-500/10 border-indigo-500/20',
+    color: 'text-indigo-800 dark:text-indigo-400',
+    bg: 'bg-indigo-50 border-indigo-200 dark:bg-indigo-500/10 dark:border-indigo-500/20',
   },
   despachado: {
     label: 'Despachado',
     icon: Truck,
-    color: 'text-cyan-400',
-    bg: 'bg-cyan-500/10 border-cyan-500/20',
+    color: 'text-cyan-800 dark:text-cyan-400',
+    bg: 'bg-cyan-50 border-cyan-200 dark:bg-cyan-500/10 dark:border-cyan-500/20',
   },
   completado: {
     label: 'Completado',
     icon: CheckCircle2,
-    color: 'text-emerald-300',
-    bg: 'bg-emerald-500/10 border-emerald-500/20',
+    color: 'text-emerald-800 dark:text-emerald-300',
+    bg: 'bg-emerald-50 border-emerald-200 dark:bg-emerald-500/10 dark:border-emerald-500/20',
   },
   cancelado: {
     label: 'Cancelado',
     icon: XCircle,
-    color: 'text-rose-400',
-    bg: 'bg-rose-500/10 border-rose-500/20',
+    color: 'text-rose-800 dark:text-rose-400',
+    bg: 'bg-rose-50 border-rose-200 dark:bg-rose-500/10 dark:border-rose-500/20',
   },
 };
 
@@ -171,18 +171,18 @@ export const StoreAdminPedidos: React.FC<StoreAdminPedidosProps> = ({ store }) =
   return (
     <div className="space-y-6">
       {/* Encabezado */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[#DEE7F2] dark:border-slate-800">
         <div>
-          <h2 className="text-lg font-bold text-white flex items-center gap-2">
-            <ShoppingBag className="w-5 h-5 text-indigo-400" />
+          <h2 className="text-lg font-bold text-[#14213D] dark:text-white flex items-center gap-2">
+            <ShoppingBag className="w-5 h-5 text-[#1769FF] dark:text-indigo-400" />
             <span>Gestión de Pedidos de la Tienda</span>
-            <span className="text-xs px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 font-normal">
+            <span className="text-xs px-2.5 py-0.5 rounded-full bg-[#EEF4FF] text-[#1769FF] border border-[#DEE7F2] dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700 font-normal">
               {orders.length} pedidos
             </span>
           </h2>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-xs text-[#52627A] dark:text-slate-400 mt-0.5">
             Control de órdenes y actualización de los 7 estados de despacho para{' '}
-            <strong className="text-indigo-300">{store.name}</strong>
+            <strong className="text-[#1769FF] dark:text-indigo-300">{store.name}</strong>
           </p>
         </div>
 
@@ -190,32 +190,32 @@ export const StoreAdminPedidos: React.FC<StoreAdminPedidosProps> = ({ store }) =
           type="button"
           onClick={loadOrders}
           disabled={isLoading}
-          className="inline-flex items-center gap-1.5 self-start sm:self-center px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 hover:border-slate-600 text-slate-300 hover:text-white text-xs font-semibold transition cursor-pointer disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 self-start sm:self-center px-3 py-1.5 rounded-xl bg-white hover:bg-[#EEF4FF] dark:bg-slate-900 border border-[#DEE7F2] dark:border-slate-700 hover:border-[#1769FF]/40 text-[#52627A] hover:text-[#14213D] dark:text-slate-300 dark:hover:text-white text-xs font-semibold transition cursor-pointer disabled:opacity-50 shadow-2xs"
           title="Sincronizar pedidos con la base de datos"
         >
-          <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-indigo-400' : ''}`} />
+          <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-[#1769FF] dark:text-indigo-400' : ''}`} />
           <span>{isLoading ? 'Sincronizando...' : 'Actualizar'}</span>
         </button>
       </div>
 
       {notification && (
-        <div className="p-3.5 rounded-xl bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 text-xs flex items-center gap-2 animate-fadeIn">
-          <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-emerald-400" />
+        <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 dark:bg-emerald-950/60 dark:border-emerald-500/40 dark:text-emerald-300 text-xs flex items-center gap-2 animate-fadeIn">
+          <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-emerald-600 dark:text-emerald-400" />
           <span>{notification}</span>
         </div>
       )}
 
       {/* Filtros por Estado */}
-      <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-3">
+      <div className="p-4 rounded-2xl bg-[#F8FAFC] dark:bg-slate-950/60 border border-[#DEE7F2] dark:border-slate-800 space-y-3 shadow-2xs">
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
           <div className="relative flex-1 max-w-sm">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+            <Search className="w-4 h-4 text-[#94A3B8] dark:text-slate-400 absolute left-3 top-2.5" />
             <input
               type="text"
               placeholder="Buscar por cliente, teléfono o #..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-indigo-500"
+              className="w-full pl-9 pr-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-[#DEE7F2] dark:border-slate-700 text-[#14213D] dark:text-white placeholder-[#94A3B8] text-xs focus:outline-none focus:border-[#1769FF] shadow-2xs"
             />
           </div>
 
@@ -223,10 +223,10 @@ export const StoreAdminPedidos: React.FC<StoreAdminPedidosProps> = ({ store }) =
             <button
               type="button"
               onClick={() => setStatusFilter('all')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition cursor-pointer ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition cursor-pointer shadow-2xs ${
                 statusFilter === 'all'
-                  ? 'bg-indigo-600 text-white border-indigo-500'
-                  : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
+                  ? 'bg-[#1769FF] text-white border-[#1769FF]'
+                  : 'bg-white text-[#52627A] border-[#DEE7F2] hover:text-[#14213D] hover:bg-[#EEF4FF] dark:bg-slate-900 dark:text-slate-400 dark:border-slate-800 dark:hover:text-slate-200'
               }`}
             >
               Todos ({orders.length})
@@ -240,10 +240,10 @@ export const StoreAdminPedidos: React.FC<StoreAdminPedidosProps> = ({ store }) =
                   key={st}
                   type="button"
                   onClick={() => setStatusFilter(st)}
-                  className={`px-2.5 py-1.5 rounded-xl text-[11px] font-semibold border transition cursor-pointer flex items-center gap-1 ${
+                  className={`px-2.5 py-1.5 rounded-xl text-[11px] font-semibold border transition cursor-pointer flex items-center gap-1 shadow-2xs ${
                     statusFilter === st
-                      ? `${meta.bg} ${meta.color} font-bold`
-                      : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
+                      ? `${meta.bg} ${meta.color} font-bold ring-1 ring-black/5 dark:ring-white/10`
+                      : 'bg-white text-[#52627A] border-[#DEE7F2] hover:text-[#14213D] hover:bg-[#EEF4FF] dark:bg-slate-900 dark:text-slate-400 dark:border-slate-800 dark:hover:text-slate-200'
                   }`}
                 >
                   <span>{meta.label}</span>
@@ -257,36 +257,36 @@ export const StoreAdminPedidos: React.FC<StoreAdminPedidosProps> = ({ store }) =
 
       {/* Lista de Pedidos */}
       {isLoading ? (
-        <div className="p-12 text-center rounded-2xl bg-slate-950/30 border border-dashed border-slate-800 space-y-3">
-          <div className="w-6 h-6 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-xs text-slate-400">Cargando pedidos de la base de datos...</p>
+        <div className="p-12 text-center rounded-2xl bg-[#F8FAFC] dark:bg-slate-950/30 border border-dashed border-[#DEE7F2] dark:border-slate-800 space-y-3">
+          <div className="w-6 h-6 border-2 border-[#1769FF] dark:border-indigo-400 border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-xs text-[#52627A] dark:text-slate-400">Cargando pedidos de la base de datos...</p>
         </div>
       ) : loadError ? (
-        <div className="p-8 text-center rounded-2xl bg-rose-950/20 border border-rose-800/40 space-y-3 text-rose-300">
-          <AlertCircle className="w-8 h-8 text-rose-400 mx-auto" />
+        <div className="p-8 text-center rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 dark:bg-rose-950/20 dark:border-rose-800/40 dark:text-rose-300 space-y-3">
+          <AlertCircle className="w-8 h-8 text-rose-600 dark:text-rose-400 mx-auto" />
           <p className="text-sm font-semibold">Error al cargar pedidos</p>
-          <p className="text-xs text-rose-300/80">{loadError}</p>
+          <p className="text-xs text-rose-700/80 dark:text-rose-300/80">{loadError}</p>
           <button
             type="button"
             onClick={loadOrders}
-            className="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs hover:border-slate-500 cursor-pointer"
+            className="px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-[#DEE7F2] dark:border-slate-700 text-[#14213D] dark:text-white text-xs hover:border-[#1769FF] cursor-pointer shadow-2xs"
           >
             Reintentar
           </button>
         </div>
       ) : orders.length === 0 ? (
-        <div className="p-12 text-center rounded-2xl bg-slate-950/30 border border-dashed border-slate-800 space-y-2">
-          <ShoppingBag className="w-10 h-10 text-slate-400 mx-auto" />
-          <p className="text-sm font-semibold text-white">No hay pedidos registrados</p>
-          <p className="text-xs text-slate-400 max-w-sm mx-auto">
+        <div className="p-12 text-center rounded-2xl bg-[#F8FAFC] dark:bg-slate-950/30 border border-dashed border-[#DEE7F2] dark:border-slate-800 space-y-2">
+          <ShoppingBag className="w-10 h-10 text-[#94A3B8] dark:text-slate-400 mx-auto" />
+          <p className="text-sm font-semibold text-[#14213D] dark:text-white">No hay pedidos registrados</p>
+          <p className="text-xs text-[#52627A] dark:text-slate-400 max-w-sm mx-auto">
             Este comercio aún no cuenta con pedidos. Cuando los clientes completen sus pedidos desde la tienda pública, se sincronizarán aquí automáticamente.
           </p>
         </div>
       ) : filteredOrders.length === 0 ? (
-        <div className="p-12 text-center rounded-2xl bg-slate-950/30 border border-dashed border-slate-800 space-y-2">
-          <ShoppingBag className="w-10 h-10 text-slate-400 mx-auto" />
-          <p className="text-sm font-semibold text-white">No hay pedidos en este estado</p>
-          <p className="text-xs text-slate-400">
+        <div className="p-12 text-center rounded-2xl bg-[#F8FAFC] dark:bg-slate-950/30 border border-dashed border-[#DEE7F2] dark:border-slate-800 space-y-2">
+          <ShoppingBag className="w-10 h-10 text-[#94A3B8] dark:text-slate-400 mx-auto" />
+          <p className="text-sm font-semibold text-[#14213D] dark:text-white">No hay pedidos en este estado</p>
+          <p className="text-xs text-[#52627A] dark:text-slate-400">
             Ajusta los filtros para visualizar pedidos anteriores o completados.
           </p>
         </div>
@@ -306,16 +306,16 @@ export const StoreAdminPedidos: React.FC<StoreAdminPedidosProps> = ({ store }) =
             return (
               <div
                 key={ord.id}
-                className="p-4 rounded-2xl bg-slate-950/70 border border-slate-800 hover:border-slate-700 transition flex flex-col gap-3"
+                className="p-4 rounded-2xl bg-white dark:bg-slate-950/70 border border-[#DEE7F2] dark:border-slate-800 hover:border-[#1769FF]/40 dark:hover:border-slate-700 transition flex flex-col gap-3 shadow-2xs"
               >
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                   {/* Datos del Pedido */}
                   <div className="space-y-1.5 min-w-0">
                     <div className="flex items-center gap-2.5 flex-wrap">
-                      <span className="font-mono text-xs font-black text-indigo-300">
+                      <span className="font-mono text-xs font-black text-[#1769FF] dark:text-indigo-300">
                         #{ord.id.slice(-4).toUpperCase()}
                       </span>
-                      <span className="text-xs font-bold text-white">
+                      <span className="text-xs font-bold text-[#14213D] dark:text-white">
                         {ord.customer_name || 'Cliente Particular'}
                       </span>
                       <span
@@ -326,19 +326,19 @@ export const StoreAdminPedidos: React.FC<StoreAdminPedidosProps> = ({ store }) =
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-4 text-xs text-slate-400 flex-wrap">
+                    <div className="flex items-center gap-4 text-xs text-[#52627A] dark:text-slate-400 flex-wrap">
                       <span>
-                        Fecha: <strong className="text-slate-300">{dateStr}</strong>
+                        Fecha: <strong className="text-[#14213D] dark:text-slate-300">{dateStr}</strong>
                       </span>
                       {ord.customer_phone && (
                         <span className="flex items-center gap-1">
-                          <Phone className="w-3 h-3 text-emerald-400" />
-                          <strong className="text-emerald-300">{ord.customer_phone}</strong>
+                          <Phone className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                          <strong className="text-emerald-700 dark:text-emerald-300">{ord.customer_phone}</strong>
                         </span>
                       )}
                       {ord.customer_email && (
                         <span className="flex items-center gap-1">
-                          <Mail className="w-3 h-3 text-cyan-400" />
+                          <Mail className="w-3 h-3 text-cyan-600 dark:text-cyan-400" />
                           <span>{ord.customer_email}</span>
                         </span>
                       )}
@@ -346,10 +346,10 @@ export const StoreAdminPedidos: React.FC<StoreAdminPedidosProps> = ({ store }) =
                   </div>
 
                   {/* Importe, Selector Rápido de Estado y Botón Detalle */}
-                  <div className="flex items-center justify-between md:justify-end gap-4 flex-shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-slate-800">
+                  <div className="flex items-center justify-between md:justify-end gap-4 flex-shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-[#DEE7F2] dark:border-slate-800">
                     <div className="text-left md:text-right">
-                      <span className="text-xs text-slate-400 block">Total</span>
-                      <span className="text-base font-black text-emerald-400">
+                      <span className="text-xs text-[#52627A] dark:text-slate-400 block">Total</span>
+                      <span className="text-base font-black text-emerald-600 dark:text-emerald-400">
                         Bs {ord.total}
                       </span>
                     </div>
@@ -361,7 +361,7 @@ export const StoreAdminPedidos: React.FC<StoreAdminPedidosProps> = ({ store }) =
                         onChange={(e) =>
                           handleStatusChange(ord.id, e.target.value as OrderStatus)
                         }
-                        className="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs font-semibold focus:outline-none focus:border-indigo-500 cursor-pointer"
+                        className="px-3 py-1.5 rounded-xl bg-[#F8FAFC] dark:bg-slate-900 border border-[#DEE7F2] dark:border-slate-700 text-[#14213D] dark:text-white text-xs font-semibold focus:outline-none focus:border-[#1769FF] cursor-pointer shadow-2xs"
                       >
                         {ALL_STATUSES.map((st) => (
                           <option key={st} value={st}>
@@ -373,15 +373,15 @@ export const StoreAdminPedidos: React.FC<StoreAdminPedidosProps> = ({ store }) =
                       <button
                         type="button"
                         onClick={() => toggleOrderDetails(ord.id)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-xs font-semibold text-slate-300 hover:text-white hover:border-slate-500 transition cursor-pointer"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-[#EEF4FF] dark:bg-slate-900 border border-[#DEE7F2] dark:border-slate-700 text-xs font-semibold text-[#52627A] hover:text-[#14213D] dark:text-slate-300 dark:hover:text-white transition cursor-pointer shadow-2xs"
                         title={isExpanded ? 'Ocultar detalle de productos' : 'Ver detalle de productos'}
                       >
-                        <Package className="w-3.5 h-3.5 text-indigo-400" />
+                        <Package className="w-3.5 h-3.5 text-[#1769FF] dark:text-indigo-400" />
                         <span>{isExpanded ? 'Ocultar detalle' : 'Ver detalle'}</span>
                         {isExpanded ? (
-                          <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
+                          <ChevronUp className="w-3.5 h-3.5 text-[#52627A] dark:text-slate-400" />
                         ) : (
-                          <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                          <ChevronDown className="w-3.5 h-3.5 text-[#52627A] dark:text-slate-400" />
                         )}
                       </button>
                     </div>
@@ -390,43 +390,43 @@ export const StoreAdminPedidos: React.FC<StoreAdminPedidosProps> = ({ store }) =
 
                 {/* Detalle de productos de Supabase (order_items) */}
                 {isExpanded && (
-                  <div className="pt-3 border-t border-slate-800/80 mt-1">
+                  <div className="pt-3 border-t border-[#DEE7F2] dark:border-slate-800/80 mt-1">
                     {isLoadingItems ? (
-                      <div className="flex items-center gap-2 py-3 text-xs text-slate-400 justify-center">
-                        <RefreshCw className="w-3.5 h-3.5 animate-spin text-indigo-400" />
+                      <div className="flex items-center gap-2 py-3 text-xs text-[#52627A] dark:text-slate-400 justify-center">
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin text-[#1769FF] dark:text-indigo-400" />
                         <span>Cargando productos de Supabase...</span>
                       </div>
                     ) : items.length === 0 ? (
-                      <div className="py-2.5 px-3 rounded-xl bg-slate-900/40 text-xs text-slate-400 text-center">
+                      <div className="py-2.5 px-3 rounded-xl bg-[#F8FAFC] dark:bg-slate-900/40 text-xs text-[#52627A] dark:text-slate-400 text-center border border-[#DEE7F2] dark:border-transparent">
                         Sin detalle disponible en base de datos
                       </div>
                     ) : (
                       <div className="space-y-1.5">
-                        <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-1">
+                        <div className="text-[11px] font-bold text-[#52627A] dark:text-slate-400 uppercase tracking-wider px-1">
                           Productos del Pedido ({items.length})
                         </div>
-                        <div className="rounded-xl border border-slate-800/80 overflow-hidden divide-y divide-slate-800/60 bg-slate-900/30">
+                        <div className="rounded-xl border border-[#DEE7F2] dark:border-slate-800/80 overflow-hidden divide-y divide-[#DEE7F2] dark:divide-slate-800/60 bg-[#F8FAFC]/60 dark:bg-slate-900/30">
                           {items.map((it) => (
                             <div
                               key={it.id}
-                              className="px-3 py-2 flex items-center justify-between text-xs gap-3 hover:bg-slate-900/50 transition"
+                              className="px-3 py-2 flex items-center justify-between text-xs gap-3 hover:bg-[#EEF4FF]/50 dark:hover:bg-slate-900/50 transition"
                             >
                               <div className="flex items-center gap-2.5 min-w-0">
-                                <div className="w-6 h-6 rounded-lg bg-indigo-950/60 border border-indigo-800/40 flex items-center justify-center flex-shrink-0">
-                                  <Package className="w-3.5 h-3.5 text-indigo-400" />
+                                <div className="w-6 h-6 rounded-lg bg-[#EEF4FF] dark:bg-indigo-950/60 border border-[#DEE7F2] dark:border-indigo-800/40 flex items-center justify-center flex-shrink-0">
+                                  <Package className="w-3.5 h-3.5 text-[#1769FF] dark:text-indigo-400" />
                                 </div>
                                 <div className="min-w-0">
-                                  <span className="font-semibold text-slate-200 block truncate">
+                                  <span className="font-semibold text-[#14213D] dark:text-slate-200 block truncate">
                                     {it.product_name || `Producto (#${it.product_id.slice(-4)})`}
                                   </span>
-                                  <span className="text-[11px] text-slate-400">
-                                    Cantidad: <strong className="text-slate-300">{it.quantity} un.</strong> · Precio unitario: <strong className="text-slate-300">Bs {it.unit_price}</strong>
+                                  <span className="text-[11px] text-[#52627A] dark:text-slate-400">
+                                    Cantidad: <strong className="text-[#14213D] dark:text-slate-300">{it.quantity} un.</strong> · Precio unitario: <strong className="text-[#14213D] dark:text-slate-300">Bs {it.unit_price}</strong>
                                   </span>
                                 </div>
                               </div>
                               <div className="text-right flex-shrink-0">
-                                <span className="text-[10px] text-slate-400 block">Subtotal</span>
-                                <span className="font-bold text-emerald-400 text-xs">
+                                <span className="text-[10px] text-[#52627A] dark:text-slate-400 block">Subtotal</span>
+                                <span className="font-bold text-emerald-600 dark:text-emerald-400 text-xs">
                                   Bs {(it.quantity * it.unit_price).toFixed(2)}
                                 </span>
                               </div>

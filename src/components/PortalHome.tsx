@@ -35,6 +35,11 @@ import { useRouter } from '../context/RouterContext';
 import { getPublicStores } from '../lib/multiTenantService';
 import { Store, StoreType } from '../types';
 import { ContactSection } from './ContactSection';
+import { DashboardShowcaseSection } from './landing/DashboardShowcaseSection';
+import { ThreeStepsDemoSection } from './landing/ThreeStepsDemoSection';
+import { AgenteMaxShowcaseSection } from './landing/AgenteMaxShowcaseSection';
+import { PlanesPreciosSection } from './landing/PlanesPreciosSection';
+import { trackCommercialEvent } from '../lib/commercialTrackingService';
 
 interface StoreCardMetadata {
   icon: React.ElementType;
@@ -148,6 +153,9 @@ function StoreCardLogo({ store }: { store: Store }) {
         <img
           src={currentSrc}
           alt={`Logotipo oficial de ${store.name}`}
+          width={56}
+          height={56}
+          decoding="async"
           className="w-full h-full object-contain"
           onError={handleImageError}
           loading="lazy"
@@ -850,7 +858,8 @@ export const PortalHome: React.FC = () => {
     return () => window.removeEventListener('hashchange', handleHashNavigation);
   }, []);
 
-  const handleScrollToStores = () => {
+  const handleScrollToStores = (origin: string = 'hero_secundario') => {
+    trackCommercialEvent('click_explorar_tiendas', { origin });
     const section = document.getElementById('carrusel-comercios') || document.getElementById('descubre-tiendas');
     if (section) {
       section.scrollIntoView({ behavior: 'smooth' });
@@ -869,19 +878,39 @@ export const PortalHome: React.FC = () => {
   const [mockupHighlightZone, setMockupHighlightZone] = useState<'brand' | 'whatsapp' | 'commission' | null>(null);
   const [addedMockupIds, setAddedMockupIds] = useState<Record<string, boolean>>({});
 
-  // Transición suave entre comercios cada 4.5 segundos
+  // Transición suave entre comercios cada 4.5 segundos (con pausa al ocultar pestaña para optimizar CPU y batería)
   useEffect(() => {
     if (heroStoreList.length <= 1 || isHeroPaused) return;
 
-    const timer = setInterval(() => {
-      setIsHeroTransitioning(true);
-      setTimeout(() => {
-        setHeroIndex((prev) => (prev + 1) % heroStoreList.length);
-        setIsHeroTransitioning(false);
-      }, 300);
-    }, 4500);
+    let timer: NodeJS.Timeout | null = null;
 
-    return () => clearInterval(timer);
+    const startTimer = () => {
+      if (timer) clearInterval(timer);
+      timer = setInterval(() => {
+        if (typeof document !== 'undefined' && document.hidden) return;
+        setIsHeroTransitioning(true);
+        setTimeout(() => {
+          setHeroIndex((prev) => (prev + 1) % heroStoreList.length);
+          setIsHeroTransitioning(false);
+        }, 300);
+      }, 4500);
+    };
+
+    const handleVisibility = () => {
+      if (document.hidden) {
+        if (timer) clearInterval(timer);
+      } else {
+        startTimer();
+      }
+    };
+
+    startTimer();
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      if (timer) clearInterval(timer);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, [heroStoreList.length, isHeroPaused]);
 
   const currentHeroStore = heroStoreList[heroIndex % heroStoreList.length];
@@ -896,7 +925,8 @@ export const PortalHome: React.FC = () => {
 
 
 
-  const handleCreateStore = () => {
+  const handleCreateStore = (origin: string = 'hero_cta') => {
+    trackCommercialEvent('click_crear_mi_tienda', { origin });
     const contactSection = document.getElementById('contacto');
     if (contactSection) {
       contactSection.scrollIntoView({ behavior: 'smooth' });
@@ -935,7 +965,7 @@ export const PortalHome: React.FC = () => {
   }, [stores, rubroFiltro]);
 
   return (
-    <div className="w-full space-y-12 sm:space-y-16 lg:space-y-20">
+    <main id="main-content" tabIndex={-1} className="w-full space-y-12 sm:space-y-16 lg:space-y-20 focus:outline-none">
       {/* ========================================================================= */}
       {/* 1. HERO — "Tu comercio local, ahora en digital."                           */}
       {/* ========================================================================= */}
@@ -1462,6 +1492,11 @@ export const PortalHome: React.FC = () => {
                       type="button"
                       onClick={() => {
                         if (!heroShowcase.isDemo) {
+                          trackCommercialEvent('click_ver_tienda_catalogo', {
+                            storeSlug: heroShowcase.slug,
+                            storeName: heroShowcase.name,
+                            origin: 'hero_mockup',
+                          });
                           navigate(`/tienda/${heroShowcase.slug}`);
                         }
                       }}
@@ -1833,6 +1868,7 @@ export const PortalHome: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => {
+                        trackCommercialEvent('click_explorar_tiendas', { origin: 'asi_se_ve_tu_tienda' });
                         const target = document.getElementById('comercios') || document.getElementById('carrusel-comercios');
                         if (target) {
                           target.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -2007,6 +2043,12 @@ export const PortalHome: React.FC = () => {
                       href={waUrl}
                       target="_blank"
                       rel="noopener noreferrer"
+                      onClick={() => {
+                        trackCommercialEvent('apertura_whatsapp_comercial', {
+                          origin: 'asi_se_ve_tu_tienda',
+                          storeSlug: activeShowcase.slug,
+                        });
+                      }}
                       className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-colors shadow-sm cursor-pointer active:scale-95"
                     >
                       <MessageCircle className="w-3.5 h-3.5" />
@@ -2111,6 +2153,42 @@ export const PortalHome: React.FC = () => {
           </div>
         </div>
       </section>
+
+      {/* Divisor Visual Sutil */}
+      <div className="w-full h-px bg-slate-200/70 dark:bg-[#16223b]" />
+
+      {/* ========================================================================= */}
+      {/* MÓDULO 3: PRESENTACIÓN AUTÉNTICA DEL DASHBOARD EN LA LANDING              */}
+      {/* Exhibición en marco de computadora con colorimetría y diseño 100% real    */}
+      {/* ========================================================================= */}
+      <DashboardShowcaseSection />
+
+      {/* Divisor Visual Sutil */}
+      <div className="w-full h-px bg-slate-200/70 dark:bg-[#16223b]" />
+
+      {/* ========================================================================= */}
+      {/* MÓDULO 4: DEMOSTRACIÓN VISUAL DE LOS 3 PASOS                              */}
+      {/* Crea tu tienda digital → Publica tu catálogo → Comparte y recibe pedidos  */}
+      {/* ========================================================================= */}
+      <ThreeStepsDemoSection />
+
+      {/* Divisor Visual Sutil */}
+      <div className="w-full h-px bg-slate-200/70 dark:bg-[#16223b]" />
+
+      {/* ========================================================================= */}
+      {/* MÓDULO 5: PRESENTACIÓN VISUAL DE AGENTE MAX                                */}
+      {/* Asistente virtual inteligente dentro de las tiendas públicas              */}
+      {/* ========================================================================= */}
+      <AgenteMaxShowcaseSection />
+
+      {/* Divisor Visual Sutil */}
+      <div className="w-full h-px bg-slate-200/70 dark:bg-[#16223b]" />
+
+      {/* ========================================================================= */}
+      {/* MÓDULO 6: PLANES, PRECIOS Y COMPARACIÓN COMERCIAL                          */}
+      {/* MAXINEGO BASIC y PRO: duraciones, precios y ahorros oficiales              */}
+      {/* ========================================================================= */}
+      <PlanesPreciosSection />
 
       {/* Divisor Visual Sutil */}
       <div className="w-full h-px bg-slate-200/70 dark:bg-[#16223b]" />
@@ -2228,7 +2306,7 @@ export const PortalHome: React.FC = () => {
             </p>
             <button
               type="button"
-              onClick={handleCreateStore}
+              onClick={() => handleCreateStore('vitrina_empty_state')}
               className="mt-2 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold cursor-pointer shadow-xs transition"
             >
               <StoreIcon className="w-3.5 h-3.5" />
@@ -2242,7 +2320,10 @@ export const PortalHome: React.FC = () => {
             </p>
             <button
               type="button"
-              onClick={() => setRubroFiltro('todos')}
+              onClick={() => {
+                trackCommercialEvent('click_explorar_tiendas', { origin: 'vitrina_filtered_empty' });
+                setRubroFiltro('todos');
+              }}
               className="px-4 py-2 rounded-xl text-xs font-bold bg-blue-600 text-white hover:bg-blue-700 transition cursor-pointer shadow-xs"
             >
               Ver todos los comercios
@@ -2314,7 +2395,14 @@ export const PortalHome: React.FC = () => {
                     </div>
                     <button
                       type="button"
-                      onClick={() => navigate(`/tienda/${store.slug}`)}
+                      onClick={() => {
+                        trackCommercialEvent('click_ver_tienda_catalogo', {
+                          storeSlug: store.slug,
+                          storeName: store.name,
+                          origin: 'vitrina_card',
+                        });
+                        navigate(`/tienda/${store.slug}`);
+                      }}
                       className="w-full py-2.5 px-4 rounded-xl text-xs font-bold transition flex items-center justify-between cursor-pointer bg-slate-900 hover:bg-blue-600 text-white dark:bg-[#152342] dark:hover:bg-blue-600 dark:border dark:border-[#22355e] shadow-xs active:scale-[0.99] group/btn"
                     >
                       <span className="flex items-center gap-2">
@@ -2429,6 +2517,6 @@ export const PortalHome: React.FC = () => {
       {/* Formulario íntegro de contacto con WhatsApp oficial y llamada clara a la acción */}
       {/* ========================================================================= */}
       <ContactSection />
-    </div>
+    </main>
   );
 };

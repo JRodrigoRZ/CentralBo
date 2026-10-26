@@ -144,19 +144,19 @@ export const MiTiendaContacto: React.FC<MiTiendaContactoProps> = ({ store }) => 
   return (
     <form onSubmit={handleSave} className="space-y-6">
       {/* Encabezado */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[#DEE7F2] dark:border-[#263653]">
         <div>
-          <h2 className="text-lg font-bold text-white flex items-center gap-2">
-            <Share2 className="w-5 h-5 text-indigo-400" />
+          <h2 className="text-lg font-bold text-[#14213D] dark:text-[#F8FAFC] flex items-center gap-2">
+            <Share2 className="w-5 h-5 text-[#1769FF] dark:text-[#3B82F6]" />
             <span>Canales de Contacto y Redes Sociales</span>
             {isLoading && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-800 text-[10px] text-slate-400 font-normal">
-                <Loader2 className="w-3 h-3 animate-spin text-indigo-400" />
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#EEF4FF] text-[10px] text-[#1769FF] font-normal border border-[#DEE7F2] dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700">
+                <Loader2 className="w-3 h-3 animate-spin text-[#1769FF] dark:text-indigo-400" />
                 <span>Sincronizando...</span>
               </span>
             )}
           </h2>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-xs text-[#52627A] dark:text-[#B8C6DA] mt-0.5">
             Administra y prueba los botones directos que verán los clientes en tu tienda
           </p>
         </div>
@@ -164,7 +164,7 @@ export const MiTiendaContacto: React.FC<MiTiendaContactoProps> = ({ store }) => 
         <button
           type="submit"
           disabled={isSaving}
-          className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-semibold shadow-md transition cursor-pointer self-start sm:self-auto"
+          className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-[#1769FF] hover:bg-blue-700 dark:bg-[#3B82F6] dark:hover:bg-[#2563EB] disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-semibold shadow-2xs transition cursor-pointer self-start sm:self-auto"
         >
           {isSaving ? (
             <Loader2 className="w-4 h-4 animate-spin" />
@@ -176,36 +176,36 @@ export const MiTiendaContacto: React.FC<MiTiendaContactoProps> = ({ store }) => 
       </div>
 
       {savedSuccess && (
-        <div className="p-3.5 rounded-xl bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 text-xs flex items-center gap-2 animate-fadeIn">
-          <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-emerald-400" />
+        <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 dark:bg-[#102A24] dark:border-[#34D399]/40 dark:text-[#34D399] text-xs flex items-center gap-2 animate-fadeIn">
+          <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-emerald-600 dark:text-[#34D399]" />
           <span>Canales de contacto actualizados correctamente en Supabase.</span>
         </div>
       )}
 
       {saveError && (
-        <div className="p-3.5 rounded-xl bg-rose-950/60 border border-rose-500/40 text-rose-300 text-xs flex items-center gap-2 animate-fadeIn">
-          <AlertCircle className="w-4 h-4 flex-shrink-0 text-rose-400" />
+        <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 dark:bg-[#2E141E] dark:border-[#F87171]/40 dark:text-[#F87171] text-xs flex items-center gap-2 animate-fadeIn">
+          <AlertCircle className="w-4 h-4 flex-shrink-0 text-rose-600 dark:text-[#F87171]" />
           <span>{saveError}</span>
         </div>
       )}
 
       {loadingError && (
-        <div className="p-3.5 rounded-xl bg-amber-950/40 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 flex-shrink-0 text-amber-400" />
+        <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 dark:bg-[#241C12] dark:border-[#FBBF24]/30 dark:text-[#FBBF24] text-xs flex items-center gap-2 animate-fadeIn">
+          <AlertCircle className="w-4 h-4 flex-shrink-0 text-amber-600 dark:text-[#FBBF24]" />
           <span>{loadingError}</span>
         </div>
       )}
 
       {/* WhatsApp (Canal Crítico de Ventas en Bolivia) */}
-      <div className="p-5 rounded-2xl bg-slate-950/60 border border-emerald-500/30 space-y-4">
+      <div className="p-5 rounded-2xl bg-emerald-50/70 border border-emerald-200 dark:bg-slate-950/60 dark:border-emerald-500/30 space-y-4 shadow-2xs">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+            <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400 flex items-center justify-center">
               <MessageCircle className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-white">WhatsApp de Pedidos y Atención</h3>
-              <p className="text-[11px] text-slate-400">Canal principal de confirmación y envíos en Bolivia</p>
+              <h3 className="text-sm font-bold text-[#14213D] dark:text-white">WhatsApp de Pedidos y Atención</h3>
+              <p className="text-[11px] text-[#52627A] dark:text-slate-400">Canal principal de confirmación y envíos en Bolivia</p>
             </div>
           </div>
 
@@ -213,7 +213,7 @@ export const MiTiendaContacto: React.FC<MiTiendaContactoProps> = ({ store }) => 
             <button
               type="button"
               onClick={() => openTestLink(profile.whatsapp, 'whatsapp')}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-600/30 text-xs font-semibold transition cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 text-white dark:bg-emerald-600/20 dark:text-emerald-300 border border-emerald-600 dark:border-emerald-500/40 hover:bg-emerald-700 dark:hover:bg-emerald-600/30 text-xs font-semibold transition cursor-pointer shadow-2xs"
             >
               <span>Abrir WhatsApp</span>
               <ExternalLink className="w-3.5 h-3.5" />
@@ -223,27 +223,27 @@ export const MiTiendaContacto: React.FC<MiTiendaContactoProps> = ({ store }) => 
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1.5">
+            <label className="block text-xs font-medium text-[#52627A] dark:text-slate-300 mb-1.5">
               Número con Código de País (+591)
             </label>
             <input
               type="text"
               value={profile.whatsapp || ''}
               onChange={(e) => setProfile({ ...profile, whatsapp: e.target.value })}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs font-mono focus:outline-none focus:border-emerald-500 transition"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-emerald-200 dark:border-slate-700 text-[#14213D] dark:text-white text-xs font-mono focus:outline-none focus:border-emerald-500 transition shadow-2xs"
               placeholder="+591 71023456"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1.5">
+            <label className="block text-xs font-medium text-[#52627A] dark:text-slate-300 mb-1.5">
               Teléfono Fijo / Centralita
             </label>
             <input
               type="text"
               value={profile.phone || ''}
               onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs font-mono focus:outline-none focus:border-indigo-500 transition"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-[#DEE7F2] dark:border-slate-700 text-[#14213D] dark:text-white text-xs font-mono focus:outline-none focus:border-[#1769FF] transition shadow-2xs"
               placeholder="+591 2 2789012"
             />
           </div>
@@ -251,24 +251,24 @@ export const MiTiendaContacto: React.FC<MiTiendaContactoProps> = ({ store }) => 
       </div>
 
       {/* Redes Sociales Principales */}
-      <div className="p-5 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-4">
-        <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+      <div className="p-5 rounded-2xl bg-white dark:bg-slate-950/60 border border-[#DEE7F2] dark:border-slate-800 space-y-4 shadow-2xs">
+        <h3 className="text-xs font-bold text-[#14213D] dark:text-slate-300 uppercase tracking-wider">
           Redes Sociales Oficiales
         </h3>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {/* Instagram */}
-          <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
+          <div className="p-3.5 rounded-xl bg-[#F8FAFC] dark:bg-slate-900 border border-[#DEE7F2] dark:border-slate-800 space-y-2 shadow-2xs">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Instagram className="w-4 h-4 text-pink-400" />
-                <span className="text-xs font-bold text-white">Instagram</span>
+                <Instagram className="w-4 h-4 text-pink-600 dark:text-pink-400" />
+                <span className="text-xs font-bold text-[#14213D] dark:text-white">Instagram</span>
               </div>
               {profile.socials?.instagram && (
                 <button
                   type="button"
                   onClick={() => openTestLink(profile.socials.instagram, 'instagram')}
-                  className="text-pink-400 hover:text-pink-300 text-[10px] font-semibold flex items-center gap-1 cursor-pointer"
+                  className="text-pink-600 dark:text-pink-400 hover:text-pink-700 dark:hover:text-pink-300 text-[10px] font-semibold flex items-center gap-1 cursor-pointer"
                 >
                   <span>Abrir</span>
                   <ExternalLink className="w-3 h-3" />
@@ -284,23 +284,23 @@ export const MiTiendaContacto: React.FC<MiTiendaContactoProps> = ({ store }) => 
                   socials: { ...(profile.socials || {}), instagram: e.target.value },
                 })
               }
-              className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:border-pink-500"
+              className="w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-950 border border-[#DEE7F2] dark:border-slate-700 text-[#14213D] dark:text-white text-xs focus:outline-none focus:border-pink-500 shadow-2xs"
               placeholder="@usuario_instagram"
             />
           </div>
 
           {/* Facebook */}
-          <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
+          <div className="p-3.5 rounded-xl bg-[#F8FAFC] dark:bg-slate-900 border border-[#DEE7F2] dark:border-slate-800 space-y-2 shadow-2xs">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Facebook className="w-4 h-4 text-blue-400" />
-                <span className="text-xs font-bold text-white">Facebook</span>
+                <Facebook className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                <span className="text-xs font-bold text-[#14213D] dark:text-white">Facebook</span>
               </div>
               {profile.socials?.facebook && (
                 <button
                   type="button"
                   onClick={() => openTestLink(profile.socials.facebook, 'facebook')}
-                  className="text-blue-400 hover:text-blue-300 text-[10px] font-semibold flex items-center gap-1 cursor-pointer"
+                  className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-[10px] font-semibold flex items-center gap-1 cursor-pointer"
                 >
                   <span>Abrir</span>
                   <ExternalLink className="w-3 h-3" />
@@ -316,23 +316,23 @@ export const MiTiendaContacto: React.FC<MiTiendaContactoProps> = ({ store }) => 
                   socials: { ...(profile.socials || {}), facebook: e.target.value },
                 })
               }
-              className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:border-blue-500"
+              className="w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-950 border border-[#DEE7F2] dark:border-slate-700 text-[#14213D] dark:text-white text-xs focus:outline-none focus:border-blue-500 shadow-2xs"
               placeholder="NombrePaginaFacebook"
             />
           </div>
 
           {/* TikTok */}
-          <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
+          <div className="p-3.5 rounded-xl bg-[#F8FAFC] dark:bg-slate-900 border border-[#DEE7F2] dark:border-slate-800 space-y-2 shadow-2xs">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Video className="w-4 h-4 text-cyan-400" />
-                <span className="text-xs font-bold text-white">TikTok</span>
+                <Video className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
+                <span className="text-xs font-bold text-[#14213D] dark:text-white">TikTok</span>
               </div>
               {profile.socials?.tiktok && (
                 <button
                   type="button"
                   onClick={() => openTestLink(profile.socials.tiktok, 'tiktok')}
-                  className="text-cyan-400 hover:text-cyan-300 text-[10px] font-semibold flex items-center gap-1 cursor-pointer"
+                  className="text-cyan-600 dark:text-cyan-400 hover:text-cyan-700 dark:hover:text-cyan-300 text-[10px] font-semibold flex items-center gap-1 cursor-pointer"
                 >
                   <span>Abrir</span>
                   <ExternalLink className="w-3 h-3" />
@@ -348,23 +348,23 @@ export const MiTiendaContacto: React.FC<MiTiendaContactoProps> = ({ store }) => 
                   socials: { ...(profile.socials || {}), tiktok: e.target.value },
                 })
               }
-              className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:border-cyan-500"
+              className="w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-950 border border-[#DEE7F2] dark:border-slate-700 text-[#14213D] dark:text-white text-xs focus:outline-none focus:border-cyan-500 shadow-2xs"
               placeholder="@usuario_tiktok"
             />
           </div>
 
           {/* YouTube */}
-          <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
+          <div className="p-3.5 rounded-xl bg-[#F8FAFC] dark:bg-slate-900 border border-[#DEE7F2] dark:border-slate-800 space-y-2 shadow-2xs">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Youtube className="w-4 h-4 text-rose-500" />
-                <span className="text-xs font-bold text-white">Canal de YouTube</span>
+                <Youtube className="w-4 h-4 text-rose-600 dark:text-rose-500" />
+                <span className="text-xs font-bold text-[#14213D] dark:text-white">Canal de YouTube</span>
               </div>
               {profile.socials?.youtube && (
                 <button
                   type="button"
                   onClick={() => openTestLink(profile.socials.youtube, 'youtube')}
-                  className="text-rose-400 hover:text-rose-300 text-[10px] font-semibold flex items-center gap-1 cursor-pointer"
+                  className="text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 text-[10px] font-semibold flex items-center gap-1 cursor-pointer"
                 >
                   <span>Abrir</span>
                   <ExternalLink className="w-3 h-3" />
@@ -380,7 +380,7 @@ export const MiTiendaContacto: React.FC<MiTiendaContactoProps> = ({ store }) => 
                   socials: { ...(profile.socials || {}), youtube: e.target.value },
                 })
               }
-              className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:border-rose-500"
+              className="w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-950 border border-[#DEE7F2] dark:border-slate-700 text-[#14213D] dark:text-white text-xs focus:outline-none focus:border-rose-500 shadow-2xs"
               placeholder="https://youtube.com/@micanal"
             />
           </div>

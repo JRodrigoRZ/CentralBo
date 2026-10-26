@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Download, ShieldCheck, CheckCircle2, Smartphone, X, ExternalLink, Copy, Check, Share2, PlusSquare } from 'lucide-react';
+import { Download, ShieldCheck, CheckCircle2, Smartphone, X, ExternalLink, Copy, Check, Share2, PlusSquare, Rocket } from 'lucide-react';
 import { usePWA } from '../../hooks/usePWA';
 
 interface StoreAdminPWAInstallButtonProps {
@@ -86,10 +86,10 @@ export const StoreAdminPWAInstallButton: React.FC<StoreAdminPWAInstallButtonProp
           id={`admin-pwa-install-btn-${tenantId.slice(0, 8)}`}
           onClick={handleInstallClick}
           disabled={isInstalling}
-          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-500/40 text-xs font-semibold transition cursor-pointer disabled:opacity-50 ${className}`}
+          className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 sm:py-2 rounded-xl bg-purple-50/80 hover:bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:hover:bg-purple-900/50 dark:text-purple-300 border border-purple-200/80 dark:border-purple-800/50 text-xs font-semibold transition cursor-pointer disabled:opacity-50 shadow-2xs ${className}`}
           title={`Instalar app administrativa para ${storeName}`}
         >
-          <ShieldCheck className="w-3.5 h-3.5 text-indigo-400" />
+          <Rocket className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
           <span>{isInstalling ? 'Instalando...' : 'Instalar Panel'}</span>
         </button>
 

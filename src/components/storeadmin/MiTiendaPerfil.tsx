@@ -250,17 +250,17 @@ export const MiTiendaPerfil: React.FC<MiTiendaPerfilProps> = ({ store }) => {
   return (
     <form onSubmit={handleSave} className="space-y-6">
       {/* Encabezado */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[#DEE7F2] dark:border-[#263653]">
         <div>
-          <h2 className="text-lg font-bold text-white flex items-center gap-2">
-            <StoreIcon className="w-5 h-5 text-indigo-400" />
+          <h2 className="text-lg font-bold text-[#14213D] dark:text-[#F8FAFC] flex items-center gap-2">
+            <StoreIcon className="w-5 h-5 text-[#1769FF] dark:text-[#3B82F6]" />
             <span>Perfil del Comercio</span>
             {isLoading && (
-              <Loader2 className="w-4 h-4 text-indigo-400 animate-spin ml-2" title="Sincronizando con Supabase..." />
+              <Loader2 className="w-4 h-4 text-[#1769FF] dark:text-[#3B82F6] animate-spin ml-2" title="Sincronizando con Supabase..." />
             )}
           </h2>
-          <p className="text-xs text-slate-400 mt-0.5">
-            Información de identidad pública, ubicación y canales de contacto directo (almacenamiento centralizado en Supabase)
+          <p className="text-xs text-[#475569] dark:text-[#B8C6DA] mt-0.5">
+            Información de identidad pública, ubicación y canales de contacto directo
           </p>
         </div>
 
@@ -268,7 +268,7 @@ export const MiTiendaPerfil: React.FC<MiTiendaPerfilProps> = ({ store }) => {
           type="submit"
           id="btn-guardar-perfil-comercio"
           disabled={isSaving || isUploadingLogo}
-          className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-800 disabled:cursor-not-allowed text-white text-xs font-semibold shadow-md transition cursor-pointer self-start sm:self-auto"
+          className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-[#1769FF] hover:bg-blue-700 dark:bg-[#3B82F6] dark:hover:bg-[#2563EB] disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-semibold shadow-2xs transition cursor-pointer self-start sm:self-auto"
         >
           {isSaving || isUploadingLogo ? (
             <>
@@ -287,9 +287,9 @@ export const MiTiendaPerfil: React.FC<MiTiendaPerfilProps> = ({ store }) => {
       {savedSuccess && (
         <div
           id="alerta-perfil-guardado-exitoso"
-          className="p-3.5 rounded-xl bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 text-xs flex items-center gap-2 animate-fadeIn"
+          className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 dark:bg-[#102A24] dark:border-[#34D399]/40 dark:text-[#34D399] text-xs flex items-center gap-2 animate-fadeIn"
         >
-          <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-emerald-400" />
+          <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-emerald-600 dark:text-[#34D399]" />
           <span>Información de perfil actualizada exitosamente en Supabase para {profile.name}.</span>
         </div>
       )}
@@ -297,51 +297,51 @@ export const MiTiendaPerfil: React.FC<MiTiendaPerfilProps> = ({ store }) => {
       {errorMessage && (
         <div
           id="alerta-perfil-error-guardado"
-          className="p-3.5 rounded-xl bg-rose-950/60 border border-rose-500/40 text-rose-300 text-xs flex items-start gap-2 animate-fadeIn"
+          className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 dark:bg-[#2E141E] dark:border-[#F87171]/40 dark:text-[#F87171] text-xs flex items-start gap-2 animate-fadeIn"
         >
-          <AlertCircle className="w-4 h-4 flex-shrink-0 text-rose-400 mt-0.5" />
+          <AlertCircle className="w-4 h-4 flex-shrink-0 text-rose-600 dark:text-[#F87171] mt-0.5" />
           <div className="flex-1">
             <span className="font-semibold block mb-0.5">No se pudo guardar el perfil en Supabase</span>
-            <span className="text-[11px] text-rose-200/90">{errorMessage}</span>
+            <span className="text-[11px] text-rose-700/90 dark:text-[#F87171]/90">{errorMessage}</span>
           </div>
         </div>
       )}
 
-      {/* Identidad del Comercio (Logo, Nombre, Descripción) */}
-      <div className="p-5 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-5">
+      {/* 1. Identidad del Comercio (Logo, Nombre, Descripción) */}
+      <div className="p-5 rounded-2xl bg-white dark:bg-[#101B32] border border-[#DEE7F2] dark:border-[#263653] space-y-5 shadow-2xs">
         <div className="flex items-center justify-between">
-          <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+          <h3 className="text-xs font-bold text-[#14213D] dark:text-[#F8FAFC] uppercase tracking-wider">
             1. Identidad Principal
           </h3>
-          <span className="text-[11px] text-slate-400 flex items-center gap-1.5">
-            <ShieldCheck className="w-3.5 h-3.5 text-indigo-400" />
+          <span className="text-[11px] text-[#475569] dark:text-[#B8C6DA] flex items-center gap-1.5">
+            <ShieldCheck className="w-3.5 h-3.5 text-[#1769FF] dark:text-[#3B82F6]" />
             <span>Un único logo vigente por comercio</span>
           </span>
         </div>
 
         {/* Nombre de la Tienda */}
         <div>
-          <label className="block text-xs font-medium text-slate-300 mb-1.5">
+          <label className="block text-xs font-medium text-[#52627A] dark:text-[#B8C6DA] mb-1.5">
             Nombre de la Tienda / Negocio
           </label>
           <input
             type="text"
             value={profile.name}
             onChange={(e) => setProfile({ ...profile, name: e.target.value })}
-            className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-indigo-500 transition"
+            className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-[#17243D] border border-[#DEE7F2] dark:border-[#263653] text-[#14213D] dark:text-[#F8FAFC] placeholder-[#94A3B8] dark:placeholder-[#7E90B0] text-xs focus:outline-none focus:border-[#1769FF] dark:focus:border-[#3B82F6] focus:ring-1 focus:ring-[#1769FF]/20 shadow-2xs transition"
             placeholder="Ej. Restaurante Gourmet Roma"
             required
           />
         </div>
 
         {/* Sección Especializada: Logo del Comercio */}
-        <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 space-y-4">
+        <div className="p-4 rounded-xl bg-[#F8FAFC] dark:bg-[#17243D] border border-[#DEE7F2] dark:border-[#263653] space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <ImageIcon className="w-4 h-4 text-indigo-400" />
-              <span className="text-xs font-semibold text-white">Logo del Comercio</span>
+              <ImageIcon className="w-4 h-4 text-[#1769FF] dark:text-[#3B82F6]" />
+              <span className="text-xs font-semibold text-[#14213D] dark:text-[#F8FAFC]">Logo del Comercio</span>
             </div>
-            <span className="text-[11px] text-slate-400">
+            <span className="text-[11px] text-[#475569] dark:text-[#B8C6DA]">
               Formatos: PNG, JPG, WEBP, SVG • Máx. 2 MB
             </span>
           </div>
@@ -350,9 +350,9 @@ export const MiTiendaPerfil: React.FC<MiTiendaPerfilProps> = ({ store }) => {
           {logoActionSuccess && (
             <div
               id="alerta-logo-exito"
-              className="p-3 rounded-lg bg-emerald-950/70 border border-emerald-500/40 text-emerald-300 text-xs flex items-center gap-2 animate-fadeIn"
+              className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 dark:bg-[#102A24] dark:border-[#34D399]/40 dark:text-[#34D399] text-xs flex items-center gap-2 animate-fadeIn"
             >
-              <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-emerald-400" />
+              <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-emerald-600 dark:text-[#34D399]" />
               <span>{logoActionSuccess}</span>
             </div>
           )}
@@ -360,12 +360,12 @@ export const MiTiendaPerfil: React.FC<MiTiendaPerfilProps> = ({ store }) => {
           {logoActionError && (
             <div
               id="alerta-logo-error"
-              className="p-3 rounded-lg bg-rose-950/70 border border-rose-500/40 text-rose-300 text-xs flex items-start gap-2 animate-fadeIn"
+              className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 dark:bg-[#2E141E] dark:border-[#F87171]/40 dark:text-[#F87171] text-xs flex items-start gap-2 animate-fadeIn"
             >
-              <AlertCircle className="w-4 h-4 flex-shrink-0 text-rose-400 mt-0.5" />
+              <AlertCircle className="w-4 h-4 flex-shrink-0 text-rose-600 dark:text-[#F87171] mt-0.5" />
               <div className="flex-1">
                 <span className="font-semibold block mb-0.5">Error en el logo</span>
-                <span className="text-[11px] text-rose-200/90">{logoActionError}</span>
+                <span className="text-[11px] text-rose-700/90 dark:text-[#F87171]/90">{logoActionError}</span>
               </div>
             </div>
           )}
@@ -373,8 +373,8 @@ export const MiTiendaPerfil: React.FC<MiTiendaPerfilProps> = ({ store }) => {
           {/* Comparador Visual: Logo Actual vs Previsualización */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
             {/* Visualizador del Logo Oficial Vigente */}
-            <div className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800/90 flex items-center gap-3">
-              <div className="w-16 h-16 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center overflow-hidden flex-shrink-0">
+            <div className="p-3.5 rounded-xl bg-white dark:bg-[#101B32] border border-[#DEE7F2] dark:border-[#263653] flex items-center gap-3">
+              <div className="w-16 h-16 rounded-xl bg-[#F8FAFC] dark:bg-[#17243D] border border-[#DEE7F2] dark:border-[#263653] flex items-center justify-center overflow-hidden flex-shrink-0">
                 {profile.logoUrl && !logoImgError ? (
                   <img
                     id="img-logo-oficial"
@@ -384,21 +384,21 @@ export const MiTiendaPerfil: React.FC<MiTiendaPerfilProps> = ({ store }) => {
                     className="w-full h-full object-contain p-1"
                   />
                 ) : (
-                  <div className="flex flex-col items-center justify-center text-slate-400">
-                    <StoreIcon className="w-7 h-7 text-slate-400" />
+                  <div className="flex flex-col items-center justify-center text-[#94A3B8] dark:text-[#7E90B0]">
+                    <StoreIcon className="w-7 h-7" />
                   </div>
                 )}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5 mb-0.5">
-                  <span className="text-xs font-semibold text-white">Logo Actual</span>
+                  <span className="text-xs font-semibold text-[#14213D] dark:text-[#F8FAFC]">Logo Actual</span>
                   {profile.logoUrl && !logoImgError && (
-                    <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-1.5 py-0.2 rounded border border-emerald-500/20 font-medium">
+                    <span className="text-[10px] text-emerald-700 dark:text-[#34D399] bg-emerald-50 dark:bg-[#102A24] px-1.5 py-0.2 rounded border border-emerald-200 dark:border-[#34D399]/30 font-medium">
                       Vigente
                     </span>
                   )}
                 </div>
-                <p className="text-[11px] text-slate-400 truncate">
+                <p className="text-[11px] text-[#475569] dark:text-[#B8C6DA] truncate">
                   {profile.logoUrl && !logoImgError
                     ? profile.logoUrl.includes('supabase.co/storage')
                       ? 'Alojado en Supabase Storage'
@@ -406,7 +406,7 @@ export const MiTiendaPerfil: React.FC<MiTiendaPerfilProps> = ({ store }) => {
                     : 'Sin logo oficial configurado'}
                 </p>
                 {logoImgError && profile.logoUrl && (
-                  <p className="text-[10px] text-rose-400 mt-0.5">
+                  <p className="text-[10px] text-rose-600 dark:text-[#F87171] mt-0.5">
                     No se pudo cargar la imagen desde la URL.
                   </p>
                 )}
@@ -417,13 +417,13 @@ export const MiTiendaPerfil: React.FC<MiTiendaPerfilProps> = ({ store }) => {
             <div
               className={`p-3.5 rounded-xl border flex items-center gap-3 transition ${
                 selectedLogoFile && previewLogoUrl
-                  ? 'bg-indigo-950/20 border-indigo-500/50'
-                  : 'bg-slate-950/40 border-dashed border-slate-800'
+                  ? 'bg-blue-50/50 dark:bg-[#17243D] border-[#1769FF]/50 dark:border-[#3B82F6]/60'
+                  : 'bg-white/60 dark:bg-[#101B32]/60 border-dashed border-[#DEE7F2] dark:border-[#263653]'
               }`}
             >
               {selectedLogoFile && previewLogoUrl ? (
                 <>
-                  <div className="w-16 h-16 rounded-xl bg-slate-900 border-2 border-indigo-500/60 flex items-center justify-center overflow-hidden flex-shrink-0">
+                  <div className="w-16 h-16 rounded-xl bg-white dark:bg-[#17243D] border-2 border-[#1769FF] dark:border-[#3B82F6] flex items-center justify-center overflow-hidden flex-shrink-0">
                     <img
                       id="img-logo-preview"
                       src={previewLogoUrl}
@@ -433,32 +433,32 @@ export const MiTiendaPerfil: React.FC<MiTiendaPerfilProps> = ({ store }) => {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-1 mb-0.5">
-                      <span className="text-xs font-semibold text-indigo-300 truncate">
+                      <span className="text-xs font-semibold text-[#1769FF] dark:text-[#3B82F6] truncate">
                         Previsualización
                       </span>
-                      <span className="text-[10px] text-amber-400 bg-amber-500/10 px-1.5 py-0.2 rounded border border-amber-500/20 font-medium">
+                      <span className="text-[10px] text-amber-700 dark:text-[#FBBF24] bg-amber-50 dark:bg-[#241C12] px-1.5 py-0.2 rounded border border-amber-200 dark:border-[#FBBF24]/30 font-medium">
                         Pendiente
                       </span>
                     </div>
-                    <p className="text-[11px] text-slate-300 truncate font-mono">
+                    <p className="text-[11px] text-[#14213D] dark:text-[#F8FAFC] truncate font-mono">
                       {selectedLogoFile.name}
                     </p>
-                    <p className="text-[10px] text-slate-400">
+                    <p className="text-[10px] text-[#475569] dark:text-[#B8C6DA]">
                       {(selectedLogoFile.size / 1024).toFixed(1)} KB • Listo para subir
                     </p>
                   </div>
                 </>
               ) : (
-                <div className="flex items-center gap-3 text-slate-400 w-full py-1">
-                  <div className="w-16 h-16 rounded-xl bg-slate-900/60 border border-slate-800 flex items-center justify-center flex-shrink-0">
-                    <UploadCloud className="w-6 h-6 text-slate-400" />
+                <div className="flex items-center gap-3 text-[#475569] dark:text-[#B8C6DA] w-full py-1">
+                  <div className="w-16 h-16 rounded-xl bg-[#F8FAFC] dark:bg-[#17243D] border border-[#DEE7F2] dark:border-[#263653] flex items-center justify-center flex-shrink-0">
+                    <UploadCloud className="w-6 h-6 text-[#94A3B8] dark:text-[#7E90B0]" />
                   </div>
                   <div className="text-left">
-                    <span className="text-xs font-medium text-slate-400 block">
+                    <span className="text-xs font-medium text-[#14213D] dark:text-[#F8FAFC] block">
                       Nuevo Logo
                     </span>
-                    <span className="text-[11px] text-slate-400">
-                      Selecciona un archivo para ver la previsualización antes de subir.
+                    <span className="text-[11px] text-[#475569] dark:text-[#B8C6DA]">
+                      Selecciona un archivo para previsualizar antes de subir.
                     </span>
                   </div>
                 </div>
@@ -466,16 +466,16 @@ export const MiTiendaPerfil: React.FC<MiTiendaPerfilProps> = ({ store }) => {
             </div>
           </div>
 
-          {/* Opciones de Carga: 1. Subir archivo (Recomendado) y 2. URL Manual */}
-          <div className="space-y-3 pt-2 border-t border-slate-800/80">
+          {/* Opciones de Carga: 1. Subir archivo y 2. URL Manual */}
+          <div className="space-y-3 pt-2 border-t border-[#DEE7F2] dark:border-[#263653]">
             {/* Opción 1: Selector de Archivo Local */}
             <div>
               <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
-                <span className="text-xs font-medium text-slate-200 flex items-center gap-1.5">
-                  <UploadCloud className="w-3.5 h-3.5 text-indigo-400" />
+                <span className="text-xs font-medium text-[#14213D] dark:text-[#F8FAFC] flex items-center gap-1.5">
+                  <UploadCloud className="w-3.5 h-3.5 text-[#1769FF] dark:text-[#3B82F6]" />
                   <span>Opción A: Subir imagen desde tu dispositivo</span>
                 </span>
-                <span className="text-[10px] text-indigo-400/90 font-medium">
+                <span className="text-[10px] text-[#1769FF] dark:text-[#3B82F6] font-medium">
                   Recomendado para máxima resolución y PWA
                 </span>
               </div>
@@ -497,9 +497,9 @@ export const MiTiendaPerfil: React.FC<MiTiendaPerfilProps> = ({ store }) => {
                   id="btn-seleccionar-logo"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={isUploadingLogo || isSaving}
-                  className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:bg-slate-900 disabled:cursor-not-allowed text-white text-xs font-medium border border-slate-700 transition cursor-pointer"
+                  className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white hover:bg-[#EEF4FF] dark:bg-[#101B32] dark:hover:bg-[#1E2D4A] disabled:opacity-50 disabled:cursor-not-allowed text-[#14213D] dark:text-[#F8FAFC] text-xs font-medium border border-[#DEE7F2] dark:border-[#263653] transition cursor-pointer shadow-2xs"
                 >
-                  <UploadCloud className="w-3.5 h-3.5 text-indigo-400" />
+                  <UploadCloud className="w-3.5 h-3.5 text-[#1769FF] dark:text-[#3B82F6]" />
                   <span>
                     {selectedLogoFile ? 'Cambiar archivo seleccionado' : 'Seleccionar logo desde dispositivo'}
                   </span>
@@ -512,7 +512,7 @@ export const MiTiendaPerfil: React.FC<MiTiendaPerfilProps> = ({ store }) => {
                       id="btn-subir-guardar-logo"
                       onClick={handleUploadAndSaveLogo}
                       disabled={isUploadingLogo || isSaving}
-                      className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-800 disabled:cursor-not-allowed text-white text-xs font-semibold shadow transition cursor-pointer"
+                      className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#1769FF] hover:bg-blue-700 dark:bg-[#3B82F6] dark:hover:bg-[#2563EB] disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-semibold shadow-2xs transition cursor-pointer"
                     >
                       {isUploadingLogo ? (
                         <>
@@ -532,7 +532,7 @@ export const MiTiendaPerfil: React.FC<MiTiendaPerfilProps> = ({ store }) => {
                       id="btn-descartar-logo"
                       onClick={handleCancelSelectedLogo}
                       disabled={isUploadingLogo || isSaving}
-                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 hover:text-white text-xs transition cursor-pointer"
+                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-[#EEF4FF] dark:bg-[#101B32] dark:hover:bg-[#1E2D4A] text-[#475569] dark:text-[#B8C6DA] hover:text-[#14213D] dark:hover:text-[#F8FAFC] border border-[#DEE7F2] dark:border-[#263653] text-xs transition cursor-pointer"
                       title="Cancelar selección de archivo"
                     >
                       <X className="w-3.5 h-3.5" />
@@ -543,13 +543,13 @@ export const MiTiendaPerfil: React.FC<MiTiendaPerfilProps> = ({ store }) => {
               </div>
             </div>
 
-            {/* Opción 2: URL Manual de Imagen (Preservando funcionalidad existente) */}
+            {/* Opción 2: URL Manual de Imagen */}
             <div className="pt-2">
               <label
                 htmlFor="input-url-logo"
-                className="block text-xs font-medium text-slate-300 mb-1.5 flex items-center gap-1.5"
+                className="block text-xs font-medium text-[#52627A] dark:text-[#B8C6DA] mb-1.5 flex items-center gap-1.5"
               >
-                <LinkIcon className="w-3.5 h-3.5 text-slate-400" />
+                <LinkIcon className="w-3.5 h-3.5 text-[#94A3B8] dark:text-[#7E90B0]" />
                 <span>Opción B: URL del Logo (Enlace HTTPS manual)</span>
               </label>
               <input
@@ -561,10 +561,10 @@ export const MiTiendaPerfil: React.FC<MiTiendaPerfilProps> = ({ store }) => {
                   setLogoImgError(false);
                 }}
                 disabled={isUploadingLogo || isSaving}
-                className="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-indigo-500 transition disabled:opacity-60"
+                className="w-full px-3.5 py-2 rounded-xl bg-white dark:bg-[#17243D] border border-[#DEE7F2] dark:border-[#263653] text-[#14213D] dark:text-[#F8FAFC] placeholder-[#94A3B8] dark:placeholder-[#7E90B0] text-xs focus:outline-none focus:border-[#1769FF] dark:focus:border-[#3B82F6] focus:ring-1 focus:ring-[#1769FF]/20 shadow-2xs transition disabled:opacity-60"
                 placeholder="https://images.unsplash.com/..."
               />
-              <p className="text-[10px] text-slate-400 mt-1">
+              <p className="text-[10px] text-[#52627A] dark:text-[#B8C6DA] mt-1">
                 Puedes pegar directamente un enlace HTTPS externo si tu imagen ya está alojada en otro servidor.
               </p>
             </div>
@@ -573,105 +573,105 @@ export const MiTiendaPerfil: React.FC<MiTiendaPerfilProps> = ({ store }) => {
 
         {/* Descripción Comercial */}
         <div>
-          <label className="block text-xs font-medium text-slate-300 mb-1.5">
+          <label className="block text-xs font-medium text-[#52627A] dark:text-[#B8C6DA] mb-1.5">
             Descripción Comercial del Negocio
           </label>
           <textarea
             rows={3}
             value={profile.description}
             onChange={(e) => setProfile({ ...profile, description: e.target.value })}
-            className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-indigo-500 transition resize-none"
+            className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-[#17243D] border border-[#DEE7F2] dark:border-[#263653] text-[#14213D] dark:text-[#F8FAFC] placeholder-[#94A3B8] dark:placeholder-[#7E90B0] text-xs focus:outline-none focus:border-[#1769FF] dark:focus:border-[#3B82F6] focus:ring-1 focus:ring-[#1769FF]/20 shadow-2xs transition resize-none"
             placeholder="Describe tu propuesta de valor, productos estelares o historia..."
           />
         </div>
       </div>
 
-      {/* Ubicación y Canales de Contacto Directo */}
-      <div className="p-5 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-4">
-        <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+      {/* 2. Ubicación y Canales de Contacto Directo */}
+      <div className="p-5 rounded-2xl bg-white dark:bg-[#101B32] border border-[#DEE7F2] dark:border-[#263653] space-y-4 shadow-2xs">
+        <h3 className="text-xs font-bold text-[#14213D] dark:text-[#F8FAFC] uppercase tracking-wider">
           2. Ubicación y Contacto Oficial
         </h3>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="sm:col-span-2">
-            <label className="block text-xs font-medium text-slate-300 mb-1.5 flex items-center gap-1.5">
-              <MapPin className="w-3.5 h-3.5 text-rose-400" />
+            <label className="block text-xs font-medium text-[#52627A] dark:text-[#B8C6DA] mb-1.5 flex items-center gap-1.5">
+              <MapPin className="w-3.5 h-3.5 text-rose-500" />
               <span>Dirección Física / Sucursal</span>
             </label>
             <input
               type="text"
               value={profile.address}
               onChange={(e) => setProfile({ ...profile, address: e.target.value })}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-indigo-500 transition"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-[#17243D] border border-[#DEE7F2] dark:border-[#263653] text-[#14213D] dark:text-[#F8FAFC] placeholder-[#94A3B8] dark:placeholder-[#7E90B0] text-xs focus:outline-none focus:border-[#1769FF] dark:focus:border-[#3B82F6] focus:ring-1 focus:ring-[#1769FF]/20 shadow-2xs transition"
               placeholder="Ej. Av. Ballivián #1234, Calacoto, La Paz - Bolivia"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1.5 flex items-center gap-1.5">
-              <Phone className="w-3.5 h-3.5 text-indigo-400" />
+            <label className="block text-xs font-medium text-[#52627A] dark:text-[#B8C6DA] mb-1.5 flex items-center gap-1.5">
+              <Phone className="w-3.5 h-3.5 text-[#1769FF] dark:text-[#3B82F6]" />
               <span>Teléfono Fijo / Móvil</span>
             </label>
             <input
               type="text"
               value={profile.phone}
               onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-indigo-500 transition"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-[#17243D] border border-[#DEE7F2] dark:border-[#263653] text-[#14213D] dark:text-[#F8FAFC] placeholder-[#94A3B8] dark:placeholder-[#7E90B0] text-xs focus:outline-none focus:border-[#1769FF] dark:focus:border-[#3B82F6] focus:ring-1 focus:ring-[#1769FF]/20 shadow-2xs transition"
               placeholder="+591 2 2789012"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1.5 flex items-center gap-1.5">
-              <MessageCircle className="w-3.5 h-3.5 text-emerald-400" />
+            <label className="block text-xs font-medium text-[#52627A] dark:text-[#B8C6DA] mb-1.5 flex items-center gap-1.5">
+              <MessageCircle className="w-3.5 h-3.5 text-emerald-500" />
               <span>WhatsApp de Atención Oficial (Prioritario)</span>
             </label>
             <input
               type="text"
               value={profile.whatsapp}
               onChange={(e) => setProfile({ ...profile, whatsapp: e.target.value })}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-indigo-500 transition"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-[#17243D] border border-[#DEE7F2] dark:border-[#263653] text-[#14213D] dark:text-[#F8FAFC] placeholder-[#94A3B8] dark:placeholder-[#7E90B0] text-xs focus:outline-none focus:border-[#1769FF] dark:focus:border-[#3B82F6] focus:ring-1 focus:ring-[#1769FF]/20 shadow-2xs transition"
               placeholder="+591 71023456"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1.5 flex items-center gap-1.5">
-              <Mail className="w-3.5 h-3.5 text-cyan-400" />
+            <label className="block text-xs font-medium text-[#52627A] dark:text-[#B8C6DA] mb-1.5 flex items-center gap-1.5">
+              <Mail className="w-3.5 h-3.5 text-cyan-500" />
               <span>Email de Contacto</span>
             </label>
             <input
               type="email"
               value={profile.email}
               onChange={(e) => setProfile({ ...profile, email: e.target.value })}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-indigo-500 transition"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-[#17243D] border border-[#DEE7F2] dark:border-[#263653] text-[#14213D] dark:text-[#F8FAFC] placeholder-[#94A3B8] dark:placeholder-[#7E90B0] text-xs focus:outline-none focus:border-[#1769FF] dark:focus:border-[#3B82F6] focus:ring-1 focus:ring-[#1769FF]/20 shadow-2xs transition"
               placeholder="contacto@mitienda.bo"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1.5 flex items-center gap-1.5">
-              <Clock className="w-3.5 h-3.5 text-amber-400" />
+            <label className="block text-xs font-medium text-[#52627A] dark:text-[#B8C6DA] mb-1.5 flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5 text-amber-500" />
               <span>Información Breve de Atención</span>
             </label>
             <input
               type="text"
               value={profile.attentionInfo}
               onChange={(e) => setProfile({ ...profile, attentionInfo: e.target.value })}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-indigo-500 transition"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-[#17243D] border border-[#DEE7F2] dark:border-[#263653] text-[#14213D] dark:text-[#F8FAFC] placeholder-[#94A3B8] dark:placeholder-[#7E90B0] text-xs focus:outline-none focus:border-[#1769FF] dark:focus:border-[#3B82F6] focus:ring-1 focus:ring-[#1769FF]/20 shadow-2xs transition"
               placeholder="Lunes a Sábado de 08:30 a 20:30"
             />
           </div>
         </div>
       </div>
 
-      {/* Redes Sociales (Priorizando Instagram, Facebook, TikTok, además YouTube y WhatsApp) */}
-      <div className="p-5 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-4">
+      {/* 3. Redes Sociales */}
+      <div className="p-5 rounded-2xl bg-white dark:bg-[#101B32] border border-[#DEE7F2] dark:border-[#263653] space-y-4 shadow-2xs">
         <div className="flex items-center justify-between">
-          <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+          <h3 className="text-xs font-bold text-[#14213D] dark:text-[#F8FAFC] uppercase tracking-wider">
             3. Redes Sociales (Prioridad Oficial)
           </h3>
-          <span className="text-[10px] text-indigo-300 font-semibold bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20">
+          <span className="text-[10px] text-[#1769FF] dark:text-[#3B82F6] font-semibold bg-[#EEF4FF] dark:bg-[#17243D] px-2 py-0.5 rounded border border-[#DEE7F2] dark:border-[#263653]">
             Instagram • Facebook • TikTok
           </span>
         </div>
@@ -679,8 +679,8 @@ export const MiTiendaPerfil: React.FC<MiTiendaPerfilProps> = ({ store }) => {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {/* Instagram */}
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1.5 flex items-center gap-1.5">
-              <Instagram className="w-3.5 h-3.5 text-pink-400" />
+            <label className="block text-xs font-medium text-[#52627A] dark:text-[#B8C6DA] mb-1.5 flex items-center gap-1.5">
+              <Instagram className="w-3.5 h-3.5 text-pink-500" />
               <span>Instagram (Prioritario)</span>
             </label>
             <input
@@ -692,15 +692,15 @@ export const MiTiendaPerfil: React.FC<MiTiendaPerfilProps> = ({ store }) => {
                   socials: { ...profile.socials, instagram: e.target.value },
                 })
               }
-              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-indigo-500 transition"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-[#17243D] border border-[#DEE7F2] dark:border-[#263653] text-[#14213D] dark:text-[#F8FAFC] placeholder-[#94A3B8] dark:placeholder-[#7E90B0] text-xs focus:outline-none focus:border-[#1769FF] dark:focus:border-[#3B82F6] focus:ring-1 focus:ring-[#1769FF]/20 shadow-2xs transition"
               placeholder="@mitienda_bo"
             />
           </div>
 
           {/* Facebook */}
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1.5 flex items-center gap-1.5">
-              <Facebook className="w-3.5 h-3.5 text-blue-400" />
+            <label className="block text-xs font-medium text-[#52627A] dark:text-[#B8C6DA] mb-1.5 flex items-center gap-1.5">
+              <Facebook className="w-3.5 h-3.5 text-blue-500" />
               <span>Facebook (Prioritario)</span>
             </label>
             <input
@@ -712,15 +712,15 @@ export const MiTiendaPerfil: React.FC<MiTiendaPerfilProps> = ({ store }) => {
                   socials: { ...profile.socials, facebook: e.target.value },
                 })
               }
-              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-indigo-500 transition"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-[#17243D] border border-[#DEE7F2] dark:border-[#263653] text-[#14213D] dark:text-[#F8FAFC] placeholder-[#94A3B8] dark:placeholder-[#7E90B0] text-xs focus:outline-none focus:border-[#1769FF] dark:focus:border-[#3B82F6] focus:ring-1 focus:ring-[#1769FF]/20 shadow-2xs transition"
               placeholder="MiTiendaBolivia"
             />
           </div>
 
           {/* TikTok */}
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1.5 flex items-center gap-1.5">
-              <Video className="w-3.5 h-3.5 text-cyan-400" />
+            <label className="block text-xs font-medium text-[#52627A] dark:text-[#B8C6DA] mb-1.5 flex items-center gap-1.5">
+              <Video className="w-3.5 h-3.5 text-cyan-500" />
               <span>TikTok (Prioritario)</span>
             </label>
             <input
@@ -732,14 +732,14 @@ export const MiTiendaPerfil: React.FC<MiTiendaPerfilProps> = ({ store }) => {
                   socials: { ...profile.socials, tiktok: e.target.value },
                 })
               }
-              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-indigo-500 transition"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-[#17243D] border border-[#DEE7F2] dark:border-[#263653] text-[#14213D] dark:text-[#F8FAFC] placeholder-[#94A3B8] dark:placeholder-[#7E90B0] text-xs focus:outline-none focus:border-[#1769FF] dark:focus:border-[#3B82F6] focus:ring-1 focus:ring-[#1769FF]/20 shadow-2xs transition"
               placeholder="@mitienda.bolivia"
             />
           </div>
 
           {/* YouTube */}
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1.5 flex items-center gap-1.5">
+            <label className="block text-xs font-medium text-[#52627A] dark:text-[#B8C6DA] mb-1.5 flex items-center gap-1.5">
               <Youtube className="w-3.5 h-3.5 text-rose-500" />
               <span>YouTube (Opcional)</span>
             </label>
@@ -752,7 +752,7 @@ export const MiTiendaPerfil: React.FC<MiTiendaPerfilProps> = ({ store }) => {
                   socials: { ...profile.socials, youtube: e.target.value },
                 })
               }
-              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-indigo-500 transition"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-[#17243D] border border-[#DEE7F2] dark:border-[#263653] text-[#14213D] dark:text-[#F8FAFC] placeholder-[#94A3B8] dark:placeholder-[#7E90B0] text-xs focus:outline-none focus:border-[#1769FF] dark:focus:border-[#3B82F6] focus:ring-1 focus:ring-[#1769FF]/20 shadow-2xs transition"
               placeholder="https://youtube.com/@mitiendabo"
             />
           </div>

@@ -566,25 +566,25 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
   return (
     <div className="space-y-6">
       {/* Encabezado */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#DEE7F2] dark:border-slate-800">
         <div>
-          <h2 className="text-lg font-bold text-white flex items-center gap-2">
-            <Package className="w-5 h-5 text-indigo-400" />
+          <h2 className="text-lg font-bold text-[#14213D] dark:text-white flex items-center gap-2">
+            <Package className="w-5 h-5 text-[#1769FF] dark:text-indigo-400" />
             <span>Catálogo de Productos</span>
-            <span className="text-xs px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 font-normal">
+            <span className="text-xs px-2 py-0.5 rounded-full bg-[#EEF4FF] text-[#1769FF] dark:bg-slate-800 dark:text-slate-300 font-medium">
               {products.length} productos
             </span>
           </h2>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-xs text-[#52627A] dark:text-slate-400 mt-0.5">
             Administra precios, existencias, fotografías y atributos específicos de{' '}
-            <strong className="text-indigo-300">{store.name}</strong>
+            <strong className="text-[#1769FF] dark:text-indigo-300">{store.name}</strong>
           </p>
         </div>
 
         <button
           type="button"
           onClick={handleOpenCreate}
-          className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-md transition cursor-pointer self-start sm:self-auto"
+          className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-[#1769FF] hover:bg-blue-700 dark:bg-indigo-600 dark:hover:bg-indigo-500 text-white text-xs font-semibold shadow-2xs transition cursor-pointer self-start sm:self-auto"
         >
           <Plus className="w-4 h-4" />
           <span>Nuevo Producto</span>
@@ -592,21 +592,21 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
       </div>
 
       {notification && (
-        <div className="p-3.5 rounded-xl bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 text-xs flex items-center gap-2 animate-fadeIn">
-          <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-emerald-400" />
+        <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 dark:bg-emerald-950/60 dark:border-emerald-500/40 dark:text-emerald-300 text-xs flex items-center gap-2 animate-fadeIn">
+          <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-emerald-600 dark:text-emerald-400" />
           <span>{notification}</span>
         </div>
       )}
 
       {/* Barra de Filtros y Búsqueda */}
-      <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
+      <div className="p-4 rounded-2xl bg-white dark:bg-slate-950/60 border border-[#DEE7F2] dark:border-slate-800 shadow-2xs flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
         <div className="flex-1 max-w-sm">
           <input
             type="text"
             placeholder="Buscar por nombre o descripción..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-white text-xs focus:outline-none focus:border-indigo-500"
+            className="w-full px-3 py-2 rounded-xl bg-[#F8FAFC] dark:bg-slate-900 border border-[#DEE7F2] dark:border-slate-800 text-[#14213D] dark:text-white placeholder-[#94A3B8] text-xs focus:outline-none focus:border-[#1769FF]"
           />
         </div>
 
@@ -615,7 +615,7 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
           <select
             value={filterCategory}
             onChange={(e) => setFilterCategory(e.target.value)}
-            className="px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 text-xs focus:outline-none"
+            className="px-3 py-2 rounded-xl bg-[#F8FAFC] dark:bg-slate-900 border border-[#DEE7F2] dark:border-slate-800 text-[#14213D] dark:text-slate-300 text-xs focus:outline-none focus:border-[#1769FF]"
           >
             <option value="all">Todas las categorías</option>
             {categories.map((c) => (
@@ -629,7 +629,7 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            className="px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 text-xs focus:outline-none"
+            className="px-3 py-2 rounded-xl bg-[#F8FAFC] dark:bg-slate-900 border border-[#DEE7F2] dark:border-slate-800 text-[#14213D] dark:text-slate-300 text-xs focus:outline-none focus:border-[#1769FF]"
           >
             <option value="all">Todos los estados</option>
             <option value="activo">Activo</option>
@@ -641,10 +641,10 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
 
       {/* Grid de Productos */}
       {filteredProducts.length === 0 ? (
-        <div className="p-12 text-center rounded-2xl bg-slate-950/30 border border-dashed border-slate-800 space-y-3">
-          <Package className="w-10 h-10 text-slate-400 mx-auto" />
-          <p className="text-sm font-semibold text-white">No se encontraron productos</p>
-          <p className="text-xs text-slate-400 max-w-sm mx-auto">
+        <div className="p-12 text-center rounded-2xl bg-white dark:bg-slate-950/30 border border-dashed border-[#DEE7F2] dark:border-slate-800 space-y-3">
+          <Package className="w-10 h-10 text-[#94A3B8] dark:text-slate-400 mx-auto" />
+          <p className="text-sm font-semibold text-[#14213D] dark:text-white">No se encontraron productos</p>
+          <p className="text-xs text-[#52627A] dark:text-slate-400 max-w-sm mx-auto">
             Prueba ajustando los filtros o añade tu primer artículo usando el botón de arriba.
           </p>
         </div>
@@ -659,15 +659,15 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
             return (
               <div
                 key={product.id}
-                className={`p-4 rounded-2xl border flex flex-col justify-between transition ${
+                className={`p-4 rounded-2xl border flex flex-col justify-between transition shadow-2xs ${
                   product.is_available
-                    ? 'bg-slate-950/70 border-slate-800 hover:border-slate-700'
-                    : 'bg-slate-950/40 border-slate-900 opacity-70'
+                    ? 'bg-white dark:bg-slate-950/70 border-[#DEE7F2] dark:border-slate-800 hover:border-[#1769FF]/50 dark:hover:border-slate-700'
+                    : 'bg-[#F8FAFC] dark:bg-slate-950/40 border-[#DEE7F2] dark:border-slate-900 opacity-70'
                 }`}
               >
                 <div className="space-y-3">
                   {/* Imagen y Badges */}
-                  <div className="relative h-36 rounded-xl overflow-hidden bg-slate-900 border border-slate-800">
+                  <div className="relative h-36 rounded-xl overflow-hidden bg-[#F8FAFC] dark:bg-slate-900 border border-[#DEE7F2] dark:border-slate-800">
                     {product.image_url ? (
                       <img
                         src={product.image_url}
@@ -675,7 +675,7 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-slate-400">
+                      <div className="w-full h-full flex items-center justify-center text-[#94A3B8] dark:text-slate-400">
                         <ImageIcon className="w-8 h-8" />
                       </div>
                     )}
@@ -683,13 +683,13 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
                     {/* Badges superiores */}
                     <div className="absolute top-2 left-2 flex flex-wrap gap-1">
                       {isFeatured && (
-                        <span className="px-2 py-0.5 rounded-md bg-amber-500 text-slate-950 text-[10px] font-black uppercase flex items-center gap-1 shadow">
+                        <span className="px-2 py-0.5 rounded-md bg-amber-500 text-slate-950 text-[10px] font-black uppercase flex items-center gap-1 shadow-xs">
                           <Star className="w-3 h-3 fill-slate-950" />
                           <span>Destacado</span>
                         </span>
                       )}
                       {offerPrice && (
-                        <span className="px-2 py-0.5 rounded-md bg-rose-600 text-white text-[10px] font-bold shadow">
+                        <span className="px-2 py-0.5 rounded-md bg-rose-600 text-white text-[10px] font-bold shadow-xs">
                           Oferta
                         </span>
                       )}
@@ -699,9 +699,9 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
                       <span
                         className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase ${
                           product.status === 'activo'
-                            ? 'bg-emerald-500/80 text-white'
+                            ? 'bg-emerald-600 dark:bg-emerald-500/80 text-white'
                             : product.status === 'inactivo'
-                            ? 'bg-rose-500/80 text-white'
+                            ? 'bg-rose-600 dark:bg-rose-500/80 text-white'
                             : 'bg-slate-600 text-white'
                         }`}
                       >
@@ -714,8 +714,8 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
                       <span
                         className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
                           product.is_available
-                            ? 'bg-slate-950/80 text-emerald-400 border border-emerald-500/40'
-                            : 'bg-rose-950/90 text-rose-300 border border-rose-500/40'
+                            ? 'bg-white/95 text-emerald-700 border border-emerald-200 dark:bg-slate-950/80 dark:text-emerald-400 dark:border-emerald-500/40'
+                            : 'bg-white/95 text-rose-700 border border-rose-200 dark:bg-rose-950/90 dark:text-rose-300 dark:border-rose-500/40'
                         }`}
                       >
                         {product.is_available ? 'Disponible' : 'Agotado'}
@@ -725,30 +725,30 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
 
                   {/* Datos del producto */}
                   <div>
-                    <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1">
+                    <div className="flex items-center justify-between text-[11px] text-[#52627A] dark:text-slate-400 mb-1">
                       <span>{cat?.name || 'Sin categoría'}</span>
                       {product.attributes?.sku && (
-                        <span className="font-mono text-[10px] text-slate-400">
+                        <span className="font-mono text-[10px] text-[#52627A] dark:text-slate-400">
                           SKU: {product.attributes.sku}
                         </span>
                       )}
                     </div>
 
-                    <h4 className="text-sm font-bold text-white line-clamp-1">
+                    <h4 className="text-sm font-bold text-[#14213D] dark:text-white line-clamp-1">
                       {product.name}
                     </h4>
-                    <p className="text-xs text-slate-400 line-clamp-2 mt-1">
+                    <p className="text-xs text-[#52627A] dark:text-slate-400 line-clamp-2 mt-1">
                       {product.description || 'Sin descripción detallada.'}
                     </p>
                   </div>
 
                   {/* Precios (Bs) */}
                   <div className="flex items-baseline gap-2 pt-1">
-                    <span className="text-base font-black text-emerald-400">
+                    <span className="text-base font-black text-emerald-600 dark:text-emerald-400">
                       Bs {offerPrice || product.price}
                     </span>
                     {(previousPrice || (offerPrice && product.price)) && (
-                      <span className="text-xs text-slate-400 line-through">
+                      <span className="text-xs text-[#94A3B8] dark:text-slate-400 line-through">
                         Bs {previousPrice || product.price}
                       </span>
                     )}
@@ -756,8 +756,8 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
 
                   {/* Atributos específicos según vertical */}
                   {store.store_type === 'restaurante' && product.attributes?.modifiers && (
-                    <div className="text-[11px] text-slate-400 bg-slate-900/60 p-2 rounded-lg border border-slate-800">
-                      <span className="font-semibold text-slate-300 block">Modificadores/Extras:</span>
+                    <div className="text-[11px] text-[#52627A] dark:text-slate-400 bg-[#F8FAFC] dark:bg-slate-900/60 p-2 rounded-lg border border-[#DEE7F2] dark:border-slate-800">
+                      <span className="font-semibold text-[#14213D] dark:text-slate-300 block">Modificadores/Extras:</span>
                       <span>
                         {product.attributes.modifiers.length > 0
                           ? product.attributes.modifiers.map((m: any) => `${m.name} (+Bs ${m.price})`).join(', ')
@@ -767,29 +767,29 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
                   )}
 
                   {store.store_type === 'moda' && product.attributes?.sizes && (
-                    <div className="text-[11px] text-slate-400 bg-slate-900/60 p-2 rounded-lg border border-slate-800">
-                      <span className="font-semibold text-slate-300 block">Tallas:</span>
+                    <div className="text-[11px] text-[#52627A] dark:text-slate-400 bg-[#F8FAFC] dark:bg-slate-900/60 p-2 rounded-lg border border-[#DEE7F2] dark:border-slate-800">
+                      <span className="font-semibold text-[#14213D] dark:text-slate-300 block">Tallas:</span>
                       <span className="font-mono">{product.attributes.sizes.join(' • ')}</span>
                     </div>
                   )}
 
                   {store.store_type === 'servicios' && product.attributes?.duration_minutes && (
-                    <div className="text-[11px] text-slate-400 bg-slate-900/60 p-2 rounded-lg border border-slate-800">
-                      <span className="font-semibold text-slate-300 block">Duración de Sesión:</span>
+                    <div className="text-[11px] text-[#52627A] dark:text-slate-400 bg-[#F8FAFC] dark:bg-slate-900/60 p-2 rounded-lg border border-[#DEE7F2] dark:border-slate-800">
+                      <span className="font-semibold text-[#14213D] dark:text-slate-300 block">Duración de Sesión:</span>
                       <span>{product.attributes.duration_minutes} minutos</span>
                     </div>
                   )}
                 </div>
 
                 {/* Acciones del Producto */}
-                <div className="pt-4 mt-3 border-t border-slate-800/80 flex items-center justify-between gap-2">
+                <div className="pt-4 mt-3 border-t border-[#DEE7F2] dark:border-slate-800/80 flex items-center justify-between gap-2">
                   <button
                     type="button"
                     onClick={() => handleToggleAvailability(product)}
                     className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition cursor-pointer ${
                       product.is_available
-                        ? 'bg-rose-950/30 border-rose-500/30 text-rose-300 hover:bg-rose-950/50'
-                        : 'bg-emerald-950/30 border-emerald-500/30 text-emerald-300 hover:bg-emerald-950/50'
+                        ? 'bg-rose-50 border-rose-200 text-rose-700 hover:bg-rose-100 dark:bg-rose-950/30 dark:border-rose-500/30 dark:text-rose-300 dark:hover:bg-rose-950/50'
+                        : 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:border-emerald-500/30 dark:text-emerald-300 dark:hover:bg-emerald-950/50'
                     }`}
                   >
                     {product.is_available ? 'Marcar Agotado' : 'Habilitar'}
@@ -801,10 +801,10 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
                       type="button"
                       onClick={() => copyShareLink(product.id)}
                       title="Copiar enlace directo del producto para compartir"
-                      className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white transition cursor-pointer"
+                      className="p-1.5 rounded-lg bg-white dark:bg-slate-900 border border-[#DEE7F2] dark:border-slate-800 text-[#52627A] dark:text-slate-300 hover:text-[#14213D] dark:hover:text-white hover:bg-[#F8FAFC] transition cursor-pointer shadow-2xs"
                     >
                       {copiedId === product.id ? (
-                        <Check className="w-3.5 h-3.5 text-emerald-400" />
+                        <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                       ) : (
                         <Share2 className="w-3.5 h-3.5" />
                       )}
@@ -814,7 +814,7 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
                     <button
                       type="button"
                       onClick={() => handleOpenEdit(product)}
-                      className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white transition cursor-pointer"
+                      className="p-1.5 rounded-lg bg-white dark:bg-slate-900 border border-[#DEE7F2] dark:border-slate-800 text-[#52627A] dark:text-slate-300 hover:text-[#14213D] dark:hover:text-white hover:bg-[#F8FAFC] transition cursor-pointer shadow-2xs"
                       title="Editar producto"
                     >
                       <Edit2 className="w-3.5 h-3.5" />
@@ -824,7 +824,7 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
                     <button
                       type="button"
                       onClick={() => handleDelete(product.id)}
-                      className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-rose-400 hover:bg-rose-950/40 transition cursor-pointer"
+                      className="p-1.5 rounded-lg bg-white dark:bg-slate-900 border border-[#DEE7F2] dark:border-slate-800 text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/40 transition cursor-pointer shadow-2xs"
                       title="Eliminar producto"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -839,12 +839,12 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
 
       {/* Modal / Formulario de Creación / Edición */}
       {isEditing && currentProduct && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 md:p-6 overflow-hidden">
-          <div className="bg-slate-950 border border-slate-800 rounded-2xl w-full max-w-2xl max-h-[92vh] sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-50 bg-black/60 dark:bg-black/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 md:p-6 overflow-hidden">
+          <div className="bg-white dark:bg-slate-950 border border-[#DEE7F2] dark:border-slate-800 rounded-2xl w-full max-w-2xl max-h-[92vh] sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-150">
             {/* Cabecera visualmente estable */}
-            <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-slate-800 bg-slate-950 shrink-0">
-              <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <Package className="w-4 h-4 text-indigo-400" />
+            <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-[#DEE7F2] dark:border-slate-800 bg-white dark:bg-slate-950 shrink-0">
+              <h3 className="text-base font-bold text-[#14213D] dark:text-white flex items-center gap-2">
+                <Package className="w-4 h-4 text-[#1769FF] dark:text-indigo-400" />
                 <span>
                   {currentProduct.id && products.some((p) => p.id === currentProduct.id)
                     ? 'Editar Producto'
@@ -854,7 +854,7 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
               <button
                 type="button"
                 onClick={handleCloseModal}
-                className="px-2 py-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-900 text-xs font-bold transition cursor-pointer"
+                className="px-2 py-1 rounded-lg text-[#52627A] hover:text-[#14213D] hover:bg-[#F8FAFC] dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-900 text-xs font-bold transition cursor-pointer"
               >
                 ✕ Cerrar
               </button>
@@ -865,7 +865,7 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
               <div className="flex-1 overflow-y-auto px-5 sm:px-6 py-4 space-y-4 overscroll-contain">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1">
+                  <label className="block text-xs font-medium text-[#52627A] dark:text-slate-300 mb-1">
                     Nombre del Producto *
                   </label>
                   <input
@@ -876,13 +876,13 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
                     onChange={(e) =>
                       setCurrentProduct({ ...currentProduct, name: e.target.value })
                     }
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-indigo-500"
+                    className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-[#DEE7F2] dark:border-slate-700 text-[#14213D] dark:text-white text-xs focus:outline-none focus:border-[#1769FF] dark:focus:border-indigo-500"
                     placeholder="Ej. Pizza Margherita Di Bufala"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1">
+                  <label className="block text-xs font-medium text-[#52627A] dark:text-slate-300 mb-1">
                     Categoría
                   </label>
                   <select
@@ -890,7 +890,7 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
                     onChange={(e) =>
                       setCurrentProduct({ ...currentProduct, category_id: e.target.value || null })
                     }
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-indigo-500"
+                    className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-[#DEE7F2] dark:border-slate-700 text-[#14213D] dark:text-white text-xs focus:outline-none focus:border-[#1769FF] dark:focus:border-indigo-500"
                   >
                     <option value="">Sin categoría (General)</option>
                     {categories.map((c) => (
@@ -904,10 +904,10 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
 
               <div>
                 <div className="flex justify-between items-center mb-1">
-                  <label className="block text-xs font-medium text-slate-300">
+                  <label className="block text-xs font-medium text-[#52627A] dark:text-slate-300">
                     Descripción
                   </label>
-                  <span className="text-[10px] text-slate-500">
+                  <span className="text-[10px] text-[#94A3B8] dark:text-slate-500">
                     {(currentProduct.description || '').length}/1000
                   </span>
                 </div>
@@ -918,7 +918,7 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
                   onChange={(e) =>
                     setCurrentProduct({ ...currentProduct, description: e.target.value })
                   }
-                  className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-indigo-500 resize-none"
+                  className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-[#DEE7F2] dark:border-slate-700 text-[#14213D] dark:text-white text-xs focus:outline-none focus:border-[#1769FF] dark:focus:border-indigo-500 resize-none"
                   placeholder="Detalles de preparación, ingredientes, materiales o alcance (máx. 1000 caracteres)..."
                 />
               </div>
@@ -926,7 +926,7 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
               {/* Precios (Bs) */}
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1">
+                  <label className="block text-xs font-medium text-[#52627A] dark:text-slate-300 mb-1">
                     Precio Regular (Bs) *
                   </label>
                   <input
@@ -938,12 +938,12 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
                     onChange={(e) =>
                       setCurrentProduct({ ...currentProduct, price: Number(e.target.value) })
                     }
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-indigo-500"
+                    className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-[#DEE7F2] dark:border-slate-700 text-[#14213D] dark:text-white text-xs focus:outline-none focus:border-[#1769FF] dark:focus:border-indigo-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1">
+                  <label className="block text-xs font-medium text-[#52627A] dark:text-slate-300 mb-1">
                     Precio Anterior (Bs)
                   </label>
                   <input
@@ -961,12 +961,12 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
                       })
                     }
                     placeholder="Opcional tachado"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-indigo-500"
+                    className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-[#DEE7F2] dark:border-slate-700 text-[#14213D] dark:text-white text-xs focus:outline-none focus:border-[#1769FF] dark:focus:border-indigo-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1">
+                  <label className="block text-xs font-medium text-[#52627A] dark:text-slate-300 mb-1">
                     Precio Oferta (Bs)
                   </label>
                   <input
@@ -984,29 +984,29 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
                       })
                     }
                     placeholder="Opcional promocional"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-indigo-500"
+                    className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-[#DEE7F2] dark:border-slate-700 text-[#14213D] dark:text-white text-xs focus:outline-none focus:border-[#1769FF] dark:focus:border-indigo-500"
                   />
                 </div>
               </div>
 
               {/* Atributos Específicos según Vertical */}
               {store.store_type === 'moda' && (
-                <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-700/80 space-y-4">
-                  <div className="flex items-center gap-2 text-xs font-bold text-indigo-400 uppercase tracking-wider">
+                <div className="p-4 rounded-xl bg-[#F8FAFC] dark:bg-slate-900/80 border border-[#DEE7F2] dark:border-slate-700/80 space-y-4">
+                  <div className="flex items-center gap-2 text-xs font-bold text-[#1769FF] dark:text-indigo-400 uppercase tracking-wider">
                     <Shirt className="w-4 h-4" />
                     <span>Configuración de Moda</span>
                   </div>
 
                   {/* Tallas */}
                   <div>
-                    <label className="block text-xs font-medium text-slate-300 mb-1.5">
+                    <label className="block text-xs font-medium text-[#52627A] dark:text-slate-300 mb-1.5">
                       Tallas Disponibles
                     </label>
                     <div className="flex flex-wrap gap-1.5 mb-2">
                       {((currentProduct.attributes?.sizes as string[]) || []).map((size, idx) => (
                         <span
                           key={idx}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 text-white text-xs"
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 border border-[#DEE7F2] dark:border-slate-700 text-[#14213D] dark:text-white text-xs shadow-2xs"
                         >
                           <span className="font-semibold">{size}</span>
                           <button
@@ -1019,14 +1019,14 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
                                 attributes: { ...currentProduct.attributes, sizes: updated },
                               });
                             }}
-                            className="text-slate-400 hover:text-rose-400 p-0.5 cursor-pointer"
+                            className="text-[#52627A] hover:text-rose-500 p-0.5 cursor-pointer"
                           >
                             <X className="w-3 h-3" />
                           </button>
                         </span>
                       ))}
                       {(!currentProduct.attributes?.sizes || (currentProduct.attributes.sizes as string[]).length === 0) && (
-                        <span className="text-xs text-slate-500 italic">No hay tallas agregadas</span>
+                        <span className="text-xs text-[#94A3B8] italic">No hay tallas agregadas</span>
                       )}
                     </div>
                     <div className="flex gap-2">
@@ -1050,7 +1050,7 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
                           }
                         }}
                         placeholder="Ej: S, M, L, XL, 38, 40..."
-                        className="flex-1 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-indigo-500"
+                        className="flex-1 px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-[#DEE7F2] dark:border-slate-700 text-[#14213D] dark:text-white text-xs focus:outline-none focus:border-[#1769FF]"
                       />
                       <button
                         type="button"
@@ -1066,7 +1066,7 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
                             }
                           }
                         }}
-                        className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold cursor-pointer flex items-center gap-1"
+                        className="px-3 py-1.5 rounded-xl bg-[#1769FF] hover:bg-blue-700 dark:bg-indigo-600 dark:hover:bg-indigo-500 text-white text-xs font-semibold cursor-pointer flex items-center gap-1 shadow-2xs"
                       >
                         <Plus className="w-3.5 h-3.5" />
                         <span>Añadir</span>
@@ -1075,18 +1075,18 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
                   </div>
 
                   {/* Colores */}
-                  <div className="pt-2 border-t border-slate-800">
-                    <label className="block text-xs font-medium text-slate-300 mb-1.5">
+                  <div className="pt-2 border-t border-[#DEE7F2] dark:border-slate-800">
+                    <label className="block text-xs font-medium text-[#52627A] dark:text-slate-300 mb-1.5">
                       Colores / Variantes
                     </label>
                     <div className="flex flex-wrap gap-2 mb-2.5">
                       {((currentProduct.attributes?.colors as Array<{ name: string; hex: string }>) || []).map((col, idx) => (
                         <span
                           key={idx}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 text-white text-xs"
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 border border-[#DEE7F2] dark:border-slate-700 text-[#14213D] dark:text-white text-xs shadow-2xs"
                         >
                           <span
-                            className="w-3 h-3 rounded-full border border-slate-600 inline-block shadow-sm"
+                            className="w-3 h-3 rounded-full border border-slate-300 dark:border-slate-600 inline-block shadow-2xs"
                             style={{ backgroundColor: col.hex }}
                           />
                           <span>{col.name}</span>
@@ -1100,14 +1100,14 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
                                 attributes: { ...currentProduct.attributes, colors: updated },
                               });
                             }}
-                            className="text-slate-400 hover:text-rose-400 p-0.5 cursor-pointer ml-0.5"
+                            className="text-[#52627A] hover:text-rose-500 p-0.5 cursor-pointer ml-0.5"
                           >
                             <X className="w-3 h-3" />
                           </button>
                         </span>
                       ))}
                       {(!currentProduct.attributes?.colors || (currentProduct.attributes.colors as any[]).length === 0) && (
-                        <span className="text-xs text-slate-500 italic">No hay colores agregados</span>
+                        <span className="text-xs text-[#94A3B8] italic">No hay colores agregados</span>
                       )}
                     </div>
                     <div className="flex gap-2 items-center">
@@ -1116,13 +1116,13 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
                         value={newColorName}
                         onChange={(e) => setNewColorName(e.target.value)}
                         placeholder="Nombre color (Ej: Azul Marino)"
-                        className="flex-1 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-indigo-500"
+                        className="flex-1 px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-[#DEE7F2] dark:border-slate-700 text-[#14213D] dark:text-white text-xs focus:outline-none focus:border-[#1769FF]"
                       />
                       <input
                         type="color"
                         value={newColorHex}
                         onChange={(e) => setNewColorHex(e.target.value)}
-                        className="w-9 h-8 rounded-lg bg-slate-800 border border-slate-700 cursor-pointer p-0.5"
+                        className="w-9 h-8 rounded-lg bg-white dark:bg-slate-800 border border-[#DEE7F2] dark:border-slate-700 cursor-pointer p-0.5"
                         title="Seleccionar color"
                       />
                       <button
@@ -1143,7 +1143,7 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
                             }
                           }
                         }}
-                        className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold cursor-pointer flex items-center gap-1"
+                        className="px-3 py-1.5 rounded-xl bg-[#1769FF] hover:bg-blue-700 dark:bg-indigo-600 dark:hover:bg-indigo-500 text-white text-xs font-semibold cursor-pointer flex items-center gap-1 shadow-2xs"
                       >
                         <Plus className="w-3.5 h-3.5" />
                         <span>Añadir</span>
@@ -1154,26 +1154,26 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
               )}
 
               {store.store_type === 'restaurante' && (
-                <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-700/80 space-y-4">
-                  <div className="flex items-center gap-2 text-xs font-bold text-amber-400 uppercase tracking-wider">
+                <div className="p-4 rounded-xl bg-[#F8FAFC] dark:bg-slate-900/80 border border-[#DEE7F2] dark:border-slate-700/80 space-y-4">
+                  <div className="flex items-center gap-2 text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider">
                     <ChefHat className="w-4 h-4" />
                     <span>Configuración de Gastronomía</span>
                   </div>
 
                   {/* Modificadores / Extras */}
                   <div>
-                    <label className="block text-xs font-medium text-slate-300 mb-1.5">
+                    <label className="block text-xs font-medium text-[#52627A] dark:text-slate-300 mb-1.5">
                       Modificadores y Extras (Opcionales con costo adicional)
                     </label>
                     <div className="space-y-1.5 mb-2.5">
                       {((currentProduct.attributes?.modifiers as Array<{ name: string; price: number }>) || []).map((mod, idx) => (
                         <div
                           key={idx}
-                          className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-xs"
+                          className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-white dark:bg-slate-800 border border-[#DEE7F2] dark:border-slate-700 text-xs shadow-2xs"
                         >
-                          <span className="text-white font-medium">{mod.name}</span>
+                          <span className="text-[#14213D] dark:text-white font-medium">{mod.name}</span>
                           <div className="flex items-center gap-3">
-                            <span className="text-emerald-400 font-semibold">
+                            <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
                               {mod.price > 0 ? `+Bs ${mod.price.toFixed(2)}` : 'Gratis / Sin costo'}
                             </span>
                             <button
@@ -1186,7 +1186,7 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
                                   attributes: { ...currentProduct.attributes, modifiers: updated },
                                 });
                               }}
-                              className="text-slate-400 hover:text-rose-400 p-0.5 cursor-pointer"
+                              className="text-[#52627A] hover:text-rose-500 p-0.5 cursor-pointer"
                             >
                               <X className="w-3.5 h-3.5" />
                             </button>
@@ -1194,7 +1194,7 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
                         </div>
                       ))}
                       {(!currentProduct.attributes?.modifiers || (currentProduct.attributes.modifiers as any[]).length === 0) && (
-                        <span className="text-xs text-slate-500 italic">No hay modificadores agregados</span>
+                        <span className="text-xs text-[#94A3B8] italic">No hay modificadores agregados</span>
                       )}
                     </div>
                     <div className="flex gap-2">
@@ -1203,7 +1203,7 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
                         value={newModifierName}
                         onChange={(e) => setNewModifierName(e.target.value)}
                         placeholder="Nombre extra (Ej: Doble Queso, Salsa BBQ)"
-                        className="flex-1 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-indigo-500"
+                        className="flex-1 px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-[#DEE7F2] dark:border-slate-700 text-[#14213D] dark:text-white text-xs focus:outline-none focus:border-[#1769FF]"
                       />
                       <input
                         type="number"
@@ -1212,7 +1212,7 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
                         value={newModifierPrice}
                         onChange={(e) => setNewModifierPrice(e.target.value)}
                         placeholder="Precio (Bs)"
-                        className="w-28 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-indigo-500"
+                        className="w-28 px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-[#DEE7F2] dark:border-slate-700 text-[#14213D] dark:text-white text-xs focus:outline-none focus:border-[#1769FF]"
                       />
                       <button
                         type="button"
@@ -1234,7 +1234,7 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
                             }
                           }
                         }}
-                        className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold cursor-pointer flex items-center gap-1 whitespace-nowrap"
+                        className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold cursor-pointer flex items-center gap-1 whitespace-nowrap shadow-2xs"
                       >
                         <Plus className="w-3.5 h-3.5" />
                         <span>Añadir</span>
@@ -1243,7 +1243,7 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
                   </div>
 
                   {/* Configuración de Combo */}
-                  <div className="pt-3 border-t border-slate-800 space-y-2.5">
+                  <div className="pt-3 border-t border-[#DEE7F2] dark:border-slate-800 space-y-2.5">
                     <div className="flex items-center gap-2">
                       <input
                         type="checkbox"
@@ -1258,24 +1258,24 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
                             },
                           })
                         }
-                        className="w-4 h-4 rounded text-amber-600 bg-slate-800 border-slate-700"
+                        className="w-4 h-4 rounded text-amber-600 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700"
                       />
-                      <label htmlFor="is_combo_checkbox" className="text-xs font-bold text-white cursor-pointer flex items-center gap-1.5">
-                        <Utensils className="w-3.5 h-3.5 text-amber-400" />
+                      <label htmlFor="is_combo_checkbox" className="text-xs font-bold text-[#14213D] dark:text-white cursor-pointer flex items-center gap-1.5">
+                        <Utensils className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
                         <span>Es un Combo / Paquete gastronómico</span>
                       </label>
                     </div>
 
                     {Boolean(currentProduct.attributes?.is_combo) && (
                       <div className="pl-6 space-y-2">
-                        <label className="block text-xs font-medium text-slate-300">
+                        <label className="block text-xs font-medium text-[#52627A] dark:text-slate-300">
                           Elementos incluidos en el combo
                         </label>
                         <div className="flex flex-wrap gap-1.5 mb-2">
                           {((currentProduct.attributes?.combo_items as string[]) || []).map((item, idx) => (
                             <span
                               key={idx}
-                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 text-amber-200 text-xs"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-slate-800 border border-amber-200 dark:border-slate-700 text-amber-900 dark:text-amber-200 text-xs shadow-2xs"
                             >
                               <span>{item}</span>
                               <button
@@ -1288,14 +1288,14 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
                                     attributes: { ...currentProduct.attributes, combo_items: updated },
                                   });
                                 }}
-                                className="text-slate-400 hover:text-rose-400 p-0.5 cursor-pointer"
+                                className="text-slate-400 hover:text-rose-500 p-0.5 cursor-pointer"
                               >
                                 <X className="w-3 h-3" />
                               </button>
                             </span>
                           ))}
                           {(!currentProduct.attributes?.combo_items || (currentProduct.attributes.combo_items as string[]).length === 0) && (
-                            <span className="text-xs text-slate-500 italic">No hay ítems detallados para el combo</span>
+                            <span className="text-xs text-[#94A3B8] italic">No hay ítems detallados para el combo</span>
                           )}
                         </div>
                         <div className="flex gap-2">
@@ -1319,7 +1319,7 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
                               }
                             }}
                             placeholder="Ej: Hamburguesa doble, Papas fritas medianas, Soda 500ml"
-                            className="flex-1 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-amber-500"
+                            className="flex-1 px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-[#DEE7F2] dark:border-slate-700 text-[#14213D] dark:text-white text-xs focus:outline-none focus:border-amber-500"
                           />
                           <button
                             type="button"
@@ -1335,7 +1335,7 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
                                 }
                               }
                             }}
-                            className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold cursor-pointer flex items-center gap-1"
+                            className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold cursor-pointer flex items-center gap-1 shadow-2xs"
                           >
                             <Plus className="w-3.5 h-3.5" />
                             <span>Añadir</span>
@@ -1348,8 +1348,8 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
               )}
 
               {store.store_type === 'servicios' && (
-                <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-700/80 space-y-4">
-                  <div className="flex items-center gap-2 text-xs font-bold text-teal-400 uppercase tracking-wider">
+                <div className="p-4 rounded-xl bg-[#F8FAFC] dark:bg-slate-900/80 border border-[#DEE7F2] dark:border-slate-700/80 space-y-4">
+                  <div className="flex items-center gap-2 text-xs font-bold text-teal-600 dark:text-teal-400 uppercase tracking-wider">
                     <Scissors className="w-4 h-4" />
                     <span>Configuración de Servicios y Citas</span>
                   </div>
@@ -1368,16 +1368,16 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
                           },
                         })
                       }
-                      className="w-4 h-4 rounded text-teal-600 bg-slate-800 border-slate-700"
+                      className="w-4 h-4 rounded text-teal-600 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700"
                     />
-                    <label htmlFor="is_service_checkbox" className="text-xs font-bold text-white cursor-pointer">
+                    <label htmlFor="is_service_checkbox" className="text-xs font-bold text-[#14213D] dark:text-white cursor-pointer">
                       Tratar como Servicio agendable
                     </label>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs font-medium text-slate-300 mb-1">
+                      <label className="block text-xs font-medium text-[#52627A] dark:text-slate-300 mb-1">
                         Duración estimada (minutos)
                       </label>
                       <input
@@ -1395,12 +1395,12 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
                           })
                         }
                         placeholder="Ej: 45"
-                        className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-teal-500"
+                        className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-[#DEE7F2] dark:border-slate-700 text-[#14213D] dark:text-white text-xs focus:outline-none focus:border-teal-500"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-xs font-medium text-slate-300 mb-1">
+                      <label className="block text-xs font-medium text-[#52627A] dark:text-slate-300 mb-1">
                         Especialidad / Área
                       </label>
                       <input
@@ -1416,13 +1416,13 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
                           })
                         }
                         placeholder="Ej: Colorimetría, Masajes, Consulta"
-                        className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-teal-500"
+                        className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-[#DEE7F2] dark:border-slate-700 text-[#14213D] dark:text-white text-xs focus:outline-none focus:border-teal-500"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-xs font-medium text-slate-300 mb-1">
+                    <label className="block text-xs font-medium text-[#52627A] dark:text-slate-300 mb-1">
                       Profesional / Especialista Asignado
                     </label>
                     <input
@@ -1438,26 +1438,26 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
                         })
                       }
                       placeholder="Ej: Dra. García, Carlos Estilista..."
-                      className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-teal-500"
+                      className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-[#DEE7F2] dark:border-slate-700 text-[#14213D] dark:text-white text-xs focus:outline-none focus:border-teal-500"
                     />
                   </div>
                 </div>
               )}
 
               {/* Sección de Imagen Principal del Producto (Nativa y Mobile-friendly) */}
-              <div className="space-y-3 pt-2 border-t border-slate-800">
+              <div className="space-y-3 pt-2 border-t border-[#DEE7F2] dark:border-slate-800">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <label className="block text-xs font-semibold text-white">
+                    <label className="block text-xs font-semibold text-[#14213D] dark:text-white">
                       Imagen Principal del Producto
                     </label>
-                    <p className="text-[11px] text-slate-400">
+                    <p className="text-[11px] text-[#52627A] dark:text-slate-400">
                       Sube una fotografía desde tu dispositivo (PNG, JPG, WEBP hasta 5 MB).
                     </p>
                   </div>
                   {imagePreviewUrl && (
-                    <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-emerald-950/60 text-emerald-400 border border-emerald-800/60 flex items-center gap-1">
-                      <CheckCircle2 className="w-3 h-3" />
+                    <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-400 dark:border-emerald-800/60 flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
                       {selectedImageFile ? 'Archivo seleccionado' : 'Imagen activa'}
                     </span>
                   )}
@@ -1476,17 +1476,17 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
 
                 {/* Mensaje de error si la validación falla */}
                 {imageUploadError && (
-                  <div className="p-2.5 rounded-xl bg-rose-950/40 border border-rose-800/80 text-rose-300 text-xs flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4 flex-shrink-0 text-rose-400" />
+                  <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 dark:bg-rose-950/40 dark:border-rose-800/80 dark:text-rose-300 text-xs flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 flex-shrink-0 text-rose-500 dark:text-rose-400" />
                     <span>{imageUploadError}</span>
                   </div>
                 )}
 
                 {/* Previsualización de Imagen */}
                 {imagePreviewUrl ? (
-                  <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 space-y-3">
+                  <div className="p-3 rounded-xl bg-[#F8FAFC] dark:bg-slate-900/80 border border-[#DEE7F2] dark:border-slate-800 space-y-3">
                     <div className="flex flex-col sm:flex-row items-center gap-4">
-                      <div className="relative w-full sm:w-44 h-36 rounded-xl overflow-hidden bg-slate-950 border border-slate-700/80 flex-shrink-0 group">
+                      <div className="relative w-full sm:w-44 h-36 rounded-xl overflow-hidden bg-white dark:bg-slate-950 border border-[#DEE7F2] dark:border-slate-700/80 flex-shrink-0 group">
                         <img
                           src={imagePreviewUrl}
                           alt="Previsualización del producto"
@@ -1497,7 +1497,7 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
                         />
                         {isUploadingImage && (
                           <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center gap-1.5 text-white text-xs">
-                            <Loader2 className="w-5 h-5 animate-spin text-indigo-400" />
+                            <Loader2 className="w-5 h-5 animate-spin text-[#1769FF] dark:text-indigo-400" />
                             <span>Subiendo imagen...</span>
                           </div>
                         )}
@@ -1506,22 +1506,22 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
                       <div className="flex-1 space-y-2 text-left w-full">
                         {selectedImageFile ? (
                           <div>
-                            <span className="text-xs font-semibold text-indigo-300 block truncate">
+                            <span className="text-xs font-semibold text-[#1769FF] dark:text-indigo-300 block truncate">
                               {selectedImageFile.name}
                             </span>
-                            <span className="text-[11px] text-slate-400 block">
+                            <span className="text-[11px] text-[#52627A] dark:text-slate-400 block">
                               Tamaño: {(selectedImageFile.size / 1024).toFixed(1)} KB • Formato: {selectedImageFile.type.replace('image/', '').toUpperCase()}
                             </span>
-                            <span className="text-[10px] text-amber-400 mt-1 inline-block">
+                            <span className="text-[10px] text-amber-600 dark:text-amber-400 mt-1 inline-block">
                               ⚠️ Se subirá y guardará al presionar "Guardar Producto"
                             </span>
                           </div>
                         ) : (
                           <div>
-                            <span className="text-xs font-semibold text-slate-200 block truncate">
+                            <span className="text-xs font-semibold text-[#14213D] dark:text-slate-200 block truncate">
                               Imagen actual del producto
                             </span>
-                            <span className="text-[11px] text-slate-400 block break-all line-clamp-2">
+                            <span className="text-[11px] text-[#52627A] dark:text-slate-400 block break-all line-clamp-2">
                               {currentProduct.image_url}
                             </span>
                           </div>
@@ -1532,9 +1532,9 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
                             type="button"
                             onClick={() => imageFileInputRef.current?.click()}
                             disabled={isUploadingImage || isSaving}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition cursor-pointer"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-[#EEF4FF] dark:bg-slate-800 dark:hover:bg-slate-700 text-[#14213D] dark:text-slate-200 text-xs font-medium border border-[#DEE7F2] dark:border-slate-700 transition cursor-pointer shadow-2xs"
                           >
-                            <UploadCloud className="w-3.5 h-3.5 text-indigo-400" />
+                            <UploadCloud className="w-3.5 h-3.5 text-[#1769FF] dark:text-indigo-400" />
                             <span>Cambiar imagen</span>
                           </button>
 
@@ -1543,7 +1543,7 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
                               type="button"
                               onClick={handleUploadImageNow}
                               disabled={isUploadingImage || isSaving}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-medium shadow transition cursor-pointer"
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#1769FF] hover:bg-blue-700 dark:bg-indigo-600 dark:hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-medium shadow-2xs transition cursor-pointer"
                             >
                               {isUploadingImage ? (
                                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -1559,7 +1559,7 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
                               type="button"
                               onClick={handleDiscardSelectedFile}
                               disabled={isUploadingImage || isSaving}
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white text-xs transition cursor-pointer"
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-white hover:bg-slate-100 dark:bg-slate-800/80 dark:hover:bg-slate-700 text-[#52627A] dark:text-slate-400 dark:hover:text-white text-xs transition cursor-pointer border border-[#DEE7F2] dark:border-transparent"
                               title="Descartar archivo seleccionado"
                             >
                               <X className="w-3.5 h-3.5" />
@@ -1571,7 +1571,7 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
                             type="button"
                             onClick={handleRemoveProductImage}
                             disabled={isUploadingImage || isSaving}
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-rose-950/40 hover:bg-rose-950/60 border border-rose-800/60 text-rose-300 text-xs font-medium transition cursor-pointer"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-950/60 border border-rose-200 dark:border-rose-800/60 text-rose-700 dark:text-rose-300 text-xs font-medium transition cursor-pointer shadow-2xs"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                             <span>Eliminar imagen</span>
@@ -1584,22 +1584,22 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
                   /* Zona de arrastrar / seleccionar cuando no hay imagen */
                   <div
                     onClick={() => imageFileInputRef.current?.click()}
-                    className="border-2 border-dashed border-slate-700 hover:border-indigo-500/80 bg-slate-900/40 hover:bg-slate-900/70 rounded-2xl p-5 text-center cursor-pointer transition flex flex-col items-center justify-center gap-2 group"
+                    className="border-2 border-dashed border-[#DEE7F2] dark:border-slate-700 hover:border-[#1769FF] dark:hover:border-indigo-500/80 bg-[#F8FAFC] hover:bg-[#EEF4FF]/50 dark:bg-slate-900/40 dark:hover:bg-slate-900/70 rounded-2xl p-5 text-center cursor-pointer transition flex flex-col items-center justify-center gap-2 group"
                   >
-                    <div className="w-12 h-12 rounded-xl bg-slate-800 group-hover:bg-indigo-950/50 border border-slate-700 group-hover:border-indigo-500/50 flex items-center justify-center text-slate-400 group-hover:text-indigo-400 transition">
+                    <div className="w-12 h-12 rounded-xl bg-white dark:bg-slate-800 group-hover:bg-[#EEF4FF] dark:group-hover:bg-indigo-950/50 border border-[#DEE7F2] dark:border-slate-700 group-hover:border-[#1769FF]/50 dark:group-hover:border-indigo-500/50 flex items-center justify-center text-[#52627A] group-hover:text-[#1769FF] dark:text-slate-400 dark:group-hover:text-indigo-400 transition shadow-2xs">
                       <UploadCloud className="w-6 h-6" />
                     </div>
                     <div>
-                      <span className="text-xs font-semibold text-slate-200 group-hover:text-white block">
+                      <span className="text-xs font-semibold text-[#14213D] group-hover:text-[#1769FF] dark:text-slate-200 dark:group-hover:text-white block">
                         Toca aquí o haz clic para subir imagen desde tu dispositivo
                       </span>
-                      <span className="text-[11px] text-slate-400 block mt-0.5">
+                      <span className="text-[11px] text-[#52627A] dark:text-slate-400 block mt-0.5">
                         Formatos soportados: PNG, JPG o WEBP (máximo 5 MB)
                       </span>
                     </div>
                     <button
                       type="button"
-                      className="mt-1 px-3 py-1.5 rounded-xl bg-slate-800 group-hover:bg-indigo-600 text-slate-200 group-hover:text-white text-xs font-medium border border-slate-700 group-hover:border-indigo-500 transition cursor-pointer"
+                      className="mt-1 px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 group-hover:bg-[#1769FF] dark:group-hover:bg-indigo-600 text-[#14213D] group-hover:text-white dark:text-slate-200 dark:group-hover:text-white text-xs font-medium border border-[#DEE7F2] dark:border-slate-700 group-hover:border-[#1769FF] dark:group-hover:border-indigo-500 transition cursor-pointer shadow-2xs"
                     >
                       Seleccionar Archivo
                     </button>
@@ -1608,8 +1608,8 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
 
                 {/* Opción Manual de Enlace Externo (Preservación y flexibilidad) */}
                 <details className="group pt-1">
-                  <summary className="text-[11px] text-slate-400 hover:text-slate-300 cursor-pointer flex items-center gap-1 select-none">
-                    <LinkIcon className="w-3 h-3 text-slate-400" />
+                  <summary className="text-[11px] text-[#52627A] hover:text-[#14213D] dark:text-slate-400 dark:hover:text-slate-300 cursor-pointer flex items-center gap-1 select-none">
+                    <LinkIcon className="w-3 h-3 text-[#52627A] dark:text-slate-400" />
                     <span>¿Prefieres enlazar una URL de imagen externa? (Opcional)</span>
                   </summary>
                   <div className="pt-2 pl-4">
@@ -1625,7 +1625,7 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
                           setImagePreviewUrl(null);
                         }
                       }}
-                      className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-indigo-500"
+                      className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-[#DEE7F2] dark:border-slate-700 text-[#14213D] dark:text-white text-xs focus:outline-none focus:border-[#1769FF] dark:focus:border-indigo-500"
                       placeholder="https://images.unsplash.com/..."
                     />
                   </div>
@@ -1635,7 +1635,7 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
               {/* Estado y Opciones */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
                 <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1">
+                  <label className="block text-xs font-medium text-[#52627A] dark:text-slate-300 mb-1">
                     Estado en Catálogo
                   </label>
                   <select
@@ -1646,7 +1646,7 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
                         status: e.target.value as ProductStatus,
                       })
                     }
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none"
+                    className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-[#DEE7F2] dark:border-slate-700 text-[#14213D] dark:text-white text-xs focus:outline-none focus:border-[#1769FF]"
                   >
                     <option value="activo">Activo</option>
                     <option value="inactivo">Inactivo</option>
@@ -1662,11 +1662,11 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
                     onChange={(e) =>
                       setCurrentProduct({ ...currentProduct, is_available: e.target.checked })
                     }
-                    className="w-4 h-4 rounded text-indigo-600 bg-slate-800 border-slate-700"
+                    className="w-4 h-4 rounded text-[#1769FF] bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700"
                   />
                   <label
                     htmlFor="is_available_modal"
-                    className="text-xs font-bold text-white cursor-pointer"
+                    className="text-xs font-bold text-[#14213D] dark:text-white cursor-pointer"
                   >
                     Disponible para Venta
                   </label>
@@ -1686,11 +1686,11 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
                         },
                       })
                     }
-                    className="w-4 h-4 rounded text-indigo-600 bg-slate-800 border-slate-700"
+                    className="w-4 h-4 rounded text-[#1769FF] bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700"
                   />
                   <label
                     htmlFor="is_featured_modal"
-                    className="text-xs font-bold text-white cursor-pointer"
+                    className="text-xs font-bold text-[#14213D] dark:text-white cursor-pointer"
                   >
                     Marcar Destacado
                   </label>
@@ -1699,18 +1699,18 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
               </div>
 
               {/* Botones de acción del modal (Fijados y siempre accesibles) */}
-              <div className="flex items-center justify-end gap-3 px-5 sm:px-6 py-3.5 border-t border-slate-800 bg-slate-950/95 shrink-0">
+              <div className="flex items-center justify-end gap-3 px-5 sm:px-6 py-3.5 border-t border-[#DEE7F2] dark:border-slate-800 bg-[#F8FAFC] dark:bg-slate-950/95 shrink-0">
                 <button
                   type="button"
                   onClick={handleCloseModal}
-                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold cursor-pointer transition"
+                  className="px-4 py-2 rounded-xl bg-white hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 border border-[#DEE7F2] dark:border-transparent text-[#52627A] dark:text-white text-xs font-semibold cursor-pointer transition shadow-2xs"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={isSaving}
-                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-semibold cursor-pointer flex items-center gap-1.5 transition shadow-sm"
+                  className="px-4 py-2 rounded-xl bg-[#1769FF] hover:bg-blue-700 dark:bg-indigo-600 dark:hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-semibold cursor-pointer flex items-center gap-1.5 transition shadow-2xs"
                 >
                   {isSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                   <span>{isSaving ? 'Guardando...' : 'Guardar Producto'}</span>
