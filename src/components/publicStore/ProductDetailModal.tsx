@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   X,
   Share2,
@@ -18,6 +18,8 @@ import {
   Building2,
   Calendar,
   ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import { Product, Category, StoreType, FashionSettings, RestaurantSettings } from '../../types';
@@ -28,6 +30,7 @@ export interface ProductDetailModalProps {
   product: Product;
   storeType: StoreType;
   storeName?: string;
+  isPaidPlan?: boolean;
   categories?: Category[];
   fashionSettings?: FashionSettings;
   restaurantSettings?: RestaurantSettings;
@@ -58,6 +61,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   product,
   storeType,
   storeName,
+  isPaidPlan = false,
   categories = [],
   fashionSettings,
   restaurantSettings,
@@ -80,14 +84,86 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const [addedSuccess, setAddedSuccess] = useState(false);
   const [imgError, setImgError] = useState(false);
 
+  // Determinar imágenes disponibles respetando estrictamente la regla comercial del plan:
+  // - Plan FREE: Solo 1 fotografía (product.image_url o primera disponible), sin controles de galería.
+  // - Planes BASIC y PRO: Hasta 3 fotografías (1 principal + hasta 2 adicionales) con navegación interactiva.
+  const galleryImages = useMemo(() => {
+    if (!isPaidPlan) {
+      return product.image_url ? [product.image_url] : [];
+    }
+
+    let list: string[] = [];
+    if (Array.isArray(product.images) && product.images.length > 0) {
+      list = product.images.filter((img) => typeof img === 'string' && img.trim()).slice(0, 3);
+    } else if (Array.isArray(product.attributes?.images)) {
+      list = (product.attributes.images as string[]).filter((img) => typeof img === 'string' && img.trim()).slice(0, 3);
+    } else if (Array.isArray(product.attributes?.gallery_images)) {
+      list = (product.attributes.gallery_images as string[]).filter((img) => typeof img === 'string' && img.trim()).slice(0, 3);
+    }
+
+    if (product.image_url && !list.includes(product.image_url)) {
+      list = [product.image_url, ...list].slice(0, 3);
+    }
+
+    return list.length > 0 ? list : (product.image_url ? [product.image_url] : []);
+  }, [product, isPaidPlan]);
+
+  const [activeImageIndex, setActiveImageIndex] = useState<number>(0);
+  const activeImage = galleryImages[activeImageIndex] || galleryImages[0] || product.image_url || null;
+
+  // Manejo de navegación entre imágenes
+  const handlePrevImage = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setActiveImageIndex((prev) => (prev > 0 ? prev - 1 : galleryImages.length - 1));
+    setImgError(false);
+  };
+
+  const handleNextImage = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setActiveImageIndex((prev) => (prev < galleryImages.length - 1 ? prev + 1 : 0));
+    setImgError(false);
+  };
+
+  // Soporte de navegación con teclas de flecha
+  useEffect(() => {
+    if (galleryImages.length <= 1) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') {
+        setActiveImageIndex((prev) => (prev > 0 ? prev - 1 : galleryImages.length - 1));
+        setImgError(false);
+      } else if (e.key === 'ArrowRight') {
+        setActiveImageIndex((prev) => (prev < galleryImages.length - 1 ? prev + 1 : 0));
+        setImgError(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [galleryImages.length]);
+
+  // Soporte de gestos táctiles (swipe) en dispositivos móviles
+  const touchStartXRef = useRef<number | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartXRef.current = e.touches[0].clientX;
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartXRef.current === null || galleryImages.length <= 1) return;
+    const touchEndX = e.changedTouches[0].clientX;
+    const diff = touchStartXRef.current - touchEndX;
+    if (Math.abs(diff) > 40) {
+      if (diff > 0) {
+        handleNextImage();
+      } else {
+        handlePrevImage();
+      }
+    }
+    touchStartXRef.current = null;
+  };
+
   // Atributos de moda reales
   const sizes = (product.attributes?.sizes as string[]) || [];
   const colors = (product.attributes?.colors as Array<{ name: string; hex: string }>) || [];
-  const galleryImages = (product.attributes?.gallery_images as string[]) || (product.image_url ? [product.image_url] : []);
-
-  const [activeImage, setActiveImage] = useState<string | null>(
-    galleryImages[0] || product.image_url || null
-  );
   const [selectedSize, setSelectedSize] = useState<string>(sizes[0] || '');
   const [selectedColor, setSelectedColor] = useState<CartColorVariant | undefined>(
     colors[0] ? { name: colors[0].name, hex: colors[0].hex } : undefined
@@ -274,14 +350,17 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             {/* COLUMNA IZQUIERDA: FOTOGRAFÍA O FALLBACK NEUTRO */}
             <div className="space-y-3">
               <div
+                onTouchStart={handleTouchStart}
+                onTouchEnd={handleTouchEnd}
                 className={`w-full rounded-2xl border border-stone-200/80 dark:border-stone-800 overflow-hidden relative shadow-inner bg-stone-100 dark:bg-stone-800/60 ${imageAspectClass} select-none`}
               >
                 {hasImage ? (
                   <img
+                    key={activeImage}
                     src={activeImage!}
                     alt={product.name}
                     onError={() => setImgError(true)}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover transition-opacity duration-300 animate-in fade-in"
                   />
                 ) : (
                   /* Fallback visual neutro y refinado respetando la identidad del comercio */
@@ -309,16 +388,41 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   </div>
                 )}
 
+                {/* Controles de navegación y contador (Exclusivo para planes BASIC y PRO con múltiples fotos) */}
+                {galleryImages.length > 1 && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={handlePrevImage}
+                      aria-label="Fotografía anterior"
+                      className="absolute left-2.5 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-black/50 hover:bg-black/75 text-white backdrop-blur-xs flex items-center justify-center transition-all duration-150 cursor-pointer shadow-md hover:scale-105 active:scale-95 z-10"
+                    >
+                      <ChevronLeft className="w-5 h-5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleNextImage}
+                      aria-label="Siguiente fotografía"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-black/50 hover:bg-black/75 text-white backdrop-blur-xs flex items-center justify-center transition-all duration-150 cursor-pointer shadow-md hover:scale-105 active:scale-95 z-10"
+                    >
+                      <ChevronRight className="w-5 h-5" />
+                    </button>
+                    <div className="absolute top-3 right-3 px-2.5 py-0.5 rounded-full bg-black/60 text-white text-[10px] font-bold backdrop-blur-xs shadow-xs z-10">
+                      {activeImageIndex + 1} / {galleryImages.length}
+                    </div>
+                  </>
+                )}
+
                 {/* Badge de Oferta */}
                 {hasOffer && (
-                  <span className="absolute top-3 left-3 px-2.5 py-1 rounded-lg bg-rose-600 text-white font-black text-xs shadow-md tracking-wider">
+                  <span className="absolute top-3 left-3 px-2.5 py-1 rounded-lg bg-rose-600 text-white font-black text-xs shadow-md tracking-wider z-10">
                     {discountPercent > 0 ? `-${discountPercent}%` : 'OFERTA'}
                   </span>
                 )}
 
                 {/* Estado Agotado */}
                 {!product.is_available && (
-                  <div className="absolute inset-0 bg-stone-950/65 backdrop-blur-[2px] flex items-center justify-center p-3">
+                  <div className="absolute inset-0 bg-stone-950/65 backdrop-blur-[2px] flex items-center justify-center p-3 z-20">
                     <span className="px-3.5 py-1.5 rounded-full bg-stone-900/95 text-stone-100 border border-stone-700 font-bold text-xs shadow-lg flex items-center gap-2">
                       <span className="w-2 h-2 rounded-full bg-rose-500 inline-block" />
                       <span>Agotado</span>
@@ -327,7 +431,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 )}
               </div>
 
-              {/* Miniaturas de Galería (Solo si existen múltiples fotos reales) */}
+              {/* Miniaturas de Galería (Solo si existen múltiples fotos y plan BASIC o PRO) */}
               {galleryImages.length > 1 && (
                 <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
                   {galleryImages.map((img, idx) => (
@@ -335,17 +439,17 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                       key={idx}
                       type="button"
                       onClick={() => {
-                        setActiveImage(img);
+                        setActiveImageIndex(idx);
                         setImgError(false);
                       }}
-                      className={`w-14 h-14 rounded-xl overflow-hidden border-2 shrink-0 transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer ${
-                        activeImage === img
-                          ? 'shadow-sm'
+                      className={`w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden border-2 shrink-0 transition-all duration-200 cursor-pointer ${
+                        activeImageIndex === idx
+                          ? 'shadow-md scale-102 ring-2 ring-offset-1'
                           : 'opacity-60 hover:opacity-100 border-stone-200 dark:border-stone-800'
                       }`}
                       style={
-                        activeImage === img
-                          ? { borderColor: primaryColor }
+                        activeImageIndex === idx
+                          ? { borderColor: primaryColor, ringColor: `${primaryColor}40` }
                           : undefined
                       }
                     >

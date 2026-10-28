@@ -21,6 +21,27 @@ function isValidUUID(str: unknown): boolean {
   return typeof str === 'string' && UUID_REGEX.test(str.trim());
 }
 
+function isQrPaymentQuery(query: string): boolean {
+  if (!query || typeof query !== 'string') return false;
+  const q = query.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const hasQrKeyword = q.includes('qr') || q.includes('q.r');
+  const hasPayKeyword =
+    q.includes('paga') ||
+    q.includes('pago') ||
+    q.includes('cobro') ||
+    q.includes('transfer') ||
+    q.includes('cuenta');
+
+  if (hasQrKeyword) return true;
+  if (
+    hasPayKeyword &&
+    (q.includes('codigo') || q.includes('escan') || q.includes('foto') || q.includes('imagen'))
+  ) {
+    return true;
+  }
+  return false;
+}
+
 export default async function handler(req: any, res: any) {
   // Configuración de encabezados CORS y seguridad
   res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -196,19 +217,26 @@ export default async function handler(req: any, res: any) {
     const whatsapp_tienda = hasWhatsapp ? rawWhatsapp : '';
 
     const rawQr =
-      payment.qr_image_url ||
-      payment.qr_url ||
+      body.qrImageUrl ||
+      body.qr_image_url ||
       payment.qrImageUrl ||
+      payment.qr_image_url ||
       payment.qrUrl ||
-      profile.qr_image_url ||
-      profile.qr_url ||
+      payment.qr_url ||
       profile.qrImageUrl ||
+      profile.qr_image_url ||
       profile.qrUrl ||
+      profile.qr_url ||
+      (store as any).qrImageUrl ||
       (store as any).qr_image_url ||
       (store as any).qr_url ||
       '';
 
-    const hasQr = typeof rawQr === 'string' && rawQr.trim().startsWith('http');
+    const isQrSimpleActive = payment.qrSimple !== false;
+    const hasQr =
+      typeof rawQr === 'string' &&
+      (rawQr.trim().startsWith('http') || rawQr.trim().startsWith('data:image/')) &&
+      isQrSimpleActive;
     const qr_url_tienda = hasQr ? rawQr.trim() : '';
 
     // Formatear catálogo de productos/servicios para {lista_productos}
@@ -236,16 +264,26 @@ export default async function handler(req: any, res: any) {
       : 'Actualmente no hay productos registrados en el catálogo.';
 
     const qrInstruction = hasQr
-      ? `4. GESTIÓN DE PAGO POR QR:
-   - Si el cliente elige pagar con QR o pregunta por los datos de pago:
-     * La tienda TIENE un QR configurado (${qr_url_tienda}): Muestra la imagen del QR usando formato Markdown:
-       ![Código QR de Pago](${qr_url_tienda})
-       Y acompáñalo con: "Aquí tienes el código QR para realizar tu pago por el total de Bs. [monto]."`
-      : `4. GESTIÓN DE PAGO POR QR:
-   - Si el cliente elige pagar con QR o pregunta por los datos de pago:
-     * La tienda NO tiene un código QR configurado.
-     * ESTÁ ESTRICTAMENTE PROHIBIDO generar imágenes rotas en Markdown como ![Código QR de Pago]() o inventar URLs de imagen.
-     * Indica cordialmente: "Para pago por transferencia o QR, el comercio te proporcionará los datos directos al confirmar tu pedido."`;
+      ? `4. GESTIÓN Y ASISTENCIA DE PAGO POR CÓDIGO QR (MÓDULO 3):
+   - Cuando el cliente manifieste su intención de pagar mediante QR (ejemplos: "Quiero pagar con QR", "¿Tienen QR?", "Muéstrame el QR para pagar", "¿Cómo puedo pagar por QR?", "Pásame el código QR", "Voy a pagar por QR", "¿Dónde está el QR de pago?" o cualquier consulta similar sobre pago con QR):
+     * Responde de manera breve, amigable y cercana identificando el comercio. Ejemplo exacto: "¡Claro! 💜 Este es el código QR de ${nombre_tienda} para que puedas realizar tu pago."
+     * Muestra obligatoriamente la imagen auténtica del código QR del comercio usando formato Markdown exacto:
+       ![Código QR de Pago - ${nombre_tienda}](${qr_url_tienda})
+     * Explica de forma clara y breve el procedimiento de pago y la instrucción obligatoria del comprobante:
+       "Puedes escanear este QR desde tu aplicación bancaria para realizar el pago.\n\nUna vez realizado el pago, recuerda enviar tu comprobante por WhatsApp junto con el pedido que tienes en tu carrito. Así el comercio podrá revisar la información de tu pago. 📲"
+     * Recuerda al cliente que para confirmar su compra debe completar su pedido en el carrito usando la opción de "Pago mediante QR" y enviarlo al WhatsApp de ${nombre_tienda}.
+     * REGLAS ESTRICTAS DE SEGURIDAD PARA EL QR:
+       - No deformes ni recortes la imagen.
+       - No uses imágenes de ejemplo ni URLs inventadas.
+       - No uses el QR de MAXINEGO ni de otra tienda.
+       - ESTÁ TERMINANTEMENTE PROHIBIDO afirmar o simular que el pago fue recibido, validado o verificado automáticamente. MAXINEGO no realiza verificación bancaria automática.
+       - No vacíes ni alteres el carrito del cliente. El comprobante será adjuntado manualmente por el cliente dentro de WhatsApp.`
+      : `4. GESTIÓN Y ASISTENCIA DE PAGO POR CÓDIGO QR (MÓDULO 3 - COMERCIO SIN QR):
+   - Si el cliente pregunta por pago con QR o solicita un código QR:
+     * La tienda ${nombre_tienda} NO tiene un código QR de cobro disponible en este momento.
+     * Responde de forma transparente: "Por el momento, este comercio no tiene un código QR de pago disponible."
+     * Informa cordialmente sobre los otros métodos de pago que tenga la tienda (por ejemplo efectivo contraentrega o coordinación directa al enviar el pedido por WhatsApp).
+     * ESTÁ ESTRICTAMENTE PROHIBIDO generar imágenes rotas en Markdown como ![Código QR de Pago]() o inventar códigos QR, cuentas bancarias o enlaces ficticios.`;
 
     const cierreInstruction = hasWhatsapp
       ? `5. CIERRE DE PEDIDO Y DERIVACIÓN A WHATSAPP:
@@ -345,9 +383,28 @@ ${cierreInstruction}
    - Si el usuario te hace preguntas no relacionadas con la tienda o MAXINEGO, responde cordialmente: "Soy el asistente de ${nombre_tienda} y estoy aquí para ayudarte con tus pedidos y dudas sobre nuestro menú."`;
     }
 
+    const isQrQuery = isQrPaymentQuery(userMessage);
+
     // 8. Verificar clave de API de Gemini
     const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
     if (!apiKey) {
+      if (isQrQuery) {
+        const reply = hasQr
+          ? `¡Claro! 💜 Este es el código QR de **${nombre_tienda}** para que puedas realizar tu pago:\n\n![Código QR de Pago - ${nombre_tienda}](${qr_url_tienda})\n\nPuedes escanear este QR desde tu aplicación bancaria para realizar el pago.\n\nUna vez realizado el pago, recuerda enviar tu comprobante por WhatsApp junto con el pedido que tienes en tu carrito. Así el comercio podrá revisar la información de tu pago. 📲`
+          : `Por el momento, este comercio no tiene un código QR de pago disponible.\n\nPuedes revisar los otros métodos de pago disponibles en el carrito o coordinar directamente con **${nombre_tienda}** por WhatsApp.`;
+
+        return res.status(200).json({
+          success: true,
+          reply,
+          store: {
+            id: store.id,
+            name: store.name,
+            slug: store.slug,
+            storeType: store.store_type,
+          },
+        });
+      }
+
       console.warn('[Chat API] GEMINI_API_KEY no encontrada en process.env.');
       return res.status(500).json({
         success: false,
@@ -419,7 +476,13 @@ ${cierreInstruction}
       }
 
       if (!succeeded) {
-        throw modelErr;
+        if (isQrQuery) {
+          replyText = hasQr
+            ? `¡Claro! 💜 Este es el código QR de **${nombre_tienda}** para que puedas realizar tu pago:\n\n![Código QR de Pago - ${nombre_tienda}](${qr_url_tienda})\n\nPuedes escanear este QR desde tu aplicación bancaria para realizar el pago.\n\nUna vez realizado el pago, recuerda enviar tu comprobante por WhatsApp junto con el pedido que tienes en tu carrito. Así el comercio podrá revisar la información de tu pago. 📲`
+            : `Por el momento, este comercio no tiene un código QR de pago disponible.\n\nPuedes revisar los otros métodos de pago disponibles en el carrito o coordinar directamente con **${nombre_tienda}** por WhatsApp.`;
+        } else {
+          throw modelErr;
+        }
       }
     }
 

@@ -65,6 +65,7 @@ export interface Product {
   price: number;
   is_available: boolean;
   image_url: string | null;
+  images?: string[];
   status: ProductStatus;
   attributes: Record<string, unknown>;
   created_at: string;
@@ -184,7 +185,7 @@ export type SuperAdminSection =
   | 'actividad'
   | 'configuracion';
 
-export type PlanId = 'basic' | 'pro';
+export type PlanId = 'free' | 'basic' | 'pro';
 export type PlanBillingCycle = 'mensual' | 'semestral' | 'anual';
 export type SubscriptionStatus = 'activa' | 'prueba' | 'vencida' | 'cancelada';
 
@@ -291,6 +292,18 @@ export interface StoreSocials {
   youtube?: string;
 }
 
+export interface StoreLocationSettings {
+  isConfigured: boolean;
+  query: string; // Coordenadas "lat,lng", dirección o enlace de Google Maps
+  latitude?: number;
+  longitude?: number;
+  displayAddress?: string;
+  referenceNotes?: string;
+  mapsUrl: string; // URL directa para abrir en Google Maps
+  embedUrl: string; // URL para iframe embebido seguro
+  confirmedAt?: string;
+}
+
 export interface StoreProfileSettings {
   logoUrl: string;
   name: string;
@@ -301,6 +314,7 @@ export interface StoreProfileSettings {
   email: string;
   attentionInfo: string;
   socials: StoreSocials;
+  location?: StoreLocationSettings;
 }
 
 export interface StoreHighlightItem {
@@ -318,6 +332,22 @@ export type StoreHighlightsLayout =
   | 'editorial'
   | 'minimal';
 
+export interface StoreBannerItem {
+  id: string;
+  imageUrl: string;
+  title?: string;
+  order: number;
+  createdAt: string;
+}
+
+export interface StoreStoryItem {
+  id: string;
+  mediaType: 'image' | 'video';
+  mediaUrl: string;
+  title?: string;
+  createdAt: string;
+}
+
 export interface StoreAppearanceSettings {
   theme: 'light' | 'dark';
   // Exclusivo Plan Pro
@@ -327,6 +357,12 @@ export interface StoreAppearanceSettings {
   customDomain: string;
   domainVerified: boolean;
   visualStyle: 'modern' | 'minimal' | 'elegant';
+  // Tiendas Públicas 2.0: 'free' es el diseño actual aprobado oficial de MAXINEGO
+  templateId?: 'free' | string;
+  // Banners Comerciales (Exclusivo Planes BASIC y PRO)
+  banners?: StoreBannerItem[];
+  // Estados Multimedia (Exclusivo Plan PRO)
+  stories?: StoreStoryItem[];
   // Sistema de Destacados del Comercio
   showHighlights?: boolean;
   highlightsLayout?: StoreHighlightsLayout;
@@ -374,6 +410,7 @@ export interface StorePaymentSettings {
     accountNumber?: string;
     accountHolder?: string;
   };
+  qrImageUrl?: string | null; // Imagen del código QR de cobro registrado por el comercio
 }
 
 // Verticales específicas

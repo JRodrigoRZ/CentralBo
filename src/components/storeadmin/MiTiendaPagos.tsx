@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   CreditCard,
   QrCode,
@@ -11,12 +11,16 @@ import {
   AlertCircle,
   ShieldCheck,
   Loader2,
+  Upload,
+  RefreshCw,
+  Trash2,
 } from 'lucide-react';
 import { Store, StorePaymentSettings } from '../../types';
 import {
   getCachedStorePaymentSettings,
   fetchStorePaymentSettings,
   saveStorePaymentSettings,
+  uploadStorePaymentQr,
   getStoreProfile,
 } from '../../lib/storeAdminService';
 
@@ -34,6 +38,66 @@ export const MiTiendaPagos: React.FC<MiTiendaPagosProps> = ({ store }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [isUploadingQr, setIsUploadingQr] = useState(false);
+  const [qrError, setQrError] = useState<string | null>(null);
+  const [qrSuccess, setQrSuccess] = useState<string | null>(null);
+  const qrFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleQrSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+
+    setQrError(null);
+    setQrSuccess(null);
+    setIsUploadingQr(true);
+
+    try {
+      const result = await uploadStorePaymentQr(store.id, file);
+      if (result.success && result.publicUrl) {
+        const updatedSettings: StorePaymentSettings = {
+          ...settings,
+          qrImageUrl: result.publicUrl,
+        };
+        setSettings(updatedSettings);
+
+        // Persistir inmediatamente para que el QR quede registrado de forma duradera
+        const saveRes = await saveStorePaymentSettings(store.id, updatedSettings);
+        if (saveRes.success) {
+          setQrSuccess('Código QR guardado exitosamente.');
+          setTimeout(() => setQrSuccess(null), 4000);
+        } else {
+          setQrSuccess('Código QR cargado localmente. Recuerda pulsar "Guardar Configuración".');
+        }
+      } else {
+        setQrError(result.error || 'No se pudo subir la imagen del código QR.');
+      }
+    } catch (err: any) {
+      setQrError(err?.message || 'Error inesperado al procesar la imagen del código QR.');
+    } finally {
+      setIsUploadingQr(false);
+    }
+  };
+
+  const handleRemoveQr = async () => {
+    if (!settings.qrImageUrl) return;
+    setQrError(null);
+    setQrSuccess(null);
+
+    const updatedSettings: StorePaymentSettings = {
+      ...settings,
+      qrImageUrl: null,
+    };
+    setSettings(updatedSettings);
+
+    try {
+      await saveStorePaymentSettings(store.id, updatedSettings);
+      setQrSuccess('Código QR eliminado.');
+      setTimeout(() => setQrSuccess(null), 3000);
+    } catch (err) {
+      console.warn('[MiTiendaPagos] Error al guardar tras eliminar QR:', err);
+    }
+  };
 
   // Sincronizar configuración oficial de métodos de pago desde Supabase al montar o cambiar de comercio
   useEffect(() => {
@@ -376,6 +440,173 @@ export const MiTiendaPagos: React.FC<MiTiendaPagosProps> = ({ store }) => {
             </label>
           </div>
         </div>
+      </div>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* SECCIÓN DEDICADA: CÓDIGO QR PARA PAGOS (MÓDULO 1) */}
+      {/* ------------------------------------------------------------------ */}
+      <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-slate-900/90 border border-[#DEE7F2] dark:border-slate-800 shadow-2xs space-y-4">
+        {/* Encabezado del apartado */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[#DEE7F2] dark:border-slate-800">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#EEF4FF] text-[#1769FF] dark:bg-indigo-500/10 dark:text-indigo-400 border border-[#DEE7F2] dark:border-indigo-500/20 flex items-center justify-center shrink-0">
+              <QrCode className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-sm font-bold text-[#14213D] dark:text-white">
+                  Código QR para pagos
+                </h3>
+                {settings.qrImageUrl ? (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-500/30">
+                    <CheckCircle2 className="w-3 h-3" />
+                    <span>QR Registrado</span>
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700">
+                    <span>Sin QR registrado</span>
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-[#52627A] dark:text-slate-400 mt-0.5">
+                Sube el código QR de tu negocio para que tus clientes puedan utilizarlo al pagar sus pedidos.
+              </p>
+            </div>
+          </div>
+
+          {/* Input oculto para subir archivo */}
+          <input
+            type="file"
+            ref={qrFileInputRef}
+            onChange={handleQrSelect}
+            accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml"
+            className="hidden"
+            aria-label="Seleccionar imagen de código QR de cobro"
+          />
+        </div>
+
+        {/* Mensajes de feedback específicos del QR */}
+        {qrSuccess && (
+          <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 dark:bg-[#102A24] dark:border-[#34D399]/40 dark:text-[#34D399] text-xs flex items-center gap-2 animate-fadeIn">
+            <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-emerald-600 dark:text-[#34D399]" />
+            <span>{qrSuccess}</span>
+          </div>
+        )}
+
+        {qrError && (
+          <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 dark:bg-[#2E141E] dark:border-[#F87171]/40 dark:text-[#F87171] text-xs flex items-center gap-2 animate-fadeIn">
+            <AlertCircle className="w-4 h-4 flex-shrink-0 text-rose-600 dark:text-[#F87171]" />
+            <span>{qrError}</span>
+          </div>
+        )}
+
+        {/* ESTADO 1: SIN QR REGISTRADO */}
+        {!settings.qrImageUrl ? (
+          <div className="p-6 sm:p-8 rounded-xl border-2 border-dashed border-[#DEE7F2] dark:border-slate-800 bg-[#F8FAFC] dark:bg-slate-950/40 text-center flex flex-col items-center justify-center space-y-3 transition">
+            <div className="w-14 h-14 rounded-2xl bg-[#EEF4FF] dark:bg-indigo-500/10 text-[#1769FF] dark:text-indigo-400 flex items-center justify-center border border-[#DEE7F2] dark:border-indigo-500/20 shadow-2xs">
+              <QrCode className="w-7 h-7" />
+            </div>
+
+            <div className="space-y-1 max-w-sm">
+              <p className="text-xs font-bold text-[#14213D] dark:text-white">
+                Todavía no tienes un código QR registrado
+              </p>
+              <p className="text-[11px] text-[#52627A] dark:text-slate-400 leading-relaxed">
+                Selecciona la imagen de tu código QR de cobro bancario o billetera móvil (BNB, BCP, Banco Unión, Yape, etc.).
+              </p>
+            </div>
+
+            <button
+              type="button"
+              disabled={isUploadingQr}
+              onClick={() => qrFileInputRef.current?.click()}
+              className="mt-2 inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-[#1769FF] hover:bg-blue-700 dark:bg-[#3B82F6] dark:hover:bg-[#2563EB] text-white text-xs font-semibold shadow-2xs transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isUploadingQr ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Subiendo código QR...</span>
+                </>
+              ) : (
+                <>
+                  <Upload className="w-4 h-4" />
+                  <span>Subir código QR</span>
+                </>
+              )}
+            </button>
+          </div>
+        ) : (
+          /* ESTADO 2: CON QR REGISTRADO */
+          <div className="p-4 sm:p-5 rounded-xl bg-[#F8FAFC] dark:bg-slate-950/40 border border-[#DEE7F2] dark:border-slate-800 flex flex-col md:flex-row items-center md:items-start gap-5">
+            {/* Contenedor del código QR: Siempre fondo blanco interior para máximo contraste y legibilidad al escanear */}
+            <div className="shrink-0 bg-white p-3 sm:p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col items-center justify-center">
+              <img
+                src={settings.qrImageUrl}
+                alt={`Código QR de cobro de ${store.name}`}
+                className="w-44 h-44 sm:w-52 sm:h-52 object-contain block select-none"
+              />
+              <span className="text-[10px] font-mono text-slate-400 mt-2 tracking-wide uppercase">
+                QR Oficial • {store.name}
+              </span>
+            </div>
+
+            {/* Información y acciones */}
+            <div className="flex-1 space-y-3 text-center md:text-left w-full">
+              <div>
+                <h4 className="text-xs font-bold text-[#14213D] dark:text-white flex items-center justify-center md:justify-start gap-1.5">
+                  <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                  <span>Código QR activo para {store.name}</span>
+                </h4>
+                <p className="text-xs text-[#52627A] dark:text-slate-400 mt-1 leading-relaxed">
+                  Este código QR se encuentra registrado y asociado exclusivamente a tu comercio.
+                  Permanecerá disponible cada vez que ingreses a este panel.
+                </p>
+              </div>
+
+              <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-[#DEE7F2] dark:border-slate-800 text-[11px] text-[#52627A] dark:text-slate-400 space-y-1">
+                <p className="font-semibold text-[#14213D] dark:text-slate-200">
+                  ¿Necesitas cambiar tu código QR?
+                </p>
+                <p>
+                  Si cambiaste de cuenta bancaria o necesitas renovar el código, pulsa el botón a continuación para seleccionar la nueva imagen. El QR anterior se sustituirá únicamente si la actualización es exitosa.
+                </p>
+              </div>
+
+              {/* Botones de acción */}
+              <div className="pt-1 flex flex-wrap items-center justify-center md:justify-start gap-2.5">
+                <button
+                  type="button"
+                  disabled={isUploadingQr}
+                  onClick={() => qrFileInputRef.current?.click()}
+                  className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#1769FF] hover:bg-blue-700 dark:bg-[#3B82F6] dark:hover:bg-[#2563EB] text-white text-xs font-semibold shadow-2xs transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isUploadingQr ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Actualizando código QR...</span>
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      <span>Actualizar código QR</span>
+                    </>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  disabled={isUploadingQr}
+                  onClick={handleRemoveQr}
+                  className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-600 dark:bg-slate-800 dark:hover:bg-rose-950/40 dark:text-slate-300 dark:hover:text-rose-400 text-xs font-medium border border-slate-200 dark:border-slate-700 transition cursor-pointer disabled:opacity-50"
+                  title="Eliminar este código QR de cobro"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Eliminar QR</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Resumen de configuración para el checkout */}

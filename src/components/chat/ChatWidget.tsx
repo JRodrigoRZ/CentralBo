@@ -10,6 +10,7 @@ import {
   AlertCircle,
   Store,
   ChevronDown,
+  QrCode,
 } from 'lucide-react';
 
 export interface ChatMessage {
@@ -26,6 +27,29 @@ interface ChatWidgetProps {
   primaryColor?: string;
   hasFloatingCart?: boolean;
   className?: string;
+  qrImageUrl?: string | null;
+  storeWhatsapp?: string;
+}
+
+function isQrPaymentQuery(query: string): boolean {
+  if (!query || typeof query !== 'string') return false;
+  const q = query.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const hasQrKeyword = q.includes('qr') || q.includes('q.r');
+  const hasPayKeyword =
+    q.includes('paga') ||
+    q.includes('pago') ||
+    q.includes('cobro') ||
+    q.includes('transfer') ||
+    q.includes('cuenta');
+
+  if (hasQrKeyword) return true;
+  if (
+    hasPayKeyword &&
+    (q.includes('codigo') || q.includes('escan') || q.includes('foto') || q.includes('imagen'))
+  ) {
+    return true;
+  }
+  return false;
 }
 
 const RenderMessageContent: React.FC<{ content: string; isUser: boolean }> = ({
@@ -36,8 +60,8 @@ const RenderMessageContent: React.FC<{ content: string; isUser: boolean }> = ({
     return <span>{content}</span>;
   }
 
-  // 1. Extraer imágenes Markdown: ![alt](url)
-  const imageRegex = /!\[([^\]]*)\]\((https?:\/\/[^\s\)]+)\)/g;
+  // 1. Extraer imágenes Markdown: ![alt](url) soportando tanto https:// como data:image/
+  const imageRegex = /!\[([^\]]*)\]\(((?:https?:\/\/|data:image\/)[^\s\)]+)\)/g;
   const parts: React.ReactNode[] = [];
   let lastIndex = 0;
   let match: RegExpExecArray | null;
@@ -51,16 +75,23 @@ const RenderMessageContent: React.FC<{ content: string; isUser: boolean }> = ({
     parts.push(
       <div
         key={`img-${match.index}`}
-        className="my-2 p-2 bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-700 shadow-md inline-block max-w-full"
+        className="my-2.5 p-3 bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-700/80 shadow-xs max-w-full w-full sm:max-w-xs mx-auto text-center space-y-2 animate-in fade-in duration-200"
       >
-        <img
-          src={src}
-          alt={alt}
-          className="w-44 h-44 max-w-full object-contain rounded-xl mx-auto block bg-white"
-          loading="lazy"
-        />
-        <div className="text-[10px] text-center text-stone-600 dark:text-stone-300 mt-1.5 font-semibold">
-          {alt}
+        <div className="flex items-center justify-center gap-1.5 text-[11px] font-bold text-stone-800 dark:text-stone-200">
+          <QrCode className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+          <span className="truncate">{alt}</span>
+        </div>
+        {/* Contenedor interior blanco para contraste óptico perfecto en escaneo bancario aun en modo oscuro */}
+        <div className="p-2.5 bg-white rounded-xl border border-stone-200 dark:border-stone-700 shadow-2xs inline-block">
+          <img
+            src={src}
+            alt={alt}
+            className="w-44 h-44 sm:w-48 sm:h-48 max-w-full object-contain block mx-auto select-none"
+            loading="eager"
+          />
+        </div>
+        <div className="text-[10px] text-stone-500 dark:text-stone-400 font-medium">
+          Escanea desde tu app bancaria móvil
         </div>
       </div>
     );
@@ -146,6 +177,8 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
   primaryColor = '#2563eb',
   hasFloatingCart = false,
   className = '',
+  qrImageUrl,
+  storeWhatsapp,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -188,26 +221,26 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
       case 'restaurante':
         return [
           '¿Cuál es el menú disponible?',
+          '¿Cómo puedo pagar por QR?',
           '¿Tienen envíos a domicilio?',
-          '¿Cuáles son sus horarios?',
         ];
       case 'moda':
         return [
           '¿Qué prendas tienen en catálogo?',
+          '¿Puedo pagar con QR?',
           '¿Qué promociones están activas?',
-          '¿Hacen envíos a mi zona?',
         ];
       case 'servicios':
         return [
           '¿Qué servicios ofrecen?',
+          '¿Tienen código QR para pagar?',
           '¿Cuáles son los horarios de atención?',
-          '¿Qué métodos de pago aceptan?',
         ];
       default:
         return [
           '¿Qué productos tienen en catálogo?',
+          '¿Tienen código QR para pagar?',
           '¿Cuáles son los métodos de pago?',
-          '¿Tienen envíos o delivery?',
         ];
     }
   };
@@ -248,12 +281,31 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
           store_id: storeId,
           message: text,
           history: historyPayload,
+          qrImageUrl: qrImageUrl || undefined,
         }),
       });
 
       const data = await response.json();
 
       if (!response.ok || !data.success) {
+        // Fallback resiliente para consulta sobre QR si el servicio backend o clave de IA presenta interrupciones
+        if (isQrPaymentQuery(text)) {
+          const fallbackReply = qrImageUrl
+            ? `¡Claro! 💜 Este es el código QR de **${storeName}** para que puedas realizar tu pago:\n\n![Código QR de Pago - ${storeName}](${qrImageUrl})\n\nPuedes escanear este QR desde tu aplicación bancaria para realizar el pago.\n\nUna vez realizado el pago, recuerda enviar tu comprobante por WhatsApp junto con el pedido que tienes en tu carrito. Así el comercio podrá revisar la información de tu pago. 📲`
+            : `Por el momento, este comercio no tiene un código QR de pago disponible.\n\nPuedes revisar los otros métodos de pago disponibles en el carrito o coordinar directamente con **${storeName}** por WhatsApp.`;
+
+          const botMessage: ChatMessage = {
+            id: `bot-${Date.now()}`,
+            role: 'assistant',
+            content: fallbackReply,
+            timestamp: new Date(),
+          };
+
+          setMessages((prev) => [...prev, botMessage]);
+          setIsLoading(false);
+          return;
+        }
+
         throw new Error(
           data.error || 'No fue posible obtener una respuesta en este momento.'
         );
@@ -269,6 +321,25 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
       setMessages((prev) => [...prev, botMessage]);
     } catch (err: any) {
       console.error('[ChatWidget] Error enviando mensaje:', err);
+
+      // Si el fallo fue al consultar por QR, asistir de inmediato con los datos del comercio
+      if (isQrPaymentQuery(text)) {
+        const fallbackReply = qrImageUrl
+          ? `¡Claro! 💜 Este es el código QR de **${storeName}** para que puedas realizar tu pago:\n\n![Código QR de Pago - ${storeName}](${qrImageUrl})\n\nPuedes escanear este QR desde tu aplicación bancaria para realizar el pago.\n\nUna vez realizado el pago, recuerda enviar tu comprobante por WhatsApp junto con el pedido que tienes en tu carrito. Así el comercio podrá revisar la información de tu pago. 📲`
+          : `Por el momento, este comercio no tiene un código QR de pago disponible.\n\nPuedes revisar los otros métodos de pago disponibles en el carrito o coordinar directamente con **${storeName}** por WhatsApp.`;
+
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `bot-${Date.now()}`,
+            role: 'assistant',
+            content: fallbackReply,
+            timestamp: new Date(),
+          },
+        ]);
+        return;
+      }
+
       const friendlyError =
         err?.message?.includes('GEMINI_API_KEY')
           ? 'El servicio de IA requiere configurar la clave GEMINI_API_KEY en el servidor.'

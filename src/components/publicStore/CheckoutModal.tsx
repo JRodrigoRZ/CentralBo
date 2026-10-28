@@ -152,11 +152,21 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     icon: React.ReactNode;
   }[] = [];
 
-  if (effectivePaymentSettings.qrSimple) {
+  // PAGO MEDIANTE QR (MÓDULO 2):
+  // Solo se presenta si el comercio habilitó QR y registró una imagen auténtica de su código QR.
+  // Regla estricta: Si el comercio todavía no tiene un QR registrado, no presentar el pago QR como disponible.
+  const hasValidStoreQr = Boolean(
+    effectivePaymentSettings.qrSimple &&
+      effectivePaymentSettings.qrImageUrl &&
+      typeof effectivePaymentSettings.qrImageUrl === 'string' &&
+      effectivePaymentSettings.qrImageUrl.trim().length > 0
+  );
+
+  if (hasValidStoreQr) {
     availablePaymentOptions.push({
       id: 'qr',
-      label: 'QR Simple',
-      sub: 'Cobro rápido por código QR',
+      label: 'Pago mediante QR',
+      sub: `Paga escaneando el QR oficial de ${store.name}`,
       icon: <QrCode className="w-5 h-5 text-indigo-500 shrink-0" />,
     });
   }
@@ -219,6 +229,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     }
   }, [
     effectivePaymentSettings.qrSimple,
+    effectivePaymentSettings.qrImageUrl,
     effectivePaymentSettings.bankTransfer,
     effectivePaymentSettings.cashOnDelivery,
   ]);
@@ -683,7 +694,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     text += `\n💳 *MÉTODO DE PAGO INDICADO:*\n`;
     switch (order.paymentMethod) {
       case 'qr':
-        text += `Pago con QR Simple\n`;
+        text += `Método de pago: QR\n`;
+        text += `Realizaré el pago mediante QR y adjuntaré mi comprobante de pago en esta conversación.\n`;
         break;
       case 'transferencia':
         text += `Transferencia Bancaria Directa\n`;
@@ -773,7 +785,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               <p>
                 <span className="text-stone-400 dark:text-stone-500">Método de Pago: </span>
                 <span className="font-semibold text-stone-800 dark:text-stone-200">
-                  {placedOrder.paymentMethod === 'qr' ? 'Cobro con QR Simple' :
+                  {placedOrder.paymentMethod === 'qr' ? 'Pago mediante QR' :
                    placedOrder.paymentMethod === 'transferencia' ? 'Transferencia Bancaria Directa' :
                    placedOrder.paymentMethod === 'contra_entrega' ? 'Efectivo Contraentrega' : 'Coordinación por WhatsApp'}
                 </span>
@@ -795,6 +807,24 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 </div>
               ))}
             </div>
+
+            {/* Recordatorio del comprobante para Pago mediante QR */}
+            {placedOrder.paymentMethod === 'qr' && (
+              <div className="border-t border-stone-200/80 dark:border-stone-800 pt-3 text-left">
+                <div className="p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200/90 dark:border-amber-800/60 text-stone-800 dark:text-stone-200 space-y-1.5">
+                  <div className="flex items-center gap-2 font-bold text-xs text-amber-900 dark:text-amber-200">
+                    <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                    <span>Instrucción sobre el comprobante de pago</span>
+                  </div>
+                  <p className="font-bold text-xs text-stone-900 dark:text-amber-100">
+                    «Después de realizar tu pago, envía el comprobante por WhatsApp junto con tu pedido».
+                  </p>
+                  <p className="text-[11px] text-stone-600 dark:text-stone-400 leading-relaxed">
+                    Al presionar el botón de abajo, se abrirá la conversación oficial de WhatsApp con <strong className="text-stone-900 dark:text-white">{store.name}</strong>. Recuerda adjuntar manualmente la captura o fotografía de tu comprobante en el chat.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* BOTÓN PRINCIPAL DE WHATSAPP */}
@@ -1315,11 +1345,72 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   </div>
                 )}
 
-              {/* Información de QR */}
-              {paymentMethod === 'qr' && effectivePaymentSettings.qrSimple && (
-                <div className="p-2.5 rounded-xl bg-stone-50 dark:bg-stone-950 border border-stone-200/80 dark:border-stone-800 text-[11px] text-stone-600 dark:text-stone-400 flex items-center gap-2">
-                  <QrCode className="w-4 h-4 text-stone-700 dark:text-stone-300 shrink-0" />
-                  <span>El comercio te proporcionará el código QR para el cobro al confirmar el pedido por WhatsApp.</span>
+              {/* ------------------------------------------------------------------ */}
+              {/* VISUALIZACIÓN DEL QR CUANDO SE SELECCIONA PAGO MEDIANTE QR (MÓDULO 2) */}
+              {/* ------------------------------------------------------------------ */}
+              {paymentMethod === 'qr' && effectivePaymentSettings.qrImageUrl && (
+                <div className="p-4 sm:p-5 rounded-2xl bg-stone-50 dark:bg-stone-950/80 border border-stone-200/90 dark:border-stone-800 space-y-4 animate-in fade-in duration-200">
+                  {/* Encabezado: Título y descripción exactos */}
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <div className="w-7 h-7 rounded-xl bg-indigo-50 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+                        <QrCode className="w-4 h-4" />
+                      </div>
+                      <h5 className="text-sm font-bold text-stone-900 dark:text-white">
+                        Paga mediante QR
+                      </h5>
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-950/60 dark:text-indigo-300 dark:border-indigo-800">
+                        {store.name}
+                      </span>
+                    </div>
+                    <p className="text-xs text-stone-600 dark:text-stone-400 leading-relaxed">
+                      Escanea el código QR de este comercio para realizar tu pago.
+                    </p>
+                  </div>
+
+                  {/* Contenedor del código QR: Siempre fondo blanco interior para máximo contraste y legibilidad óptica al escanear */}
+                  <div className="flex flex-col items-center justify-center p-4 bg-white rounded-2xl border border-stone-200 dark:border-stone-700 shadow-sm max-w-[280px] sm:max-w-[300px] mx-auto">
+                    <img
+                      src={effectivePaymentSettings.qrImageUrl}
+                      alt={`Código QR de cobro de ${store.name}`}
+                      className="w-48 h-48 sm:w-56 sm:h-56 object-contain block select-none"
+                      loading="eager"
+                    />
+                    <div className="mt-2.5 text-center">
+                      <span className="text-[11px] font-bold text-stone-800 block">
+                        {store.name}
+                      </span>
+                      <span className="text-[10px] font-mono text-stone-500 block">
+                        Total a pagar: Bs {finalTotal.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Instrucción obligatoria sobre el comprobante de pago */}
+                  <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200/90 dark:border-amber-800/60 text-stone-800 dark:text-stone-200 space-y-2">
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                      <div className="space-y-1 text-xs">
+                        <p className="font-bold text-stone-900 dark:text-amber-200">
+                          «Después de realizar tu pago, envía el comprobante por WhatsApp junto con tu pedido».
+                        </p>
+                        <div className="text-[11px] text-stone-600 dark:text-stone-400 space-y-0.5 leading-relaxed pt-1">
+                          <p className="flex items-center gap-1.5">
+                            <span className="w-4 h-4 rounded-full bg-amber-200/80 dark:bg-amber-900/60 text-amber-900 dark:text-amber-200 font-bold text-[10px] flex items-center justify-center shrink-0">1</span>
+                            <span>Primero realiza el pago escaneando este código QR desde tu app bancaria.</span>
+                          </p>
+                          <p className="flex items-center gap-1.5">
+                            <span className="w-4 h-4 rounded-full bg-amber-200/80 dark:bg-amber-900/60 text-amber-900 dark:text-amber-200 font-bold text-[10px] flex items-center justify-center shrink-0">2</span>
+                            <span>Confirma tu pedido para continuar hacia la conversación de WhatsApp con el comercio.</span>
+                          </p>
+                          <p className="flex items-center gap-1.5">
+                            <span className="w-4 h-4 rounded-full bg-amber-200/80 dark:bg-amber-900/60 text-amber-900 dark:text-amber-200 font-bold text-[10px] flex items-center justify-center shrink-0">3</span>
+                            <span>Adjunta manualmente la captura o fotografía de tu comprobante en el chat.</span>
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
 

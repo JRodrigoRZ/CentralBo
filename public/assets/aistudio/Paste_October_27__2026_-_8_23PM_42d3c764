@@ -1,0 +1,1102 @@
+# MAXINEGO.APP — TIENDAS PÚBLICAS 2.0
+## MÓDULO 6 DE 6: SELECCIÓN DE MODELOS ESPECIALES DE TIENDA
+
+### 1. CONTEXTO GENERAL
+
+MAXINEGO.app es una aplicación existente y funcional desarrollada en Google AI Studio.
+
+Estamos desarrollando la fase aprobada:
+
+"Tiendas Públicas 2.0"
+
+Esta fase consta exactamente de seis módulos:
+
+1. Rediseño visual de tiendas públicas.
+2. Banners comerciales.
+3. Galería de productos.
+4. Estados multimedia.
+5. Ubicación del comercio.
+6. Selección de modelos de tienda.
+
+LOS MÓDULOS 1 AL 5 YA FUERON IMPLEMENTADOS Y APROBADOS.
+
+Ahora debes desarrollar ÚNICAMENTE el Módulo 6.
+
+IMPORTANTE:
+
+El diseño actual aprobado de las tiendas públicas quedó definido como el diseño oficial FREE.
+
+No reemplazarlo.
+
+No reconstruirlo.
+
+No modificar su composición.
+
+Las nuevas plantillas serán diseños adicionales para los planes de pago.
+
+Si se adjuntan capturas de las tiendas actuales de SushiBill y Tienda Gloria, utilízalas como referencia visual obligatoria de la experiencia FREE que debe permanecer intacta.
+
+Las referencias visuales de modelos especiales son guías de composición y estilo, no instrucciones para copiar marcas, fotografías o elementos ajenos.
+
+---
+
+### 2. OBJETIVO ÚNICO
+
+Quiero implementar un sistema sencillo de selección de modelos visuales para las tiendas públicas de MAXINEGO.
+
+El comerciante debe poder elegir un diseño preparado para su rubro y utilizarlo en su tienda pública.
+
+Los nuevos modelos deben aprovechar automáticamente los datos reales que el comercio ya tiene registrados:
+
+- Nombre e identidad del negocio.
+- Logotipo.
+- Colores comerciales.
+- Productos y servicios.
+- Fotografías existentes.
+- Categorías.
+- Información comercial.
+- Horarios.
+- Medios de contacto.
+- Banners, cuando el plan los permita.
+- Galerías de productos, cuando el plan las permita.
+- Estados multimedia, cuando el plan los permita.
+- Ubicación del comercio, cuando exista.
+
+No exigir que el comerciante vuelva a registrar toda su información al cambiar de modelo.
+
+No generar datos ficticios.
+
+No construir tiendas independientes desde cero.
+
+No desarrollar un editor avanzado de páginas.
+
+El objetivo es seleccionar un diseño y aplicarlo a la tienda existente.
+
+---
+
+### 3. REGLA COMERCIAL OFICIAL
+
+PLAN FREE:
+
+- Utiliza exclusivamente el diseño estándar actual aprobado.
+- No puede seleccionar modelos especiales.
+- Conserva toda su experiencia visual y funcional existente.
+- El diseño FREE no debe degradarse para destacar los planes de pago.
+
+PLAN BASIC:
+
+- Puede seleccionar dos modelos especiales correspondientes a su rubro.
+- No puede seleccionar los dos modelos adicionales exclusivos de PRO.
+- Conserva todos los beneficios previamente aprobados para BASIC.
+
+PLAN PRO:
+
+- Puede seleccionar cualquiera de los cuatro modelos especiales correspondientes a su rubro.
+- Incluye los dos modelos disponibles en BASIC.
+- Incluye los otros dos modelos especiales de PRO.
+- Conserva todos los beneficios previamente aprobados para PRO.
+
+No modificar los precios oficiales.
+
+No crear nuevos planes.
+
+No cambiar la lógica comercial de otras funcionalidades.
+
+---
+
+### 4. DISTRIBUCIÓN EXACTA DE LOS MODELOS APROBADOS
+
+ESTA DISTRIBUCIÓN ES DEFINITIVA Y OBLIGATORIA.
+
+#### GASTRONOMÍA
+
+BASIC:
+- G1 — Pedido Express.
+- G2 — Menú Visual.
+
+ADICIONALES DE PRO:
+- G3 — Café & Boutique.
+- G4 — Especialidades.
+
+PRO puede utilizar G1, G2, G3 y G4.
+
+#### MODA Y CALZADO
+
+BASIC:
+- M2 — Lookbook & Colecciones.
+- M4 — Catálogo de Calzado.
+
+ADICIONALES DE PRO:
+- M1 — Boutique Editorial.
+- M3 — Streetwear Urbano.
+
+PRO puede utilizar M1, M2, M3 y M4.
+
+#### SERVICIOS
+
+BASIC:
+- S1 — Profesional Minimalista.
+- S4 — Servicios Técnicos.
+
+ADICIONALES DE PRO:
+- S2 — Belleza Visual.
+- S3 — Barbería Premium.
+
+PRO puede utilizar S1, S2, S3 y S4.
+
+#### BILLAR
+
+BASIC:
+- B2 — Snooker Deportivo.
+- B3 — Club Competitivo.
+
+ADICIONALES DE PRO:
+- B1 — Club Premium.
+- B4 — Neon Gaming.
+
+PRO puede utilizar B1, B2, B3 y B4.
+
+#### COMERCIO GENERAL
+
+BASIC:
+- C1 — Minimarket Visual.
+- C3 — Catálogo Multicategoría.
+
+ADICIONALES DE PRO:
+- C2 — Electrónica Promocional.
+- C4 — Productos Boutique.
+
+PRO puede utilizar C1, C2, C3 y C4.
+
+No intercambiar modelos entre rubros.
+
+No cambiar sus nombres.
+
+No cambiar sus identificadores.
+
+No añadir modelos nuevos.
+
+---
+
+### 5. DIFERENCIAS VISUALES REALES ENTRE MODELOS
+
+ESTA ES LA REGLA DE DISEÑO MÁS IMPORTANTE.
+
+No quiero 20 tiendas iguales con distintos colores.
+
+Cada modelo debe tener una composición visual reconocible y diferenciada.
+
+Las diferencias deben reflejarse en:
+
+- Distribución del contenido.
+- Proporciones visuales.
+- Jerarquía de fotografías.
+- Composición de encabezados.
+- Presentación de productos o servicios.
+- Organización de secciones.
+- Espaciado.
+- Tipografía.
+- Tratamiento visual de tarjetas.
+- Estilo general.
+
+Los modelos deben continuar utilizando las mismas funcionalidades existentes.
+
+No crear una funcionalidad de negocio diferente para cada diseño.
+
+Un modelo es una forma diferente de PRESENTAR la tienda, no un sistema comercial nuevo.
+
+---
+
+### 6. LOS CUATRO MODELOS DE GASTRONOMÍA
+
+#### G1 — PEDIDO EXPRESS
+Disponible en BASIC y PRO.
+
+Diseño visual orientado a negocios donde el cliente necesita encontrar productos rápidamente.
+
+Características visuales:
+
+- Portada superior compacta.
+- Identidad del comercio inmediatamente visible.
+- Categorías con gran protagonismo.
+- Catálogo accesible desde la zona inicial.
+- Tarjetas de productos compactas y claras.
+- Fotografía, nombre, precio y acción comercial muy fáciles de identificar.
+- Poca decoración innecesaria.
+- Navegación visual rápida.
+
+Apariencia moderna, dinámica y directa.
+
+No modificar el funcionamiento de pedidos.
+
+#### G2 — MENÚ VISUAL
+Disponible en BASIC y PRO.
+
+Diseño centrado en fotografías de comida.
+
+Características visuales:
+
+- Presentación amplia de las fotografías.
+- Tarjetas de platos con mayor protagonismo de imagen.
+- Categorías horizontales bien definidas.
+- Distribución visual propia de un menú gastronómico moderno.
+- Títulos y precios claramente visibles.
+- Equilibrio entre fotografía y descripción.
+- Estética limpia y apetitosa.
+
+Ideal como estilo para negocios como SushiBill.
+
+No inventar productos ni imágenes.
+
+#### G3 — CAFÉ & BOUTIQUE
+Exclusivo de PRO.
+
+Diseño visual cálido y editorial.
+
+Características visuales:
+
+- Portada de estilo acogedor.
+- Tipografía más expresiva y elegante.
+- Composición con mayor espacio visual.
+- Fotografías protagonistas.
+- Secciones con aspecto artesanal.
+- Tarjetas refinadas y menos densas.
+- Experiencia visual tipo cafetería o pastelería boutique.
+
+Debe ser claramente distinto de Pedido Express y Menú Visual.
+
+#### G4 — ESPECIALIDADES
+Exclusivo de PRO.
+
+Diseño que destaca productos individuales y su presentación.
+
+Características visuales:
+
+- Portada elegante y comercial.
+- Productos destacados con imágenes grandes.
+- Mayor jerarquía de nombres y descripciones.
+- Distribución visual refinada.
+- Secciones que resaltan especialidades existentes.
+- Tarjetas de mayor presencia visual.
+- Sensación premium.
+
+No crear nuevos tipos de producto ni nuevas opciones gastronómicas.
+
+Utilizar únicamente la información disponible.
+
+---
+
+### 7. LOS CUATRO MODELOS DE MODA Y CALZADO
+
+#### M1 — BOUTIQUE EDITORIAL
+Exclusivo de PRO.
+
+- Composición visual inspirada en editoriales de moda.
+- Fotografías grandes.
+- Tipografía elegante.
+- Mayor presencia de espacios visuales.
+- Catálogo con presentación refinada.
+- Identidad de marca protagonista.
+- Estilo sofisticado y minimalista.
+
+#### M2 — LOOKBOOK & COLECCIONES
+Disponible en BASIC y PRO.
+
+- Composición visual orientada a colecciones existentes.
+- Imágenes de productos protagonistas.
+- Catálogo organizado de forma atractiva.
+- Categorías visualmente diferenciadas.
+- Buena relación entre imagen, título y precio.
+- Presentación moderna propia de tiendas de ropa.
+
+No crear colecciones nuevas si el comercio no tiene datos que las representen.
+
+#### M3 — STREETWEAR URBANO
+Exclusivo de PRO.
+
+- Tipografía fuerte y expresiva.
+- Composición dinámica.
+- Contrastes visuales marcados.
+- Fotografías de alto impacto.
+- Tarjetas modernas de estilo urbano.
+- Jerarquía más atrevida.
+- Apariencia juvenil y comercial.
+
+Mantener la legibilidad en ambos temas.
+
+#### M4 — CATÁLOGO DE CALZADO
+Disponible en BASIC y PRO.
+
+- Mayor protagonismo de las cuadrículas de productos.
+- Fotografías amplias y bien proporcionadas.
+- Categorías claras.
+- Tarjetas que faciliten comparar artículos.
+- Nombres y precios visibles.
+- Diseño comercial limpio y funcional.
+
+No crear filtros o variantes que no existan actualmente.
+
+---
+
+### 8. LOS CUATRO MODELOS DE SERVICIOS
+
+#### S1 — PROFESIONAL MINIMALISTA
+Disponible en BASIC y PRO.
+
+- Identidad del profesional o negocio protagonista.
+- Presentación limpia y directa.
+- Servicios claramente organizados.
+- Tipografía sobria.
+- Espaciado profesional.
+- Contactos visibles.
+- Catálogo de servicios fácil de comprender.
+
+No crear sistemas nuevos de reservas.
+
+#### S2 — BELLEZA VISUAL
+Exclusivo de PRO.
+
+- Fotografías protagonistas.
+- Composición elegante.
+- Tarjetas visuales para servicios existentes.
+- Jerarquía refinada.
+- Colores y superficies delicadas.
+- Sensación de estudio de belleza o estética premium.
+
+No añadir herramientas de citas ni funciones nuevas.
+
+#### S3 — BARBERÍA PREMIUM
+Exclusivo de PRO.
+
+- Estética de alto contraste.
+- Fotografía comercial impactante.
+- Tipografía fuerte.
+- Bloques visuales con carácter.
+- Diseño sofisticado.
+- Mayor protagonismo de los servicios existentes.
+
+Mantener compatibilidad con modo claro y oscuro.
+
+#### S4 — SERVICIOS TÉCNICOS
+Disponible en BASIC y PRO.
+
+- Composición comercial práctica.
+- Lista de servicios muy legible.
+- Información del comercio destacada.
+- Fotografías de trabajos cuando existan.
+- Organización visual funcional.
+- Acceso claro a contacto.
+- Apariencia profesional y confiable.
+
+No agregar cotizadores ni formularios nuevos.
+
+---
+
+### 9. LOS CUATRO MODELOS DE BILLAR
+
+IMPORTANTE:
+
+El rubro Billar ya fue aprobado como concepto visual de tienda.
+
+No desarrollar reservas de mesas, torneos, campeonatos ni sistemas especializados que todavía no estén implementados.
+
+Estos modelos deben ser únicamente variaciones visuales de la tienda pública.
+
+#### B1 — CLUB PREMIUM
+Exclusivo de PRO.
+
+- Composición elegante.
+- Estética oscura y sofisticada cuando corresponda.
+- Acentos visuales refinados.
+- Fotografías panorámicas existentes.
+- Identidad del establecimiento protagonista.
+- Presentación premium de sus productos o servicios.
+
+#### B2 — SNOOKER DEPORTIVO
+Disponible en BASIC y PRO.
+
+- Estilo deportivo.
+- Acentos inspirados en el verde del billar, respetando la identidad elegida por el comercio.
+- Composición clara.
+- Información comercial fácil de consultar.
+- Catálogo organizado.
+- Fotografías con buen protagonismo.
+
+#### B3 — CLUB COMPETITIVO
+Disponible en BASIC y PRO.
+
+- Composición dinámica.
+- Tipografía con mayor carácter.
+- Fotografías protagonistas.
+- Contraste deportivo.
+- Tarjetas comerciales contundentes.
+- Apariencia de club moderno.
+
+No implementar torneos, rankings ni resultados deportivos.
+
+#### B4 — NEON GAMING
+Exclusivo de PRO.
+
+- Apariencia juvenil.
+- Acentos luminosos controlados.
+- Composición visual más atrevida.
+- Contraste y profundidad.
+- Tarjetas modernas.
+- Movimiento decorativo sutil.
+- Identidad de entretenimiento.
+
+No utilizar efectos que dificulten la lectura.
+
+---
+
+### 10. LOS CUATRO MODELOS DE COMERCIO GENERAL
+
+#### C1 — MINIMARKET VISUAL
+Disponible en BASIC y PRO.
+
+- Diseño fresco.
+- Categorías bien visibles.
+- Catálogo de exploración rápida.
+- Tarjetas compactas.
+- Fotografías claras.
+- Precios protagonistas.
+- Presentación comercial accesible.
+
+#### C2 — ELECTRÓNICA PROMOCIONAL
+Exclusivo de PRO.
+
+- Composición comercial de mayor impacto.
+- Banners existentes con protagonismo.
+- Productos destacados.
+- Tipografía moderna.
+- Contrastes en precios y promociones reales.
+- Presentación orientada a tecnología.
+
+No generar descuentos ficticios ni promociones automáticas.
+
+#### C3 — CATÁLOGO MULTICATEGORÍA
+Disponible en BASIC y PRO.
+
+- Diseño orientado a comercios con muchos artículos.
+- Categorías bien organizadas.
+- Catálogo con mayor densidad visual.
+- Tarjetas claras y uniformes.
+- Navegación fácil.
+- Productos organizados.
+- Excelente experiencia de exploración.
+
+#### C4 — PRODUCTOS BOUTIQUE
+Exclusivo de PRO.
+
+- Diseño visual refinado.
+- Espacios elegantes.
+- Fotografías protagonistas.
+- Tarjetas con mayor separación.
+- Tipografía delicada.
+- Identidad comercial sofisticada.
+- Presentación de catálogo menos densa.
+
+---
+
+### 11. SELECCIÓN DE MODELO DESDE EL PANEL
+
+Incorporar la selección de diseños dentro del apartado existente:
+
+MI TIENDA → APARIENCIA.
+
+No crear una nueva página administrativa independiente.
+
+Agregar una sección identificada como:
+
+"Modelo de mi tienda"
+
+Descripción sugerida:
+
+"Elige cómo quieres que se vea tu tienda digital."
+
+La experiencia de selección debe ser muy sencilla.
+
+El comerciante debe poder:
+
+1. Identificar el modelo que utiliza actualmente.
+2. Ver los diseños disponibles para su rubro y su plan.
+3. Reconocer cada modelo por su nombre y vista previa.
+4. Previsualizar un diseño antes de aplicarlo.
+5. Seleccionar el modelo deseado.
+6. Confirmar su elección.
+7. Ver el resultado en su tienda pública.
+
+No exigir configuración manual compleja.
+
+No permitir que una previsualización sustituya permanentemente el diseño hasta que el comerciante confirme.
+
+No crear un constructor visual de páginas.
+
+---
+
+### 12. VISTAS PREVIAS DE LOS MODELOS
+
+La selección debe sentirse como una galería profesional de diseños.
+
+Cada opción debe mostrar:
+
+- Nombre del modelo.
+- Imagen o representación visual clara de su composición.
+- Una indicación del modelo actualmente seleccionado.
+- Una acción de previsualización.
+- Una acción de selección cuando esté permitido por el plan.
+
+Las vistas previas deben mostrar diferencias reales entre diseños.
+
+No utilizar la misma captura para las cuatro opciones cambiando únicamente el color.
+
+La vista previa debe corresponder al modelo que se aplicará.
+
+No utilizar fotografías de otros comercios como si fueran propias del usuario.
+
+Si necesitas representar un diseño sin fotografías reales, utiliza una vista demostrativa claramente diferenciada de la información comercial auténtica.
+
+No publicar contenido ficticio en la tienda real.
+
+---
+
+### 13. RUBRO DEL COMERCIO
+
+La selección debe respetar el rubro que el comercio ya tiene registrado en MAXINEGO.
+
+RUBROS APROBADOS:
+
+- Gastronomía.
+- Moda y calzado.
+- Servicios.
+- Billar.
+- Comercio general.
+
+No crear rubros adicionales.
+
+No cambiar automáticamente la categoría comercial del establecimiento.
+
+No ofrecer modelos de un rubro distinto como si pertenecieran al rubro seleccionado.
+
+Si algún comercio no tiene un rubro reconocido entre los aprobados, conservar su diseño actual sin asignar arbitrariamente una plantilla especial.
+
+No modificar los datos del perfil por iniciativa propia.
+
+---
+
+### 14. COMPORTAMIENTO DEL PLAN FREE
+
+ESTE ES EL REQUISITO MÁS IMPORTANTE DEL MÓDULO.
+
+El diseño FREE debe continuar siendo exactamente el diseño aprobado en el Módulo 1.
+
+No cambiar:
+
+- Encabezado.
+- Logotipo.
+- Nombre comercial.
+- Identidad visual.
+- Información del negocio.
+- Buscador.
+- Categorías.
+- Catálogo.
+- Tarjetas de productos.
+- Accesos de contacto.
+- Carrito.
+- Checkout.
+- WhatsApp.
+- Pago mediante QR.
+- Agente Max.
+- Google Maps.
+- Pie de página.
+
+No aplicar automáticamente un diseño especial a FREE.
+
+No introducir una versión FREE más simple o degradada.
+
+El comercio FREE debe conservar su experiencia aprobada.
+
+---
+
+### 15. COMPORTAMIENTO DE BASIC
+
+Cuando un comercio utiliza BASIC:
+
+- Puede acceder exclusivamente a los dos modelos BASIC aprobados para su rubro.
+- No puede aplicar modelos exclusivos de PRO.
+- Debe poder previsualizar y elegir sus modelos autorizados.
+- Debe conservar sus banners.
+- Debe conservar sus galerías de hasta tres fotografías por producto.
+- Debe conservar Google Maps.
+- No debe adquirir estados multimedia, porque son exclusivos de PRO.
+
+No introducir ninguna otra diferencia comercial.
+
+---
+
+### 16. COMPORTAMIENTO DE PRO
+
+Cuando un comercio utiliza PRO:
+
+- Puede acceder a los cuatro modelos de su rubro.
+- Puede seleccionar cualquiera de ellos.
+- Conserva banners comerciales.
+- Conserva galerías de hasta tres fotografías.
+- Conserva estados multimedia.
+- Conserva Google Maps.
+- Conserva las funciones actuales de su tienda y de Agente Max.
+
+No crear opciones adicionales de personalización que no formen parte de este módulo.
+
+No transformar PRO en un editor libre de páginas.
+
+Las opciones de personalización ya existentes deben continuar funcionando.
+
+---
+
+### 17. APLICACIÓN DEL DISEÑO
+
+Cuando el comerciante confirme una selección válida:
+
+La tienda pública debe adoptar el modelo seleccionado.
+
+El diseño debe reutilizar automáticamente:
+
+- Su información comercial.
+- Sus colores existentes.
+- Su logotipo.
+- Su catálogo.
+- Sus imágenes.
+- Sus categorías.
+- Sus horarios.
+- Sus datos de contacto.
+- Su configuración de pagos.
+- Los componentes comerciales que ya funcionan.
+
+No exigir una carga nueva de productos.
+
+No borrar configuraciones.
+
+No eliminar información.
+
+No duplicar la tienda.
+
+No crear una segunda dirección pública del comercio.
+
+No cambiar sus enlaces actuales.
+
+El nuevo modelo es una forma distinta de presentar la misma tienda.
+
+---
+
+### 18. COMERCIOS QUE TODAVÍA NO ELIGIERON MODELO
+
+No sustituir automáticamente el diseño de una tienda BASIC o PRO que todavía no haya seleccionado un modelo especial.
+
+Conservar su presentación actual hasta que el comerciante realice una elección.
+
+Esto evita cambios inesperados en establecimientos existentes.
+
+No modificar automáticamente a SushiBill, Tienda Gloria u otros comercios sin confirmación de sus propietarios.
+
+---
+
+### 19. CAMBIOS DE PLAN
+
+La disponibilidad de diseños debe respetar el plan vigente.
+
+Si un comercio pasa de PRO a BASIC y tenía seleccionado un modelo exclusivo de PRO:
+
+- No continuar mostrando un modelo que su plan ya no permite.
+- Conservar la selección anterior como referencia, sin borrar información.
+- Utilizar temporalmente el diseño estándar aprobado hasta que el comerciante seleccione uno de sus modelos BASIC.
+
+Si un comercio pasa a FREE:
+
+- Mostrar el diseño estándar oficial FREE.
+- No mostrar diseños exclusivos de pago.
+- Conservar los datos comerciales y las preferencias anteriores sin eliminarlos automáticamente.
+
+Si posteriormente vuelve a un plan que permite el diseño anteriormente seleccionado, debe poder utilizarlo nuevamente.
+
+No implementar procesos nuevos de contratación o cobro.
+
+No modificar las suscripciones actuales.
+
+---
+
+### 20. BANNERS DEL MÓDULO 2
+
+La selección de modelo debe respetar los banners existentes.
+
+BASIC y PRO pueden mostrar banners registrados.
+
+Cada modelo puede integrarlos de manera visualmente diferente, según su composición.
+
+No modificar:
+
+- Su administración.
+- Sus imágenes.
+- Sus permisos.
+- Su contenido.
+- Su funcionamiento de navegación.
+
+Si una tienda no tiene banners, el modelo debe funcionar sin espacios vacíos ni imágenes inventadas.
+
+---
+
+### 21. GALERÍAS DEL MÓDULO 3
+
+La galería de hasta tres fotografías por producto debe continuar funcionando en BASIC y PRO.
+
+Cada modelo puede presentar las tarjetas de catálogo con un estilo visual distinto.
+
+Sin embargo:
+
+- La fotografía principal debe continuar visible.
+- Las fotografías adicionales deben seguir disponibles en la experiencia existente de consulta del producto.
+- No modificar el contenido de la galería.
+- No perder fotografías.
+- No alterar el proceso de compra.
+
+FREE conserva una sola fotografía por producto.
+
+---
+
+### 22. ESTADOS DEL MÓDULO 4
+
+Los estados multimedia son exclusivos de PRO.
+
+Los modelos PRO deben permitir su presentación cuando el comercio tenga estados publicados.
+
+No modificar:
+
+- Registro de estados.
+- Fotografías.
+- Videos.
+- Reproductor.
+- Controles.
+- Permisos.
+- Funcionamiento.
+
+Los modelos disponibles para BASIC no deben mostrar estados multimedia.
+
+No crear espacios vacíos cuando no existan estados.
+
+---
+
+### 23. GOOGLE MAPS DEL MÓDULO 5
+
+Google Maps está disponible en FREE, BASIC y PRO.
+
+Todos los modelos deben conservar la posibilidad de visualizar la ubicación confirmada del comercio.
+
+Puede variar la ubicación visual de la sección dentro de cada diseño, pero no su comportamiento ni la exactitud del mapa.
+
+No modificar:
+
+- Ubicación registrada.
+- Dirección escrita.
+- Configuración del comerciante.
+- Acción de abrir Google Maps.
+
+Si el comercio no tiene ubicación, no mostrar mapas ficticios ni contenedores vacíos.
+
+---
+
+### 24. CARRITO, CHECKOUT, QR Y WHATSAPP
+
+ESTOS ELEMENTOS SON FUNCIONALIDADES PROTEGIDAS.
+
+Todos los modelos visuales deben conservar exactamente el comportamiento comercial existente.
+
+No modificar:
+
+- Selección de productos.
+- Variantes.
+- Cantidades.
+- Carrito.
+- Cálculos de precios.
+- Descuentos.
+- Cupones.
+- Costos de envío.
+- Datos del pedido.
+- Checkout.
+- Métodos de pago.
+- Código QR de cobro del comercio.
+- Instrucciones de comprobante.
+- Mensaje preparado de WhatsApp.
+- Número de WhatsApp del comercio.
+
+No cambiar la experiencia funcional de compra por seleccionar un diseño.
+
+No crear un checkout diferente para cada modelo.
+
+---
+
+### 25. AGENTE MAX
+
+Agente Max ya atiende a los visitantes de las tiendas públicas.
+
+Debe continuar funcionando en todos los modelos según sus condiciones actuales.
+
+Conservar:
+
+- Asistencia sobre productos.
+- Información de precios.
+- Promociones.
+- Horarios.
+- Métodos de envío.
+- Asistencia para pago mediante QR.
+- Orientación hacia el pedido por WhatsApp.
+
+No modificar su comportamiento.
+
+No crear un asistente diferente para cada modelo.
+
+No bloquearlo detrás de elementos visuales nuevos.
+
+Mantener visible y accesible el widget dentro de cada composición.
+
+---
+
+### 26. MODO CLARO Y MODO OSCURO
+
+Todos los modelos especiales deben funcionar correctamente en ambos temas.
+
+MODO CLARO:
+
+- Colores legibles.
+- Tipografía contrastada.
+- Tarjetas bien diferenciadas.
+- Fondos coherentes.
+- Identidad comercial respetada.
+
+MODO OSCURO:
+
+- Profundidad visual.
+- Buen contraste.
+- Imágenes correctamente visibles.
+- Acentos del comercio.
+- Superficies profesionales.
+
+Una plantilla con personalidad oscura no debe resultar ilegible en modo claro.
+
+Una plantilla luminosa debe conservar una presentación cuidada en modo oscuro.
+
+No modificar el selector de tema.
+
+---
+
+### 27. RESPONSIVE
+
+Todos los modelos deben funcionar correctamente en:
+
+- Celular.
+- Tablet.
+- Computadora.
+
+PRIORIDAD MÁXIMA: CELULAR.
+
+Cada modelo debe conservar su personalidad visual al adaptarse a pantallas pequeñas.
+
+No limitarse a reducir una composición de escritorio.
+
+Comprobar:
+
+- Legibilidad.
+- Jerarquía.
+- Tarjetas.
+- Categorías.
+- Fotografías.
+- Acciones de compra.
+- Acceso al carrito.
+- Acceso a Agente Max.
+- Banners, si corresponden.
+- Estados, si corresponden.
+- Google Maps.
+- Ausencia de desbordamientos.
+
+No sacrificar funcionalidad por apariencia.
+
+---
+
+### 28. MOVIMIENTO VISUAL
+
+Quiero que los modelos especiales se sientan modernos, atractivos y premium.
+
+Aplicar movimiento visual sutil cuando corresponda:
+
+- Aparición suave de elementos.
+- Transiciones elegantes.
+- Microinteracciones.
+- Hover de tarjetas.
+- Cambio de estados visuales.
+- Sensación de profundidad.
+
+Cada modelo puede tener su propio carácter visual.
+
+Sin embargo, no quiero:
+
+- Animaciones agresivas.
+- Parpadeos.
+- Exceso de efectos.
+- Movimiento permanente innecesario.
+- Animaciones que dificulten comprar.
+
+Respetar las preferencias de movimiento reducido.
+
+No degradar el rendimiento móvil.
+
+---
+
+### 29. INDEPENDENCIA ENTRE COMERCIOS
+
+Cada tienda de MAXINEGO es independiente.
+
+Los modelos pueden compartir una composición visual, pero nunca los datos de otro comercio.
+
+Un comercio que seleccione un modelo debe conservar exclusivamente:
+
+- Su nombre.
+- Su logotipo.
+- Sus productos.
+- Sus fotografías.
+- Sus precios.
+- Sus promociones.
+- Su ubicación.
+- Su WhatsApp.
+- Su QR de cobro.
+- Sus configuraciones.
+
+No mezclar información de SushiBill con Tienda Gloria.
+
+No compartir pedidos ni datos comerciales.
+
+No modificar el modelo de otros establecimientos cuando uno seleccione una plantilla.
+
+---
+
+### 30. RESTRICCIONES ABSOLUTAS
+
+NO MODIFICAR:
+
+- El diseño estándar FREE.
+- Los precios oficiales de BASIC y PRO.
+- Las funcionalidades de banners.
+- Las galerías de productos.
+- Los estados multimedia.
+- Google Maps.
+- El catálogo.
+- El carrito.
+- Los pedidos.
+- Los pagos QR.
+- WhatsApp.
+- Agente Max.
+- Horarios.
+- Promociones.
+- Estadísticas.
+- Login.
+- Landing pública.
+- Funciones administrativas ajenas a Apariencia.
+
+NO IMPLEMENTAR:
+
+- Nuevos planes.
+- Nuevos módulos.
+- Nuevos rubros.
+- Reservas.
+- Torneos.
+- Herramientas de edición avanzada.
+- Nuevas funciones comerciales.
+- Automatizaciones de pago.
+- Sistemas de suscripción nuevos.
+
+No añadir funciones porque parezcan convenientes.
+
+Implementar exclusivamente la selección y presentación de los modelos visuales aprobados.
+
+---
+
+### 31. VALIDACIÓN OBLIGATORIA
+
+Antes de finalizar, comprobar:
+
+1. El diseño FREE sigue intacto.
+2. Los comercios FREE no pueden aplicar modelos especiales.
+3. BASIC puede seleccionar únicamente sus dos modelos aprobados por rubro.
+4. PRO puede seleccionar los cuatro modelos aprobados por rubro.
+5. Los 20 modelos existen y corresponden a sus nombres aprobados.
+6. Cada modelo tiene una composición visual diferenciada.
+7. Las diferencias no se limitan a cambios de color.
+8. El selector aparece en Mi Tienda → Apariencia.
+9. Las vistas previas representan correctamente cada modelo.
+10. La previsualización no cambia la tienda hasta confirmar.
+11. La selección confirmada se conserva al volver a entrar.
+12. La tienda pública muestra el modelo seleccionado.
+13. Los comercios existentes no cambian de diseño automáticamente.
+14. Los modelos solo muestran información real de su comercio.
+15. Los banners continúan funcionando.
+16. Las galerías de productos continúan funcionando.
+17. Los estados PRO continúan funcionando.
+18. Google Maps continúa funcionando en los tres planes.
+19. El carrito conserva su comportamiento.
+20. El checkout funciona.
+21. Los pagos QR funcionan.
+22. WhatsApp utiliza el número correcto del comercio.
+23. Agente Max continúa funcionando.
+24. Las tiendas mantienen sus URLs actuales.
+25. No existen datos mezclados entre comercios.
+26. Funciona en celular, tablet y escritorio.
+27. Funciona en modo claro y oscuro.
+28. Los cambios de plan respetan los modelos autorizados.
+29. No se modificó ninguna funcionalidad ajena a este módulo.
+30. No se introdujeron nuevas capacidades comerciales.
+
+---
+
+### 32. INFORME FINAL OBLIGATORIO
+
+Cuando termines, entrega un informe específico indicando:
+
+A. Los 20 modelos creados, agrupados por rubro.
+
+B. Los dos modelos disponibles para BASIC en cada rubro.
+
+C. Los cuatro modelos disponibles para PRO en cada rubro.
+
+D. Cómo se selecciona y previsualiza un modelo desde Apariencia.
+
+E. Cómo se aplica el diseño a la tienda pública existente.
+
+F. Cómo se conserva la plantilla FREE.
+
+G. Cómo funcionan las características ya existentes dentro de cada modelo.
+
+H. Qué comprobaciones se realizaron en celular, tablet y escritorio.
+
+I. Qué aspectos no pudieron verificarse, si los hubiera.
+
+No afirmar que un diseño fue implementado si solamente existe como nombre o vista previa.
+
+No declarar pruebas exitosas si no se ejecutaron.
+
+---
+
+### CRITERIO FINAL DE ACEPTACIÓN
+
+El Módulo 6 estará correctamente completado cuando MAXINEGO permita que cada comerciante seleccione y aplique una presentación visual apropiada para su rubro y su plan.
+
+FREE conserva exactamente el diseño actual aprobado.
+
+BASIC puede seleccionar dos modelos especiales por rubro.
+
+PRO puede seleccionar los cuatro modelos especiales por rubro.
+
+Los 20 modelos deben ser realmente distintos por su composición visual, no únicamente por sus colores.
+
+El comerciante debe poder transformar la apariencia de su tienda utilizando sus datos existentes, sin reconstruirla ni volver a configurar todas sus funciones.
+
+El carrito, los pagos mediante QR, WhatsApp, Agente Max y todos los módulos anteriores deben permanecer intactos.
+
+EJECUTA EXCLUSIVAMENTE EL MÓDULO 6 DE 6: SELECCIÓN DE MODELOS ESPECIALES DE TIENDA DE MAXINEGO.APP.

@@ -38,6 +38,10 @@ import {
   StoreType,
   StoreHighlightItem,
   StoreHighlightsLayout,
+  StoreBannerItem,
+  StoreStoryItem,
+  StoreLocationSettings,
+  Store,
 } from '../types';
 import { SUPERADMIN_STORES } from './superadminService';
 import { supabase } from './supabase';
@@ -45,13 +49,51 @@ import { supabase } from './supabase';
 // ----------------------------------------------------------------------------
 // ESTADO Y PLAN DEL COMERCIO
 // ----------------------------------------------------------------------------
-export function getStorePlan(tenantId: string): 'basic' | 'pro' {
+export function getStorePlan(tenantId: string): 'free' | 'basic' | 'pro' {
   const adminStore = SUPERADMIN_STORES.find((s) => s.id === tenantId);
-  if (adminStore) {
-    return adminStore.subscription.planId;
+  if (adminStore && adminStore.subscription?.planId) {
+    return adminStore.subscription.planId as 'free' | 'basic' | 'pro';
   }
-  // Por defecto, asignar basic si no está registrado en el superadmin
+  try {
+    const raw = localStorage.getItem(`maxinego_store_plan_${tenantId}`);
+    if (raw === 'free' || raw === 'basic' || raw === 'pro') {
+      return raw;
+    }
+  } catch {}
+  // Por defecto, tiendas registradas sin suscripción explícita operan en Basic
   return 'basic';
+}
+
+/**
+ * Determina si un comercio cuenta con un plan de pago (Basic o Pro) que
+ * habilita funcionalidades comerciales como los Banners de mi tienda.
+ */
+export function isStorePaidPlan(storeOrTenantId: Store | string | null | undefined): boolean {
+  if (!storeOrTenantId) return false;
+  const tenantId = typeof storeOrTenantId === 'string' ? storeOrTenantId : storeOrTenantId.id;
+  if (typeof storeOrTenantId !== 'string') {
+    const rawPlan = (storeOrTenantId as any).plan || (storeOrTenantId as any).subscription?.planId;
+    if (rawPlan === 'free') return false;
+    if (rawPlan === 'basic' || rawPlan === 'pro') return true;
+  }
+  const plan = getStorePlan(tenantId);
+  return plan === 'basic' || plan === 'pro';
+}
+
+/**
+ * Determina si un comercio cuenta con el Plan PRO exclusivamente,
+ * habilitando los Estados Multimedia de la tienda.
+ */
+export function isStoreProPlan(storeOrTenantId: Store | string | null | undefined): boolean {
+  if (!storeOrTenantId) return false;
+  const tenantId = typeof storeOrTenantId === 'string' ? storeOrTenantId : storeOrTenantId.id;
+  if (typeof storeOrTenantId !== 'string') {
+    const rawPlan = (storeOrTenantId as any).plan || (storeOrTenantId as any).subscription?.planId;
+    if (rawPlan === 'pro') return true;
+    if (rawPlan === 'free' || rawPlan === 'basic') return false;
+  }
+  const plan = getStorePlan(tenantId);
+  return plan === 'pro';
 }
 
 // ----------------------------------------------------------------------------
@@ -209,6 +251,24 @@ export function sanitizeProductItem(item: any, tenantId: string): Product | null
   if (typeof rawAttrs.size_guide === 'string') cleanAttrs.size_guide = rawAttrs.size_guide.slice(0, 500);
   if (typeof rawAttrs.exchange_policy === 'string') cleanAttrs.exchange_policy = rawAttrs.exchange_policy.slice(0, 500);
 
+  // 4.1 Galería de imágenes (Módulo 3: hasta 3 fotografías por producto para planes BASIC y PRO)
+  let productImages: string[] = [];
+  if (Array.isArray(item.images)) {
+    productImages = item.images.filter((img: unknown) => typeof img === 'string' && (img as string).trim()).slice(0, 3);
+  } else if (Array.isArray(rawAttrs.images)) {
+    productImages = rawAttrs.images.filter((img: unknown) => typeof img === 'string' && (img as string).trim()).slice(0, 3);
+  } else if (Array.isArray(rawAttrs.gallery_images)) {
+    productImages = rawAttrs.gallery_images.filter((img: unknown) => typeof img === 'string' && (img as string).trim()).slice(0, 3);
+  }
+
+  const primaryImage = typeof item.image_url === 'string' && item.image_url.trim() ? item.image_url.trim() : (productImages[0] || null);
+  if (primaryImage && !productImages.includes(primaryImage)) {
+    productImages = [primaryImage, ...productImages].slice(0, 3);
+  } else if (!primaryImage && productImages.length > 0) {
+    // La primera imagen se convierte en la principal
+  }
+  cleanAttrs.images = productImages;
+
   // 5. Servicios y Citas
   if (typeof rawAttrs.is_service === 'boolean') cleanAttrs.is_service = rawAttrs.is_service;
   if (
@@ -236,7 +296,8 @@ export function sanitizeProductItem(item: any, tenantId: string): Product | null
     description: typeof item.description === 'string' ? item.description.slice(0, 1000) : null,
     price: numPrice,
     is_available: item.is_available !== undefined ? Boolean(item.is_available) : true,
-    image_url: typeof item.image_url === 'string' && item.image_url.trim() ? item.image_url.trim() : null,
+    image_url: primaryImage,
+    images: productImages.length > 0 ? productImages : (primaryImage ? [primaryImage] : []),
     status: (item.status === 'inactivo' || item.status === 'borrador') ? item.status : 'activo',
     attributes: cleanAttrs,
     created_at: typeof item.created_at === 'string' ? item.created_at : new Date().toISOString(),
@@ -587,6 +648,9 @@ export async function fetchStoreProfile(tenantId: string): Promise<StoreProfileS
           youtube: rawProfile.socials?.youtube !== undefined ? String(rawProfile.socials.youtube) : (cachedProfile.socials?.youtube || ''),
           whatsapp: rawProfile.socials?.whatsapp !== undefined ? String(rawProfile.socials.whatsapp) : (cachedProfile.socials?.whatsapp || cachedProfile.whatsapp || ''),
         },
+        location: (rawProfile.location && typeof rawProfile.location === 'object' && rawProfile.location.isConfigured)
+          ? rawProfile.location
+          : cachedProfile.location,
       };
 
       saveToStorage(tenantId, 'profile', remoteProfile);
@@ -620,6 +684,74 @@ export async function fetchStoreProfile(tenantId: string): Promise<StoreProfileS
   }
 
   return cachedProfile;
+}
+
+/**
+ * Normaliza y construye la configuración de ubicación en Google Maps a partir de:
+ * - Coordenadas ("-16.5321, -68.0865")
+ * - Enlace directo de Google Maps (maps.google.com, goo.gl, maps.app.goo.gl)
+ * - Dirección física o punto de referencia ("Av. Ballivián #1234, Calacoto, La Paz")
+ * Genera la URL oficial externa y la URL segura de iframe embed.
+ */
+export function buildGoogleMapsLocation(
+  queryInput: string,
+  referenceNotes?: string
+): StoreLocationSettings | null {
+  if (!queryInput || !queryInput.trim()) return null;
+  const raw = queryInput.trim();
+
+  let cleanQuery = raw;
+  let lat: number | undefined = undefined;
+  let lng: number | undefined = undefined;
+
+  // 1. Detectar si son coordenadas puras: "-16.5321, -68.0865" o "-16.5321,-68.0865"
+  const coordsRegex = /^[-+]?([1-8]?\d(\.\d+)?|90(\.0+)?),\s*[-+]?(180(\.0+)?|((1[0-7]\d)|([1-9]?\d))(\.\d+)?)$/;
+  if (coordsRegex.test(raw)) {
+    const parts = raw.split(',').map((p) => p.trim());
+    lat = parseFloat(parts[0]);
+    lng = parseFloat(parts[1]);
+    cleanQuery = `${lat},${lng}`;
+  } else if (raw.includes('@') && raw.includes(',')) {
+    // 2. Extraer de URL tipo google.com/maps/@-16.5321,-68.0865,17z
+    const match = raw.match(/@([-+]?\d+\.\d+),([-+]?\d+\.\d+)/);
+    if (match) {
+      lat = parseFloat(match[1]);
+      lng = parseFloat(match[2]);
+      cleanQuery = `${lat},${lng}`;
+    }
+  } else if (raw.includes('q=') || raw.includes('query=')) {
+    // 3. Extraer de URL tipo google.com/maps?q=...
+    try {
+      const parsedUrl = new URL(raw);
+      const q = parsedUrl.searchParams.get('q') || parsedUrl.searchParams.get('query');
+      if (q) {
+        cleanQuery = q;
+        const subMatch = q.match(/^[-+]?([1-8]?\d(\.\d+)?|90(\.0+)?),\s*[-+]?(180(\.0+)?|((1[0-7]\d)|([1-9]?\d))(\.\d+)?)$/);
+        if (subMatch) {
+          const parts = q.split(',').map((p) => p.trim());
+          lat = parseFloat(parts[0]);
+          lng = parseFloat(parts[1]);
+        }
+      }
+    } catch {}
+  }
+
+  // URL canónica externa para abrir en Google Maps
+  const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(cleanQuery)}`;
+  // URL de iframe seguro para embed visual con zoom 16
+  const embedUrl = `https://maps.google.com/maps?q=${encodeURIComponent(cleanQuery)}&z=16&output=embed`;
+
+  return {
+    isConfigured: true,
+    query: cleanQuery,
+    latitude: lat,
+    longitude: lng,
+    displayAddress: cleanQuery,
+    referenceNotes: referenceNotes?.trim() || undefined,
+    mapsUrl,
+    embedUrl,
+    confirmedAt: new Date().toISOString(),
+  };
 }
 
 /**
@@ -658,6 +790,7 @@ export async function saveStoreProfile(
       youtube: settings.socials?.youtube || '',
       whatsapp: settings.socials?.whatsapp || settings.whatsapp || '',
     },
+    location: settings.location || undefined,
   };
 
   const now = new Date().toISOString();
@@ -867,6 +1000,233 @@ export async function uploadStoreLogo(
 }
 
 // ----------------------------------------------------------------------------
+// 2.1B GESTIÓN DE ALMACENAMIENTO DE BANNERS (Módulo 2: Banners de mi tienda)
+// ----------------------------------------------------------------------------
+
+export const ALLOWED_BANNER_MIME_TYPES = [
+  'image/png',
+  'image/jpeg',
+  'image/jpg',
+  'image/webp',
+];
+
+export const MAX_BANNER_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
+
+export async function uploadStoreBanner(
+  tenantId: string,
+  file: File
+): Promise<{ success: boolean; publicUrl?: string; error?: string }> {
+  if (!tenantId || typeof tenantId !== 'string' || !isValidTenantId(tenantId)) {
+    return { success: false, error: 'Identificador de comercio (tenantId) no válido.' };
+  }
+
+  if (!file) {
+    return { success: false, error: 'No se ha seleccionado ningún archivo de imagen.' };
+  }
+
+  if (file.size > MAX_BANNER_SIZE_BYTES) {
+    return {
+      success: false,
+      error: 'La imagen del banner supera el tamaño máximo permitido de 5 MB.',
+    };
+  }
+
+  const normalizedType = file.type?.toLowerCase() || '';
+  if (!ALLOWED_BANNER_MIME_TYPES.includes(normalizedType)) {
+    return {
+      success: false,
+      error: 'Formato no permitido. Solo se aceptan imágenes en formato PNG, JPEG o WEBP.',
+    };
+  }
+
+  let ext = 'jpg';
+  if (normalizedType === 'image/png') ext = 'png';
+  else if (normalizedType === 'image/webp') ext = 'webp';
+
+  const cleanTenantId = tenantId.trim();
+  const bannerId = `banner-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+  const targetFileName = `${bannerId}.${ext}`;
+  const targetPath = `${cleanTenantId}/banners/${targetFileName}`;
+
+  const readAsDataUrl = (): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(new Error('No se pudo procesar la imagen del banner.'));
+      reader.readAsDataURL(file);
+    });
+
+  try {
+    const { error: uploadError } = await supabase.storage
+      .from('store-logos')
+      .upload(targetPath, file, {
+        contentType: normalizedType,
+        cacheControl: '3600',
+        upsert: true,
+      });
+
+    if (!uploadError) {
+      const { data: urlData } = supabase.storage
+        .from('store-logos')
+        .getPublicUrl(targetPath);
+
+      if (urlData?.publicUrl) {
+        return {
+          success: true,
+          publicUrl: urlData.publicUrl,
+        };
+      }
+    }
+
+    // Fallback con Data URL si Storage no responde o el bucket tiene restricciones
+    const fallbackUrl = await readAsDataUrl();
+    return {
+      success: true,
+      publicUrl: fallbackUrl,
+    };
+  } catch (err: any) {
+    try {
+      const fallbackUrl = await readAsDataUrl();
+      return {
+        success: true,
+        publicUrl: fallbackUrl,
+      };
+    } catch {
+      return {
+        success: false,
+        error: err?.message || 'Error al procesar la imagen del banner.',
+      };
+    }
+  }
+}
+
+// ----------------------------------------------------------------------------
+// 2.1C GESTIÓN DE ALMACENAMIENTO DE ESTADOS MULTIMEDIA (Módulo 4: Estados PRO)
+// ----------------------------------------------------------------------------
+
+export const ALLOWED_STORY_IMAGE_MIME_TYPES = [
+  'image/png',
+  'image/jpeg',
+  'image/jpg',
+  'image/webp',
+];
+
+export const ALLOWED_STORY_VIDEO_MIME_TYPES = [
+  'video/mp4',
+  'video/webm',
+  'video/quicktime',
+];
+
+export const MAX_STORY_IMAGE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
+export const MAX_STORY_VIDEO_SIZE_BYTES = 40 * 1024 * 1024; // 40 MB
+
+export interface UploadStoryMediaResult {
+  success: boolean;
+  publicUrl?: string;
+  mediaType?: 'image' | 'video';
+  error?: string;
+}
+
+export async function uploadStoreStoryMedia(
+  tenantId: string,
+  file: File
+): Promise<UploadStoryMediaResult> {
+  if (!tenantId || typeof tenantId !== 'string' || !isValidTenantId(tenantId)) {
+    return { success: false, error: 'Identificador de comercio (tenantId) no válido.' };
+  }
+
+  if (!file) {
+    return { success: false, error: 'No se ha seleccionado ningún archivo multimedia.' };
+  }
+
+  const normalizedType = file.type?.toLowerCase() || '';
+  const isImage = ALLOWED_STORY_IMAGE_MIME_TYPES.includes(normalizedType) || normalizedType.startsWith('image/');
+  const isVideo = ALLOWED_STORY_VIDEO_MIME_TYPES.includes(normalizedType) || normalizedType.startsWith('video/');
+
+  if (!isImage && !isVideo) {
+    return {
+      success: false,
+      error: 'Formato no permitido. Solo se aceptan fotografías (PNG, JPG, WEBP) o videos cortos (MP4, WEBM, MOV).',
+    };
+  }
+
+  const maxSize = isVideo ? MAX_STORY_VIDEO_SIZE_BYTES : MAX_STORY_IMAGE_SIZE_BYTES;
+  if (file.size > maxSize) {
+    return {
+      success: false,
+      error: isVideo
+        ? 'El video supera el tamaño máximo permitido de 40 MB.'
+        : 'La fotografía supera el tamaño máximo permitido de 10 MB.',
+    };
+  }
+
+  const mediaType: 'image' | 'video' = isVideo ? 'video' : 'image';
+  let ext = isVideo ? 'mp4' : 'jpg';
+  if (normalizedType === 'image/png') ext = 'png';
+  else if (normalizedType === 'image/webp') ext = 'webp';
+  else if (normalizedType === 'video/webm') ext = 'webm';
+  else if (normalizedType === 'video/quicktime') ext = 'mov';
+
+  const cleanTenantId = tenantId.trim();
+  const storyId = `story-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+  const targetFileName = `${storyId}.${ext}`;
+  const targetPath = `${cleanTenantId}/stories/${targetFileName}`;
+
+  const readAsDataUrl = (): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(new Error('No se pudo procesar el archivo multimedia.'));
+      reader.readAsDataURL(file);
+    });
+
+  try {
+    const { error: uploadError } = await supabase.storage
+      .from('store-logos')
+      .upload(targetPath, file, {
+        contentType: normalizedType || (isVideo ? 'video/mp4' : 'image/jpeg'),
+        cacheControl: '3600',
+        upsert: true,
+      });
+
+    if (!uploadError) {
+      const { data: urlData } = supabase.storage
+        .from('store-logos')
+        .getPublicUrl(targetPath);
+
+      if (urlData?.publicUrl) {
+        return {
+          success: true,
+          publicUrl: urlData.publicUrl,
+          mediaType,
+        };
+      }
+    }
+
+    const fallbackUrl = await readAsDataUrl();
+    return {
+      success: true,
+      publicUrl: fallbackUrl,
+      mediaType,
+    };
+  } catch (err: any) {
+    try {
+      const fallbackUrl = await readAsDataUrl();
+      return {
+        success: true,
+        publicUrl: fallbackUrl,
+        mediaType,
+      };
+    } catch {
+      return {
+        success: false,
+        error: err?.message || 'Error al procesar el archivo multimedia del estado.',
+      };
+    }
+  }
+}
+
+// ----------------------------------------------------------------------------
 // 2.2 GESTIÓN DE ALMACENAMIENTO DE IMÁGENES DE PRODUCTOS (Bucket 'product-images')
 // ----------------------------------------------------------------------------
 
@@ -929,7 +1289,8 @@ export function extractStoragePathFromProductUrl(
 export async function uploadProductImage(
   tenantId: string,
   productId: string,
-  file: File
+  file: File,
+  slotIndex?: number
 ): Promise<UploadProductImageResult> {
   if (!tenantId || typeof tenantId !== 'string' || !isValidTenantId(tenantId)) {
     return { success: false, error: 'Identificador de comercio (tenantId) no válido.' };
@@ -966,8 +1327,17 @@ export async function uploadProductImage(
 
   const cleanTenantId = tenantId.trim();
   const cleanProductId = productId.trim();
-  const targetFileName = `${cleanProductId}.${ext}`;
+  const slotSuffix = typeof slotIndex === 'number' && slotIndex > 0 ? `_slot${slotIndex}` : '';
+  const targetFileName = `${cleanProductId}${slotSuffix}.${ext}`;
   const targetPath = `${cleanTenantId}/${targetFileName}`;
+
+  const readAsDataUrl = (): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(new Error('No se pudo procesar la imagen del producto.'));
+      reader.readAsDataURL(file);
+    });
 
   try {
     // 1. Subir archivo al bucket product-images (upsert reemplaza archivo con idéntico nombre)
@@ -980,57 +1350,60 @@ export async function uploadProductImage(
       });
 
     if (uploadError) {
-      console.error('[CentralBo StoreAdmin] Error al subir imagen de producto a Storage:', uploadError);
-      return {
-        success: false,
-        error: `Error al subir la imagen: ${uploadError.message}`,
-      };
-    }
+      console.warn('[CentralBo StoreAdmin] Almacenamiento remoto no disponible o falló:', uploadError.message);
+    } else {
+      // 2. Limpieza de extensiones previas obsoletas para este producto dentro de la carpeta del tenant
+      try {
+        const { data: existingFiles } = await supabase.storage
+          .from('product-images')
+          .list(cleanTenantId);
 
-    // 2. Limpieza de extensiones previas obsoletas para este producto dentro de la carpeta del tenant
-    try {
-      const { data: existingFiles } = await supabase.storage
-        .from('product-images')
-        .list(cleanTenantId);
+        if (existingFiles && Array.isArray(existingFiles) && existingFiles.length > 0) {
+          const obsoletePrefix = `${cleanProductId}${slotSuffix}.`;
+          const obsoleteFiles = existingFiles
+            .filter(
+              (item) =>
+                item.name.startsWith(obsoletePrefix) && item.name !== targetFileName
+            )
+            .map((item) => `${cleanTenantId}/${item.name}`);
 
-      if (existingFiles && Array.isArray(existingFiles) && existingFiles.length > 0) {
-        const obsoleteFiles = existingFiles
-          .filter(
-            (item) =>
-              item.name.startsWith(`${cleanProductId}.`) && item.name !== targetFileName
-          )
-          .map((item) => `${cleanTenantId}/${item.name}`);
-
-        if (obsoleteFiles.length > 0) {
-          await supabase.storage.from('product-images').remove(obsoleteFiles);
+          if (obsoleteFiles.length > 0) {
+            await supabase.storage.from('product-images').remove(obsoleteFiles);
+          }
         }
+      } catch (cleanupErr) {
+        console.warn('[uploadProductImage] Advertencia no bloqueante al limpiar imágenes obsoletas:', cleanupErr);
       }
-    } catch (cleanupErr) {
-      console.warn('[uploadProductImage] Advertencia no bloqueante al limpiar imágenes obsoletas:', cleanupErr);
+
+      // 3. Obtener URL pública oficial
+      const { data: urlData } = supabase.storage
+        .from('product-images')
+        .getPublicUrl(targetPath);
+
+      if (urlData?.publicUrl) {
+        return {
+          success: true,
+          publicUrl: urlData.publicUrl,
+          path: targetPath,
+        };
+      }
     }
+  } catch (err: any) {
+    console.warn('[CentralBo StoreAdmin] Excepción inesperada en Supabase Storage, usando persistencia local:', err);
+  }
 
-    // 3. Obtener URL pública oficial
-    const { data: urlData } = supabase.storage
-      .from('product-images')
-      .getPublicUrl(targetPath);
-
-    if (!urlData?.publicUrl) {
-      return {
-        success: false,
-        error: 'No se pudo resolver la URL pública de la imagen en Supabase Storage.',
-      };
-    }
-
+  // Fallback de resiliencia mediante Data URL para garantizar que la fotografía nunca se pierda
+  try {
+    const dataUrl = await readAsDataUrl();
     return {
       success: true,
-      publicUrl: urlData.publicUrl,
+      publicUrl: dataUrl,
       path: targetPath,
     };
-  } catch (err: any) {
-    console.error('[CentralBo StoreAdmin] Excepción inesperada al subir imagen de producto:', err);
+  } catch (fallbackErr: any) {
     return {
       success: false,
-      error: err?.message || 'Error inesperado al subir la imagen del producto.',
+      error: fallbackErr?.message || 'Error al procesar la imagen seleccionada.',
     };
   }
 }
@@ -1177,6 +1550,9 @@ export function getCachedStoreAppearance(tenantId: string): StoreAppearanceSetti
     customDomain: '',
     domainVerified: plan === 'pro',
     visualStyle: 'modern',
+    templateId: 'free',
+    banners: [],
+    stories: [],
     showHighlights: true,
     highlightsLayout: 'balanced',
     highlights: getDefaultStoreHighlights(tenantId),
@@ -1184,6 +1560,12 @@ export function getCachedStoreAppearance(tenantId: string): StoreAppearanceSetti
 
   const stored = loadFromStorage<StoreAppearanceSettings>(tenantId, 'appearance', defaultAppearance);
 
+  if (!Array.isArray(stored.banners)) {
+    stored.banners = [];
+  }
+  if (!Array.isArray(stored.stories)) {
+    stored.stories = [];
+  }
   // Asegurar que si stored no tiene highlights definidos, reciba los highlights por defecto reales
   if (!stored.highlights || stored.highlights.length === 0) {
     stored.highlights = getDefaultStoreHighlights(tenantId);
@@ -1237,6 +1619,9 @@ export async function getStoreAppearance(tenantId: string): Promise<StoreAppeara
         customDomain: isPro && typeof raw.customDomain === 'string' ? raw.customDomain : '',
         domainVerified: isPro && Boolean(raw.domainVerified),
         visualStyle: (raw.visualStyle === 'minimal' || raw.visualStyle === 'elegant') ? raw.visualStyle : 'modern',
+        templateId: raw.templateId || 'free',
+        banners: Array.isArray(raw.banners) ? raw.banners : (cached.banners || []),
+        stories: isPro && Array.isArray(raw.stories) ? raw.stories : (isPro ? (cached.stories || []) : []),
         showHighlights: raw.showHighlights !== undefined ? Boolean(raw.showHighlights) : true,
         highlightsLayout: ['balanced', 'featured', 'horizontal', 'editorial', 'minimal'].includes(raw.highlightsLayout)
           ? raw.highlightsLayout
@@ -1279,6 +1664,29 @@ export async function saveStoreAppearance(
   }
 
   const plan = getStorePlan(tenantId);
+  const isPaid = plan === 'basic' || plan === 'pro';
+
+  // Sanitizar banners comerciales para planes BASIC y PRO
+  const cleanBanners: StoreBannerItem[] = isPaid && Array.isArray(settings.banners)
+    ? settings.banners.map((b, idx) => ({
+        id: b.id || `banner-${idx + 1}-${Date.now()}`,
+        imageUrl: b.imageUrl,
+        title: b.title?.trim() || undefined,
+        order: typeof b.order === 'number' ? b.order : idx,
+        createdAt: b.createdAt || new Date().toISOString(),
+      }))
+    : [];
+
+  // Sanitizar estados multimedia (exclusivo para plan PRO)
+  const cleanStories: StoreStoryItem[] = plan === 'pro' && Array.isArray(settings.stories)
+    ? settings.stories.map((s, idx) => ({
+        id: s.id || `story-${idx + 1}-${Date.now()}`,
+        mediaType: s.mediaType === 'video' ? 'video' : 'image',
+        mediaUrl: s.mediaUrl,
+        title: s.title?.trim() || undefined,
+        createdAt: s.createdAt || new Date().toISOString(),
+      }))
+    : [];
 
   // Respetar estrictamente la política Basic vs Pro
   let appearancePayload: StoreAppearanceSettings;
@@ -1294,6 +1702,9 @@ export async function saveStoreAppearance(
       customDomain: '',
       domainVerified: false,
       visualStyle: (settings.visualStyle === 'minimal' || settings.visualStyle === 'elegant') ? settings.visualStyle : 'modern',
+      templateId: settings.templateId || 'free',
+      banners: cleanBanners,
+      stories: [],
       showHighlights: settings.showHighlights !== undefined ? Boolean(settings.showHighlights) : true,
       highlightsLayout: ['balanced', 'featured', 'horizontal', 'editorial', 'minimal'].includes(settings.highlightsLayout || '')
         ? settings.highlightsLayout!
@@ -1302,7 +1713,7 @@ export async function saveStoreAppearance(
         ? settings.highlights
         : (existing.highlights && existing.highlights.length > 0 ? existing.highlights : getDefaultStoreHighlights(tenantId)),
     };
-  } else {
+  } else if (plan === 'pro') {
     appearancePayload = {
       theme: settings.theme === 'light' ? 'light' : 'dark',
       brandPrimaryColor: settings.brandPrimaryColor || '#4f46e5',
@@ -1311,6 +1722,9 @@ export async function saveStoreAppearance(
       customDomain: settings.customDomain || '',
       domainVerified: Boolean(settings.domainVerified),
       visualStyle: (settings.visualStyle === 'minimal' || settings.visualStyle === 'elegant') ? settings.visualStyle : 'modern',
+      templateId: settings.templateId || 'free',
+      banners: cleanBanners,
+      stories: cleanStories,
       showHighlights: settings.showHighlights !== undefined ? Boolean(settings.showHighlights) : true,
       highlightsLayout: ['balanced', 'featured', 'horizontal', 'editorial', 'minimal'].includes(settings.highlightsLayout || '')
         ? settings.highlightsLayout!
@@ -1318,6 +1732,25 @@ export async function saveStoreAppearance(
       highlights: Array.isArray(settings.highlights) && settings.highlights.length > 0
         ? settings.highlights
         : getDefaultStoreHighlights(tenantId),
+    };
+  } else {
+    // Plan FREE: banners y stories deshabilitados
+    const existing = await getStoreAppearance(tenantId);
+    appearancePayload = {
+      ...existing,
+      theme: settings.theme === 'light' ? 'light' : 'dark',
+      brandPrimaryColor: '#4f46e5',
+      brandSecondaryColor: '#06b6d4',
+      brandAccentColor: '#f59e0b',
+      customDomain: '',
+      domainVerified: false,
+      visualStyle: 'modern',
+      templateId: 'free',
+      banners: [],
+      stories: [],
+      showHighlights: settings.showHighlights !== undefined ? Boolean(settings.showHighlights) : true,
+      highlightsLayout: 'balanced',
+      highlights: getDefaultStoreHighlights(tenantId),
     };
   }
 
@@ -1849,6 +2282,7 @@ export const DEFAULT_PAYMENT_SETTINGS: StorePaymentSettings = {
     accountNumber: '',
     accountHolder: '',
   },
+  qrImageUrl: null,
 };
 
 /**
@@ -1875,6 +2309,9 @@ export function isValidPaymentSettings(data: unknown): data is StorePaymentSetti
     if (bd.bankName !== undefined && typeof bd.bankName !== 'string') return false;
     if (bd.accountNumber !== undefined && typeof bd.accountNumber !== 'string') return false;
     if (bd.accountHolder !== undefined && typeof bd.accountHolder !== 'string') return false;
+  }
+  if (obj.qrImageUrl !== undefined && obj.qrImageUrl !== null) {
+    if (typeof obj.qrImageUrl !== 'string') return false;
   }
   return true;
 }
@@ -2013,6 +2450,101 @@ export async function saveStorePaymentSettings(
       error:
         err?.message ||
         'Error de conexión al guardar configuración de métodos de pago en el servidor.',
+    };
+  }
+}
+
+/**
+ * Sube o procesa la imagen del código QR de cobro de un comercio específico.
+ * - Soporta imágenes PNG, JPEG, JPG, WEBP y SVG de hasta 5 MB.
+ * - Intenta subirlo a Supabase Storage en el bucket 'store-logos' bajo la carpeta del tenant.
+ * - Si Storage no está disponible o falla, utiliza Data URL para garantizar que la imagen
+ *   se conserve en la configuración del comercio sin perder la funcionalidad.
+ * - Aislamiento estricto por tenantId: el código QR pertenece exclusivamente a este comercio.
+ */
+export async function uploadStorePaymentQr(
+  tenantId: string,
+  file: File
+): Promise<{ success: boolean; publicUrl?: string; error?: string }> {
+  if (!tenantId || typeof tenantId !== 'string' || !isValidTenantId(tenantId)) {
+    return { success: false, error: 'Identificador de comercio (tenantId) no válido.' };
+  }
+
+  if (!file) {
+    return { success: false, error: 'No se ha seleccionado ningún archivo de imagen.' };
+  }
+
+  const MAX_QR_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
+  if (file.size > MAX_QR_SIZE_BYTES) {
+    return {
+      success: false,
+      error: 'La imagen del código QR supera el tamaño máximo permitido de 5 MB.',
+    };
+  }
+
+  const normalizedType = file.type?.toLowerCase() || '';
+  const ALLOWED_QR_TYPES = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/svg+xml'];
+  if (!ALLOWED_QR_TYPES.includes(normalizedType)) {
+    return {
+      success: false,
+      error: 'Formato no permitido. Solo se aceptan imágenes en formato PNG, JPEG, JPG, WEBP o SVG.',
+    };
+  }
+
+  let ext = 'png';
+  if (normalizedType === 'image/jpeg' || normalizedType === 'image/jpg') ext = 'jpg';
+  else if (normalizedType === 'image/webp') ext = 'webp';
+  else if (normalizedType === 'image/svg+xml') ext = 'svg';
+
+  const cleanTenantId = tenantId.trim();
+  const targetFileName = `payment-qr-${Date.now()}.${ext}`;
+  const targetPath = `${cleanTenantId}/qr/${targetFileName}`;
+
+  const readAsDataUrl = (): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(new Error('No se pudo leer el archivo de imagen.'));
+      reader.readAsDataURL(file);
+    });
+
+  try {
+    const { error: uploadError } = await supabase.storage
+      .from('store-logos')
+      .upload(targetPath, file, {
+        contentType: normalizedType,
+        cacheControl: '3600',
+        upsert: true,
+      });
+
+    if (!uploadError) {
+      const { data: urlData } = supabase.storage
+        .from('store-logos')
+        .getPublicUrl(targetPath);
+
+      if (urlData?.publicUrl) {
+        return {
+          success: true,
+          publicUrl: urlData.publicUrl,
+        };
+      }
+    } else {
+      console.warn('[uploadStorePaymentQr] Almacenamiento remoto no disponible o falló:', uploadError.message);
+    }
+  } catch (storageErr) {
+    console.warn('[uploadStorePaymentQr] Excepción en Supabase Storage, usando persistencia local:', storageErr);
+  }
+
+  try {
+    const dataUrl = await readAsDataUrl();
+    return {
+      success: true,
+      publicUrl: dataUrl,
+    };
+  } catch (readErr: any) {
+    return {
+      success: false,
+      error: readErr?.message || 'Error al procesar la imagen del código QR.',
     };
   }
 }
@@ -4022,6 +4554,19 @@ export async function createStoreProduct(
       ? productInput.id.trim()
       : undefined;
 
+  const rawImages = Array.isArray(productInput.images)
+    ? productInput.images.filter((img): img is string => typeof img === 'string' && Boolean(img.trim())).slice(0, 3)
+    : [];
+  if (rawImages.length > 0) {
+    cleanAttrs.images = rawImages;
+  }
+
+  const primaryImage =
+    rawImages[0] ||
+    (typeof productInput.image_url === 'string' && productInput.image_url.trim()
+      ? productInput.image_url.trim()
+      : null);
+
   const payload: Record<string, unknown> = {
     tenant_id: tenantId,
     category_id: validCategoryId,
@@ -4032,10 +4577,7 @@ export async function createStoreProduct(
         : null,
     price: numPrice,
     is_available: productInput.is_available ?? true,
-    image_url:
-      typeof productInput.image_url === 'string' && productInput.image_url.trim()
-        ? productInput.image_url.trim()
-        : null,
+    image_url: primaryImage,
     status: validStatus,
     attributes: cleanAttrs,
   };
@@ -4151,6 +4693,20 @@ export async function updateStoreProduct(
       typeof updates.image_url === 'string' && updates.image_url.trim()
         ? updates.image_url.trim()
         : null;
+  }
+
+  if (updates.images !== undefined) {
+    const rawImages = Array.isArray(updates.images)
+      ? updates.images.filter((img): img is string => typeof img === 'string' && Boolean(img.trim())).slice(0, 3)
+      : [];
+    const currentAttrs = (payload.attributes as Record<string, unknown>) || {};
+    currentAttrs.images = rawImages;
+    payload.attributes = currentAttrs;
+    if (rawImages.length > 0) {
+      payload.image_url = rawImages[0];
+    } else if (updates.image_url === undefined) {
+      payload.image_url = null;
+    }
   }
 
   if (updates.status !== undefined) {

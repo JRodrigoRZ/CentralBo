@@ -38,6 +38,7 @@ interface PublicStoreHeaderProps {
   onOpenCart?: () => void;
   onOpenOrders?: () => void;
   primaryColor?: string;
+  templateId?: string;
 }
 
 export const PublicStoreHeader: React.FC<PublicStoreHeaderProps> = ({
@@ -46,6 +47,7 @@ export const PublicStoreHeader: React.FC<PublicStoreHeaderProps> = ({
   appearance,
   schedule,
   primaryColor = '#4f46e5',
+  templateId,
 }) => {
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [logoLoadError, setLogoLoadError] = useState(false);
@@ -155,8 +157,37 @@ export const PublicStoreHeader: React.FC<PublicStoreHeaderProps> = ({
     },
   };
 
-  // Clases atmosféricas según personalidad visual de cada vertical
+  const activeTemplate = templateId || appearance?.templateId || 'free';
+
+  // Clases atmosféricas según personalidad visual de cada vertical o modelo especial
   const getHeaderAtmosphereClasses = () => {
+    if (activeTemplate === 'b1') {
+      return 'bg-stone-950 text-white border-amber-500/40 shadow-lg';
+    }
+    if (activeTemplate === 'b4') {
+      return 'bg-slate-950 text-white border-cyan-500/40 shadow-[0_0_20px_rgba(6,182,212,0.18)]';
+    }
+    if (activeTemplate === 'g3') {
+      return 'bg-[#FDFBF7] dark:bg-[#1A1815] border-amber-200/80 dark:border-stone-800 text-stone-900 dark:text-stone-100 shadow-sm';
+    }
+    if (activeTemplate === 'g5') {
+      return 'bg-gradient-to-b from-[#FFF8F3] to-[#FFF1E8] dark:from-[#1A120E] dark:to-[#120D0A] text-stone-900 dark:text-stone-100 border-orange-500/30 shadow-md';
+    }
+    if (activeTemplate === 'g6') {
+      return 'bg-[#F9FAF9] dark:bg-[#0E1510] border-emerald-800/20 dark:border-emerald-500/30 text-stone-900 dark:text-stone-100 shadow-sm';
+    }
+    if (activeTemplate === 'g7') {
+      return 'bg-[#FAF5EE] dark:bg-[#1A1614] border-amber-200/80 dark:border-stone-800 text-stone-900 dark:text-stone-100 shadow-sm';
+    }
+    if (activeTemplate === 'g8') {
+      return 'bg-[#0B0C0E] text-white border-amber-500/40 shadow-xl';
+    }
+    if (activeTemplate === 'm3') {
+      return 'bg-stone-950 text-white border-stone-800 shadow-md';
+    }
+    if (activeTemplate === 's3') {
+      return 'bg-stone-900 text-white border-amber-600/40 shadow-md';
+    }
     if (isFashion) {
       return 'bg-[#FAF7F3] dark:bg-[#161413] border-stone-200/90 dark:border-stone-800 text-stone-900 dark:text-stone-100 shadow-sm';
     }
@@ -172,85 +203,84 @@ export const PublicStoreHeader: React.FC<PublicStoreHeaderProps> = ({
     return 'bg-white dark:bg-[#11141E] border-slate-200/90 dark:border-slate-800 text-slate-900 dark:text-slate-100 shadow-sm';
   };
 
+  const headerPaddingClass =
+    activeTemplate === 'g1' || activeTemplate === 'g5' || activeTemplate === 'c1'
+      ? 'p-4 sm:p-6 md:p-7'
+      : 'p-6 sm:p-8 md:p-9';
+
   return (
     <motion.header
       variants={containerVariants}
       initial="hidden"
       animate="visible"
-      className={`w-full rounded-3xl p-5 sm:p-7 md:p-8 relative overflow-hidden transition-all duration-300 border ${getHeaderAtmosphereClasses()}`}
+      className={`w-full rounded-3xl ${headerPaddingClass} relative overflow-hidden transition-all duration-300 border border-stone-200/90 dark:border-stone-800/90 bg-white/95 dark:bg-stone-900/95 shadow-xs ${getHeaderAtmosphereClasses()}`}
     >
-      {/* Halos atmosféricos suaves con color de identidad del comercio (sin saturación quemada) */}
+      {/* Halo ambiental suave con color de identidad del comercio */}
       <div
-        className="absolute -top-16 -right-16 w-80 h-80 rounded-full blur-3xl pointer-events-none opacity-15 dark:opacity-10 transition-opacity"
+        className="absolute -top-20 -right-20 w-80 h-80 rounded-full blur-3xl pointer-events-none opacity-15 dark:opacity-10 transition-opacity"
         style={{ backgroundColor: activeBrandPrimary }}
       />
       <div
-        className="absolute -bottom-16 -left-16 w-64 h-64 rounded-full blur-3xl pointer-events-none opacity-10 dark:opacity-8 transition-opacity"
+        className="absolute -bottom-20 -left-20 w-72 h-72 rounded-full blur-3xl pointer-events-none opacity-10 dark:opacity-5 transition-opacity"
         style={{ backgroundColor: activeBrandSecondary }}
       />
 
-      {/* Contenido estructural: Portada e Identidad */}
+      {/* Contenido estructural: Portada e Identidad del Comercio */}
       <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center gap-5 sm:gap-7">
-        {/* LOGO DEL COMERCIO (Recuperado y prioritario) */}
+        {/* LOGO DEL COMERCIO */}
         <motion.div variants={itemVariants} className="relative shrink-0">
           {hasLogo ? (
             <div
-              className="w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 rounded-2xl p-1.5 flex items-center justify-center border shadow-xs bg-white dark:bg-stone-900/95 overflow-hidden transition-transform duration-200 hover:scale-[1.02]"
-              style={{ borderColor: `${activeBrandPrimary}40` }}
+              className="w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 rounded-2xl p-2 flex items-center justify-center border shadow-xs bg-white dark:bg-stone-950 overflow-hidden transition-transform duration-200 hover:scale-[1.02]"
+              style={{ borderColor: `${activeBrandPrimary}35` }}
             >
               <img
                 src={rawLogoUrl}
                 alt={`Logo oficial de ${storeDisplayName}`}
-                className="w-full h-full object-contain rounded-xl"
+                className="w-full h-full object-contain rounded-xl block select-none"
                 onError={() => setLogoLoadError(true)}
               />
             </div>
           ) : (
-            // Fallback visual de identidad: Monograma / Isotipo estilizado
+            // Fallback visual de identidad: Monograma estilizado
             <div
-              className="w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 rounded-2xl flex flex-col items-center justify-center border shadow-xs transition-transform duration-200 hover:scale-[1.02] bg-white dark:bg-stone-900/95"
+              className="w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 rounded-2xl flex flex-col items-center justify-center border shadow-xs transition-transform duration-200 hover:scale-[1.02] bg-white dark:bg-stone-950"
               style={{
-                borderColor: `${activeBrandPrimary}40`,
+                borderColor: `${activeBrandPrimary}35`,
                 color: activeBrandPrimary,
               }}
             >
               <div
-                className="w-12 h-12 rounded-xl flex items-center justify-center text-white shadow-xs font-bold text-xl"
+                className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center text-white shadow-xs font-bold text-xl select-none"
                 style={{
                   background: `linear-gradient(135deg, ${activeBrandPrimary}, ${activeBrandSecondary})`,
                 }}
               >
                 {storeDisplayName.charAt(0).toUpperCase()}
               </div>
-              <span className="text-[10px] font-semibold mt-1 opacity-75 uppercase tracking-wider">
+              <span className="text-[10px] font-semibold mt-1 opacity-70 uppercase tracking-wider">
                 {store.store_type}
               </span>
             </div>
           )}
         </motion.div>
 
-        {/* IDENTIDAD DEL COMERCIO (Nombre + Descriptor + Estado en vivo + Contacto) */}
+        {/* IDENTIDAD DEL COMERCIO */}
         <div className="flex-1 min-w-0 space-y-2.5">
-          {/* Fila 1: Categoría / Descriptor de vertical */}
-          <motion.div variants={itemVariants} className="flex items-center gap-2">
-            <span
-              className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full border"
-              style={{
-                backgroundColor: `${activeBrandPrimary}12`,
-                color: activeBrandPrimary,
-                borderColor: `${activeBrandPrimary}33`,
-              }}
-            >
-              <VerticalIcon className="w-3 h-3" />
+          {/* Fila 1: Metadatos limpios sin píldoras invasivas + Horario de atención en vivo */}
+          <motion.div variants={itemVariants} className="flex flex-wrap items-center gap-2.5 text-xs">
+            <span className="font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+              <VerticalIcon className="w-3.5 h-3.5" style={{ color: activeBrandPrimary }} />
               <span>{storeCategoryLabel}</span>
             </span>
 
-            {/* Indicador en vivo de Horario de Atención */}
+            <span className="text-stone-300 dark:text-stone-700 select-none">•</span>
+
+            {/* Selector interactivo de Horarios de Atención */}
             <button
               type="button"
               onClick={() => setShowScheduleModal(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full border text-xs font-medium bg-white/90 dark:bg-stone-900/90 text-stone-800 dark:text-stone-200 hover:border-stone-400 dark:hover:border-stone-600 transition shadow-2xs cursor-pointer"
-              style={{ borderColor: `${activeBrandPrimary}40` }}
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl border text-xs font-semibold bg-stone-50/90 dark:bg-stone-950/80 text-stone-800 dark:text-stone-200 border-stone-200/80 dark:border-stone-800 hover:border-stone-300 dark:hover:border-stone-700 transition shadow-2xs cursor-pointer active:scale-95"
               title="Consultar horarios de atención semanales"
             >
               <span
@@ -258,19 +288,23 @@ export const PublicStoreHeader: React.FC<PublicStoreHeaderProps> = ({
                   scheduleStatus.isOpenNow ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
                 }`}
               />
-              <span className="font-semibold">{scheduleStatus.statusLabel}</span>
-              <span className="text-[11px] text-stone-500 dark:text-stone-400 hidden sm:inline">
-                • {scheduleStatus.nextOpeningInfo}
+              <span>{scheduleStatus.statusLabel}</span>
+              <span className="text-[11px] text-stone-500 dark:text-stone-400 hidden sm:inline font-normal">
+                ({scheduleStatus.nextOpeningInfo})
               </span>
               <ChevronDown className="w-3 h-3 ml-0.5 opacity-60" />
             </button>
           </motion.div>
 
-          {/* Fila 2: Nombre del Comercio */}
+          {/* Fila 2: Nombre del Comercio con tipografía adaptada */}
           <motion.div variants={itemVariants}>
             <h1
               className={`text-2xl sm:text-3xl md:text-4xl tracking-tight leading-tight ${
-                isFashion || isServices
+                activeTemplate === 'g3' || activeTemplate === 'g7' || activeTemplate === 'g8' || activeTemplate === 'm1' || activeTemplate === 'c4'
+                  ? 'font-serif font-bold text-stone-900 dark:text-white'
+                  : activeTemplate === 'g5' || activeTemplate === 'm3' || activeTemplate === 'b3' || activeTemplate === 's3'
+                  ? 'font-black tracking-tighter uppercase text-stone-900 dark:text-white'
+                  : isFashion || isServices
                   ? 'font-serif font-bold text-stone-900 dark:text-white'
                   : 'font-extrabold text-stone-900 dark:text-white'
               }`}
@@ -279,20 +313,41 @@ export const PublicStoreHeader: React.FC<PublicStoreHeaderProps> = ({
             </h1>
           </motion.div>
 
-          {/* Fila 3: Descriptor / Descripción del comercio si existe */}
+          {/* Fila 3: Descripción del comercio */}
           {profile?.description && (
             <motion.p
               variants={itemVariants}
-              className="text-xs sm:text-sm text-stone-600 dark:text-stone-300 line-clamp-2 max-w-3xl leading-relaxed"
+              className="text-xs sm:text-sm text-stone-600 dark:text-stone-300 line-clamp-2 max-w-2xl leading-relaxed"
             >
               {profile.description}
             </motion.p>
           )}
 
-          {/* Fila 4: Zona Unificada de Canales de Contacto (Pills Coherentes) */}
+          {/* Fila 4: Dirección y notas de atención (si existen) */}
+          {(profile?.address || profile?.attentionInfo) && (
+            <motion.div
+              variants={itemVariants}
+              className="flex flex-wrap items-center gap-3 text-xs text-stone-500 dark:text-stone-400 pt-0.5"
+            >
+              {profile?.address && (
+                <div className="flex items-center gap-1.5 max-w-full">
+                  <MapPin className="w-3.5 h-3.5 shrink-0" style={{ color: activeBrandPrimary }} />
+                  <span className="truncate max-w-[280px] sm:max-w-md">{profile.address}</span>
+                </div>
+              )}
+              {profile?.attentionInfo && (
+                <div className="flex items-center gap-1.5 max-w-full">
+                  <Info className="w-3.5 h-3.5 shrink-0" style={{ color: activeBrandPrimary }} />
+                  <span className="truncate max-w-[280px] sm:max-w-md">{profile.attentionInfo}</span>
+                </div>
+              )}
+            </motion.div>
+          )}
+
+          {/* Fila 5: Canales de contacto directos y redes sociales */}
           <motion.div
             variants={itemVariants}
-            className="flex flex-wrap items-center gap-2 pt-1 text-xs"
+            className="flex flex-wrap items-center gap-2 pt-2 text-xs"
           >
             {/* WhatsApp Directo */}
             {waUrl && (
@@ -300,11 +355,10 @@ export const PublicStoreHeader: React.FC<PublicStoreHeaderProps> = ({
                 href={waUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border font-semibold text-xs shadow-2xs transition bg-white/90 hover:bg-white text-stone-900 dark:bg-stone-900/90 dark:hover:bg-stone-800 dark:text-stone-100 hover:scale-[1.02] active:scale-[0.98] shrink-0"
-                style={{ borderColor: `${activeBrandPrimary}44` }}
-                title="Contactar por WhatsApp"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl font-bold text-xs shadow-xs transition bg-[#25D366] hover:bg-[#20bd5a] text-white hover:scale-[1.02] active:scale-[0.98] shrink-0 cursor-pointer"
+                title="Contactar directamente por WhatsApp"
               >
-                <MessageCircle className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                <MessageCircle className="w-3.5 h-3.5 fill-white shrink-0" />
                 <span>WhatsApp</span>
               </a>
             )}
@@ -313,8 +367,7 @@ export const PublicStoreHeader: React.FC<PublicStoreHeaderProps> = ({
             {profile?.phone && (
               <a
                 href={`tel:${profile.phone}`}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border font-medium text-xs shadow-2xs transition bg-white/90 hover:bg-white text-stone-800 hover:text-stone-950 dark:bg-stone-900/90 dark:hover:bg-stone-800 dark:text-stone-200 dark:hover:text-white hover:scale-[1.02] active:scale-[0.98] shrink-0"
-                style={{ borderColor: `${activeBrandPrimary}33` }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border font-semibold text-xs shadow-2xs transition bg-stone-50 hover:bg-stone-100 text-stone-800 dark:bg-stone-950/80 dark:hover:bg-stone-800 dark:text-stone-200 border-stone-200/80 dark:border-stone-800 hover:scale-[1.02] active:scale-[0.98] shrink-0"
                 title={`Llamar a ${profile.phone}`}
               >
                 <Phone className="w-3.5 h-3.5 shrink-0" style={{ color: activeBrandPrimary }} />
@@ -322,24 +375,11 @@ export const PublicStoreHeader: React.FC<PublicStoreHeaderProps> = ({
               </a>
             )}
 
-            {/* Ubicación / Dirección física */}
-            {profile?.address && (
-              <span
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border font-medium text-xs shadow-2xs bg-white/90 dark:bg-stone-900/90 text-stone-800 dark:text-stone-200 max-w-full"
-                style={{ borderColor: `${activeBrandPrimary}33` }}
-                title={profile.address}
-              >
-                <MapPin className="w-3.5 h-3.5 shrink-0" style={{ color: activeBrandPrimary }} />
-                <span className="truncate max-w-[200px] sm:max-w-xs md:max-w-sm">{profile.address}</span>
-              </span>
-            )}
-
             {/* Correo Electrónico */}
             {profile?.email && (
               <a
                 href={`mailto:${profile.email}`}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border font-medium text-xs shadow-2xs transition bg-white/90 hover:bg-white text-stone-800 hover:text-stone-950 dark:bg-stone-900/90 dark:hover:bg-stone-800 dark:text-stone-200 dark:hover:text-white hover:scale-[1.02] active:scale-[0.98] max-w-full shrink-0"
-                style={{ borderColor: `${activeBrandPrimary}33` }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border font-medium text-xs shadow-2xs transition bg-stone-50 hover:bg-stone-100 text-stone-800 dark:bg-stone-950/80 dark:hover:bg-stone-800 dark:text-stone-200 border-stone-200/80 dark:border-stone-800 hover:scale-[1.02] active:scale-[0.98] max-w-full shrink-0"
                 title={`Enviar correo a ${profile.email}`}
               >
                 <Mail className="w-3.5 h-3.5 shrink-0" style={{ color: activeBrandPrimary }} />
@@ -347,7 +387,7 @@ export const PublicStoreHeader: React.FC<PublicStoreHeaderProps> = ({
               </a>
             )}
 
-            {/* Redes Sociales Reales Configuradas como Pills Coherentes */}
+            {/* Redes Sociales Reales Configuradas */}
             {[
               {
                 icon: <Instagram className="w-3.5 h-3.5" />,
@@ -399,8 +439,7 @@ export const PublicStoreHeader: React.FC<PublicStoreHeaderProps> = ({
                   rel="noopener noreferrer"
                   aria-label={social.label}
                   title={social.label}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border font-medium text-xs shadow-2xs transition bg-white/90 hover:bg-white text-stone-800 hover:text-stone-950 dark:bg-stone-900/90 dark:hover:bg-stone-800 dark:text-stone-200 dark:hover:text-white hover:scale-[1.02] active:scale-[0.98] shrink-0"
-                  style={{ borderColor: `${activeBrandPrimary}33` }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border font-medium text-xs shadow-2xs transition bg-stone-50 hover:bg-stone-100 text-stone-800 dark:bg-stone-950/80 dark:hover:bg-stone-800 dark:text-stone-200 border-stone-200/80 dark:border-stone-800 hover:scale-[1.02] active:scale-[0.98] shrink-0"
                 >
                   <span className="shrink-0" style={{ color: activeBrandPrimary }}>
                     {social.icon}
@@ -409,17 +448,6 @@ export const PublicStoreHeader: React.FC<PublicStoreHeaderProps> = ({
                 </a>
               ))}
           </motion.div>
-
-          {/* Fila 5: Información o nota de atención si existe */}
-          {profile?.attentionInfo && (
-            <motion.div
-              variants={itemVariants}
-              className="flex items-center gap-1.5 text-xs text-stone-600 dark:text-stone-400 pt-1"
-            >
-              <Info className="w-3.5 h-3.5 shrink-0" style={{ color: activeBrandPrimary }} />
-              <span>{profile.attentionInfo}</span>
-            </motion.div>
-          )}
         </div>
       </div>
 

@@ -40,6 +40,7 @@ import {
   isValidUUID,
   uploadProductImage,
   deleteProductImage,
+  isStorePaidPlan,
   ALLOWED_PRODUCT_IMAGE_MIME_TYPES,
   MAX_PRODUCT_IMAGE_SIZE_BYTES,
 } from '../../lib/storeAdminService';
@@ -103,25 +104,50 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [notification, setNotification] = useState<string | null>(null);
 
-  // Estados para subida y preview de imagen nativa de producto
-  const imageFileInputRef = useRef<HTMLInputElement | null>(null);
-  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
-  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
-  const [isUploadingImage, setIsUploadingImage] = useState<boolean>(false);
-  const [imageUploadError, setImageUploadError] = useState<string | null>(null);
+  // Regla Comercial Módulo 3: Galería de hasta 3 fotos para BASIC y PRO, 1 foto para FREE
+  const isPaidPlan = isStorePaidPlan(store);
+  const maxPhotosAllowed = isPaidPlan ? 3 : 1;
+
+  interface ImageSlotItem {
+    url: string;
+    file: File | null;
+    previewUrl: string | null;
+    error: string | null;
+  }
+
+  const fileInputRef0 = useRef<HTMLInputElement | null>(null);
+  const fileInputRef1 = useRef<HTMLInputElement | null>(null);
+  const fileInputRef2 = useRef<HTMLInputElement | null>(null);
+
+  const getFileInputRef = (index: number) => {
+    if (index === 0) return fileInputRef0;
+    if (index === 1) return fileInputRef1;
+    return fileInputRef2;
+  };
+
+  const [imageSlots, setImageSlots] = useState<ImageSlotItem[]>([
+    { url: '', file: null, previewUrl: null, error: null },
+    { url: '', file: null, previewUrl: null, error: null },
+    { url: '', file: null, previewUrl: null, error: null },
+  ]);
+  const [isUploadingImages, setIsUploadingImages] = useState<boolean>(false);
 
   // Limpieza segura de URLs blob temporales
   const resetImageState = () => {
-    if (imagePreviewUrl && imagePreviewUrl.startsWith('blob:')) {
-      URL.revokeObjectURL(imagePreviewUrl);
-    }
-    setSelectedImageFile(null);
-    setImagePreviewUrl(null);
-    setIsUploadingImage(false);
-    setImageUploadError(null);
-    if (imageFileInputRef.current) {
-      imageFileInputRef.current.value = '';
-    }
+    imageSlots.forEach((slot) => {
+      if (slot.previewUrl && slot.previewUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(slot.previewUrl);
+      }
+    });
+    setImageSlots([
+      { url: '', file: null, previewUrl: null, error: null },
+      { url: '', file: null, previewUrl: null, error: null },
+      { url: '', file: null, previewUrl: null, error: null },
+    ]);
+    setIsUploadingImages(false);
+    if (fileInputRef0.current) fileInputRef0.current.value = '';
+    if (fileInputRef1.current) fileInputRef1.current.value = '';
+    if (fileInputRef2.current) fileInputRef2.current.value = '';
   };
 
   const handleCloseModal = () => {
@@ -133,111 +159,99 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
   // Limpieza automática al desmontar o cambiar preview blob
   useEffect(() => {
     return () => {
-      if (imagePreviewUrl && imagePreviewUrl.startsWith('blob:')) {
-        URL.revokeObjectURL(imagePreviewUrl);
-      }
+      imageSlots.forEach((slot) => {
+        if (slot.previewUrl && slot.previewUrl.startsWith('blob:')) {
+          URL.revokeObjectURL(slot.previewUrl);
+        }
+      });
     };
-  }, [imagePreviewUrl]);
+  }, [imageSlots]);
 
-  // Selección de archivo nativa desde el dispositivo
-  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setImageUploadError(null);
+  // Selección de archivo nativa para un slot específico (0, 1 o 2)
+  const handleSlotFileChange = (slotIndex: number, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     if (file.size > MAX_PRODUCT_IMAGE_SIZE_BYTES) {
-      setImageUploadError('La imagen supera el tamaño máximo permitido de 5 MB.');
-      if (imageFileInputRef.current) imageFileInputRef.current.value = '';
+      setImageSlots((prev) => {
+        const next = [...prev];
+        next[slotIndex] = { ...next[slotIndex], error: 'La imagen supera el tamaño máximo permitido de 5 MB.' };
+        return next;
+      });
+      const ref = getFileInputRef(slotIndex);
+      if (ref.current) ref.current.value = '';
       return;
     }
 
     const normalizedType = file.type?.toLowerCase() || '';
     if (!ALLOWED_PRODUCT_IMAGE_MIME_TYPES.includes(normalizedType)) {
-      setImageUploadError('Formato no permitido. Solo se aceptan imágenes en formato PNG, JPEG/JPG o WEBP.');
-      if (imageFileInputRef.current) imageFileInputRef.current.value = '';
+      setImageSlots((prev) => {
+        const next = [...prev];
+        next[slotIndex] = { ...next[slotIndex], error: 'Formato no permitido. Solo se aceptan imágenes en formato PNG, JPEG o WEBP.' };
+        return next;
+      });
+      const ref = getFileInputRef(slotIndex);
+      if (ref.current) ref.current.value = '';
       return;
     }
 
-    if (imagePreviewUrl && imagePreviewUrl.startsWith('blob:')) {
-      URL.revokeObjectURL(imagePreviewUrl);
+    const prevBlob = imageSlots[slotIndex]?.previewUrl;
+    if (prevBlob && prevBlob.startsWith('blob:')) {
+      URL.revokeObjectURL(prevBlob);
     }
 
     const objectUrl = URL.createObjectURL(file);
-    setSelectedImageFile(file);
-    setImagePreviewUrl(objectUrl);
-    setImageUploadError(null);
-  };
-
-  // Descartar archivo seleccionado y volver al estado previo
-  const handleDiscardSelectedFile = () => {
-    if (imagePreviewUrl && imagePreviewUrl.startsWith('blob:')) {
-      URL.revokeObjectURL(imagePreviewUrl);
-    }
-    setSelectedImageFile(null);
-    setImageUploadError(null);
-    if (imageFileInputRef.current) {
-      imageFileInputRef.current.value = '';
-    }
-    if (currentProduct?.image_url) {
-      setImagePreviewUrl(currentProduct.image_url);
-    } else {
-      setImagePreviewUrl(null);
-    }
-  };
-
-  // Eliminar imagen del producto (Storage + campo image_url)
-  const handleRemoveProductImage = () => {
-    if (imagePreviewUrl && imagePreviewUrl.startsWith('blob:')) {
-      URL.revokeObjectURL(imagePreviewUrl);
-    }
-    setSelectedImageFile(null);
-    setImagePreviewUrl(null);
-    setImageUploadError(null);
-    if (imageFileInputRef.current) {
-      imageFileInputRef.current.value = '';
-    }
-
-    if (currentProduct) {
-      const prevUrl = currentProduct.image_url;
-      setCurrentProduct({ ...currentProduct, image_url: '' });
-
-      // Si es un producto ya guardado y la imagen pertenecía a Storage, limpiarla
-      if (currentProduct.id && isValidUUID(currentProduct.id) && prevUrl) {
-        deleteProductImage(store.id, prevUrl).catch((err) =>
-          console.warn('[CatalogoProductos] Error no bloqueante al limpiar imagen:', err)
-        );
-      }
-    }
-  };
-
-  // Subida inmediata opcional cuando se edita un producto existente
-  const handleUploadImageNow = async () => {
-    if (!currentProduct?.id || !selectedImageFile || isUploadingImage) return;
-    setIsUploadingImage(true);
-    setImageUploadError(null);
-    const uploadRes = await uploadProductImage(store.id, currentProduct.id, selectedImageFile);
-    if (!uploadRes.success || !uploadRes.publicUrl) {
-      setIsUploadingImage(false);
-      setImageUploadError(uploadRes.error || 'Error al subir la imagen.');
-      return;
-    }
-
-    const updateRes = await updateStoreProduct(store.id, currentProduct.id, {
-      image_url: uploadRes.publicUrl,
+    setImageSlots((prev) => {
+      const next = [...prev];
+      next[slotIndex] = {
+        url: next[slotIndex]?.url || '',
+        file,
+        previewUrl: objectUrl,
+        error: null,
+      };
+      return next;
     });
-    setIsUploadingImage(false);
+  };
 
-    if (updateRes.success && updateRes.product) {
-      setProducts((prev) =>
-        prev.map((p) => (p.id === updateRes.product!.id ? updateRes.product! : p))
-      );
-      setCurrentProduct((prev) => (prev ? { ...prev, image_url: uploadRes.publicUrl } : null));
-      setImagePreviewUrl(uploadRes.publicUrl);
-      setSelectedImageFile(null);
-      if (imageFileInputRef.current) imageFileInputRef.current.value = '';
-      showNotification('Imagen de producto actualizada correctamente en Supabase.');
-    } else {
-      setImageUploadError(updateRes.error || 'Error al asociar la imagen al producto.');
+  // Descartar archivo o limpiar imagen en un slot
+  const handleRemoveSlotImage = (slotIndex: number) => {
+    const prevBlob = imageSlots[slotIndex]?.previewUrl;
+    if (prevBlob && prevBlob.startsWith('blob:')) {
+      URL.revokeObjectURL(prevBlob);
+    }
+    const ref = getFileInputRef(slotIndex);
+    if (ref.current) ref.current.value = '';
+
+    setImageSlots((prev) => {
+      const next = [...prev];
+      next[slotIndex] = {
+        url: '',
+        file: null,
+        previewUrl: null,
+        error: null,
+      };
+      return next;
+    });
+
+    if (slotIndex === 0 && currentProduct) {
+      setCurrentProduct({ ...currentProduct, image_url: '' });
+    }
+  };
+
+  const handleSlotUrlChange = (slotIndex: number, newUrl: string) => {
+    setImageSlots((prev) => {
+      const next = [...prev];
+      next[slotIndex] = {
+        ...next[slotIndex],
+        url: newUrl,
+        previewUrl: newUrl.trim() ? newUrl.trim() : null,
+        file: null,
+        error: null,
+      };
+      return next;
+    });
+    if (slotIndex === 0 && currentProduct) {
+      setCurrentProduct({ ...currentProduct, image_url: newUrl });
     }
   };
 
@@ -302,9 +316,23 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
 
   const handleOpenEdit = (p: Product) => {
     resetImageState();
-    if (p.image_url) {
-      setImagePreviewUrl(p.image_url);
+    const existingImages: string[] = [];
+    if (Array.isArray(p.images) && p.images.length > 0) {
+      existingImages.push(...p.images.filter((img) => typeof img === 'string' && img.trim()));
+    } else if (Array.isArray(p.attributes?.images)) {
+      existingImages.push(...(p.attributes.images as string[]).filter((img) => typeof img === 'string' && img.trim()));
+    } else if (Array.isArray(p.attributes?.gallery_images)) {
+      existingImages.push(...(p.attributes.gallery_images as string[]).filter((img) => typeof img === 'string' && img.trim()));
     }
+    if (p.image_url && !existingImages.includes(p.image_url)) {
+      existingImages.unshift(p.image_url);
+    }
+    const cleanList = existingImages.slice(0, 3);
+    setImageSlots([
+      { url: cleanList[0] || p.image_url || '', file: null, previewUrl: cleanList[0] || p.image_url || null, error: null },
+      { url: cleanList[1] || '', file: null, previewUrl: cleanList[1] || null, error: null },
+      { url: cleanList[2] || '', file: null, previewUrl: cleanList[2] || null, error: null },
+    ]);
     setNewSizeInput('');
     setNewColorName('');
     setNewColorHex('#000000');
@@ -458,37 +486,47 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
         : null;
 
     const isEditMode = Boolean(currentProduct.id && isValidUUID(currentProduct.id));
+    const targetProductId =
+      isEditMode && currentProduct.id && isValidUUID(currentProduct.id)
+        ? currentProduct.id
+        : crypto.randomUUID();
 
     setIsSaving(true);
+    setIsUploadingImages(true);
 
-    let finalImageUrl: string | null =
-      typeof currentProduct.image_url === 'string' && currentProduct.image_url.trim()
-        ? currentProduct.image_url.trim()
-        : null;
+    const maxSlotsToProcess = isPaidPlan ? 3 : 1;
+    const finalImageUrls: string[] = [];
 
-    let assignedProductId: string | undefined = isEditMode ? currentProduct.id : undefined;
+    for (let slotIdx = 0; slotIdx < maxSlotsToProcess; slotIdx++) {
+      const slot = imageSlots[slotIdx];
+      if (!slot) continue;
 
-    // Si el usuario seleccionó un archivo local, subirlo a Supabase Storage con aislamiento por tenant
-    if (selectedImageFile) {
-      setIsUploadingImage(true);
-      const targetProductId =
-        isEditMode && currentProduct.id && isValidUUID(currentProduct.id)
-          ? currentProduct.id
-          : crypto.randomUUID();
-
-      const uploadRes = await uploadProductImage(store.id, targetProductId, selectedImageFile);
-      setIsUploadingImage(false);
-
-      if (!uploadRes.success || !uploadRes.publicUrl) {
-        setIsSaving(false);
-        setImageUploadError(uploadRes.error || 'Error al subir la imagen del producto a Storage.');
-        showNotification(uploadRes.error || 'Error al subir la imagen del producto.');
-        return;
+      if (slot.file) {
+        const uploadRes = await uploadProductImage(store.id, targetProductId, slot.file, slotIdx);
+        if (!uploadRes.success || !uploadRes.publicUrl) {
+          setIsUploadingImages(false);
+          setIsSaving(false);
+          const errorMsg = uploadRes.error || `Error al subir la fotografía ${slotIdx + 1}.`;
+          setImageSlots((prev) => {
+            const next = [...prev];
+            next[slotIdx] = { ...next[slotIdx], error: errorMsg };
+            return next;
+          });
+          showNotification(errorMsg);
+          return;
+        }
+        finalImageUrls.push(uploadRes.publicUrl);
+      } else if (slot.url && slot.url.trim()) {
+        finalImageUrls.push(slot.url.trim());
       }
-
-      finalImageUrl = uploadRes.publicUrl;
-      assignedProductId = targetProductId;
     }
+
+    setIsUploadingImages(false);
+
+    const trimmedImages = finalImageUrls.slice(0, maxSlotsToProcess);
+    const finalImageUrl = trimmedImages[0] || null;
+
+    cleanAttributes.images = trimmedImages;
 
     if (isEditMode && currentProduct.id) {
       const res = await updateStoreProduct(store.id, currentProduct.id, {
@@ -498,6 +536,7 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
         category_id: validCategoryId,
         is_available: currentProduct.is_available ?? true,
         image_url: finalImageUrl,
+        images: trimmedImages,
         status:
           currentProduct.status === 'inactivo' || currentProduct.status === 'borrador'
             ? currentProduct.status
@@ -518,22 +557,20 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
       }
     } else {
       const newProdPayload: Partial<Product> = {
+        id: targetProductId,
         name: cleanName,
         price: numPrice,
         description: cleanDescription,
         category_id: validCategoryId,
         is_available: currentProduct.is_available ?? true,
         image_url: finalImageUrl,
+        images: trimmedImages,
         status:
           currentProduct.status === 'inactivo' || currentProduct.status === 'borrador'
             ? currentProduct.status
             : 'activo',
         attributes: cleanAttributes,
       };
-
-      if (assignedProductId) {
-        newProdPayload.id = assignedProductId;
-      }
 
       const res = await createStoreProduct(store.id, newProdPayload);
 
@@ -721,6 +758,16 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
                         {product.is_available ? 'Disponible' : 'Agotado'}
                       </span>
                     </div>
+
+                    {/* Badge de galería múltiple (Módulo 3) */}
+                    {product.images && product.images.length > 1 && (
+                      <div className="absolute bottom-2 right-2">
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-black/70 text-white backdrop-blur-xs flex items-center gap-1 shadow-xs">
+                          <ImageIcon className="w-3 h-3 text-white" />
+                          <span>{product.images.length} fotos</span>
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Datos del producto */}
@@ -1444,192 +1491,355 @@ export const CatalogoProductos: React.FC<CatalogoProductosProps> = ({ store }) =
                 </div>
               )}
 
-              {/* Sección de Imagen Principal del Producto (Nativa y Mobile-friendly) */}
-              <div className="space-y-3 pt-2 border-t border-[#DEE7F2] dark:border-slate-800">
+              {/* Sección de Fotografías del Producto (Módulo 3: Galería hasta 3 fotos para BASIC y PRO) */}
+              <div className="space-y-4 pt-2 border-t border-[#DEE7F2] dark:border-slate-800">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <label className="block text-xs font-semibold text-[#14213D] dark:text-white">
-                      Imagen Principal del Producto
+                    <label className="block text-xs font-bold text-[#14213D] dark:text-white flex items-center gap-1.5">
+                      <ImageIcon className="w-4 h-4 text-[#1769FF] dark:text-indigo-400" />
+                      <span>{isPaidPlan ? 'Galería del Producto (Hasta 3 Fotografías)' : 'Fotografía del Producto'}</span>
                     </label>
-                    <p className="text-[11px] text-[#52627A] dark:text-slate-400">
-                      Sube una fotografía desde tu dispositivo (PNG, JPG, WEBP hasta 5 MB).
+                    <p className="text-[11px] text-[#52627A] dark:text-slate-400 mt-0.5">
+                      {isPaidPlan
+                        ? 'Planes BASIC y PRO: Administra la fotografía principal y hasta 2 imágenes adicionales para la tienda pública.'
+                        : 'Plan FREE: Cada producto incluye una fotografía principal de portada en el catálogo.'}
                     </p>
                   </div>
-                  {imagePreviewUrl && (
-                    <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-400 dark:border-emerald-800/60 flex items-center gap-1">
-                      <CheckCircle2 className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
-                      {selectedImageFile ? 'Archivo seleccionado' : 'Imagen activa'}
-                    </span>
+                  <span
+                    className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold border ${
+                      isPaidPlan
+                        ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800/60'
+                        : 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'
+                    }`}
+                  >
+                    {isPaidPlan
+                      ? `${imageSlots.filter((s) => s.previewUrl || s.url).length}/3 fotos registradas`
+                      : 'Plan FREE (1 foto)'}
+                  </span>
+                </div>
+
+                {/* Inputs file nativos ocultos para cada slot */}
+                <input
+                  type="file"
+                  ref={fileInputRef0}
+                  accept="image/png,image/jpeg,image/webp"
+                  onChange={(e) => handleSlotFileChange(0, e)}
+                  disabled={isUploadingImages || isSaving}
+                  className="hidden"
+                />
+                {isPaidPlan && (
+                  <>
+                    <input
+                      type="file"
+                      ref={fileInputRef1}
+                      accept="image/png,image/jpeg,image/webp"
+                      onChange={(e) => handleSlotFileChange(1, e)}
+                      disabled={isUploadingImages || isSaving}
+                      className="hidden"
+                    />
+                    <input
+                      type="file"
+                      ref={fileInputRef2}
+                      accept="image/png,image/jpeg,image/webp"
+                      onChange={(e) => handleSlotFileChange(2, e)}
+                      disabled={isUploadingImages || isSaving}
+                      className="hidden"
+                    />
+                  </>
+                )}
+
+                {/* Grid de Slots de Fotografías */}
+                <div className={`grid gap-3 ${isPaidPlan ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-1'}`}>
+                  {/* SLOT 0: FOTOGRAFÍA PRINCIPAL */}
+                  <div className="p-3.5 rounded-2xl bg-[#F8FAFC] dark:bg-slate-900/80 border border-[#DEE7F2] dark:border-slate-800 space-y-2.5 flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-bold text-[#14213D] dark:text-white">
+                          Fotografía Principal
+                        </span>
+                        <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-[#1769FF] text-white">
+                          Principal
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-[#52627A] dark:text-slate-400 mb-2">
+                        Portada y tarjeta del catálogo.
+                      </p>
+
+                      {imageSlots[0].error && (
+                        <div className="p-2 mb-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-[11px] flex items-center gap-1.5">
+                          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                          <span>{imageSlots[0].error}</span>
+                        </div>
+                      )}
+
+                      {imageSlots[0].previewUrl ? (
+                        <div className="relative aspect-4/3 rounded-xl overflow-hidden bg-white dark:bg-slate-950 border border-[#DEE7F2] dark:border-slate-700">
+                          <img
+                            src={imageSlots[0].previewUrl}
+                            alt="Foto principal"
+                            className="w-full h-full object-cover"
+                          />
+                          {imageSlots[0].file && (
+                            <span className="absolute bottom-1.5 left-1.5 text-[9px] bg-black/70 text-white px-1.5 py-0.5 rounded backdrop-blur-xs">
+                              Archivo listo para guardar
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <div
+                          onClick={() => fileInputRef0.current?.click()}
+                          className="aspect-4/3 rounded-xl border-2 border-dashed border-[#DEE7F2] hover:border-[#1769FF] dark:border-slate-700 dark:hover:border-indigo-500 bg-white dark:bg-slate-950/60 flex flex-col items-center justify-center p-3 text-center cursor-pointer transition group"
+                        >
+                          <UploadCloud className="w-6 h-6 text-[#94A3B8] group-hover:text-[#1769FF] dark:text-slate-400 dark:group-hover:text-indigo-400 mb-1 transition" />
+                          <span className="text-xs font-semibold text-[#14213D] group-hover:text-[#1769FF] dark:text-slate-200">
+                            Subir fotografía
+                          </span>
+                          <span className="text-[10px] text-[#52627A] dark:text-slate-400 mt-0.5">
+                            PNG, JPG o WEBP (máx. 5 MB)
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-2 pt-1 border-t border-[#DEE7F2]/60 dark:border-slate-800">
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef0.current?.click()}
+                          disabled={isUploadingImages || isSaving}
+                          className="flex-1 inline-flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg bg-white hover:bg-[#EEF4FF] dark:bg-slate-800 dark:hover:bg-slate-700 text-[#14213D] dark:text-slate-200 text-xs font-medium border border-[#DEE7F2] dark:border-slate-700 transition cursor-pointer shadow-2xs"
+                        >
+                          <UploadCloud className="w-3.5 h-3.5 text-[#1769FF] dark:text-indigo-400" />
+                          <span>{imageSlots[0].previewUrl ? 'Cambiar' : 'Seleccionar'}</span>
+                        </button>
+                        {imageSlots[0].previewUrl && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveSlotImage(0)}
+                            disabled={isUploadingImages || isSaving}
+                            className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-transparent hover:border-rose-200 transition cursor-pointer"
+                            title="Quitar foto"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+
+                      <details className="group">
+                        <summary className="text-[10px] text-[#52627A] hover:text-[#14213D] dark:text-slate-400 cursor-pointer select-none">
+                          ¿Ingresar URL externa?
+                        </summary>
+                        <input
+                          type="url"
+                          value={imageSlots[0].url}
+                          onChange={(e) => handleSlotUrlChange(0, e.target.value)}
+                          placeholder="https://..."
+                          className="w-full mt-1.5 px-2 py-1 text-[11px] rounded-lg bg-white dark:bg-slate-900 border border-[#DEE7F2] dark:border-slate-700 text-[#14213D] dark:text-white"
+                        />
+                      </details>
+                    </div>
+                  </div>
+
+                  {/* SLOTS 1 Y 2 PARA PLANES BASIC Y PRO */}
+                  {isPaidPlan && (
+                    <>
+                      {/* SLOT 1: FOTOGRAFÍA ADICIONAL 1 */}
+                      <div className="p-3.5 rounded-2xl bg-[#F8FAFC] dark:bg-slate-900/80 border border-[#DEE7F2] dark:border-slate-800 space-y-2.5 flex flex-col justify-between">
+                        <div>
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs font-bold text-[#14213D] dark:text-white">
+                              Fotografía Adicional 1
+                            </span>
+                            <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-md bg-slate-200 dark:bg-slate-800 text-[#14213D] dark:text-slate-300">
+                              Adicional 1
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-[#52627A] dark:text-slate-400 mb-2">
+                            Segunda toma para la galería.
+                          </p>
+
+                          {imageSlots[1].error && (
+                            <div className="p-2 mb-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-[11px] flex items-center gap-1.5">
+                              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                              <span>{imageSlots[1].error}</span>
+                            </div>
+                          )}
+
+                          {imageSlots[1].previewUrl ? (
+                            <div className="relative aspect-4/3 rounded-xl overflow-hidden bg-white dark:bg-slate-950 border border-[#DEE7F2] dark:border-slate-700">
+                              <img
+                                src={imageSlots[1].previewUrl}
+                                alt="Foto adicional 1"
+                                className="w-full h-full object-cover"
+                              />
+                              {imageSlots[1].file && (
+                                <span className="absolute bottom-1.5 left-1.5 text-[9px] bg-black/70 text-white px-1.5 py-0.5 rounded backdrop-blur-xs">
+                                  Archivo listo para guardar
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <div
+                              onClick={() => fileInputRef1.current?.click()}
+                              className="aspect-4/3 rounded-xl border-2 border-dashed border-[#DEE7F2] hover:border-[#1769FF] dark:border-slate-700 dark:hover:border-indigo-500 bg-white dark:bg-slate-950/60 flex flex-col items-center justify-center p-3 text-center cursor-pointer transition group"
+                            >
+                              <Plus className="w-6 h-6 text-[#94A3B8] group-hover:text-[#1769FF] dark:text-slate-400 dark:group-hover:text-indigo-400 mb-1 transition" />
+                              <span className="text-xs font-semibold text-[#14213D] group-hover:text-[#1769FF] dark:text-slate-200">
+                                Añadir foto 2
+                              </span>
+                              <span className="text-[10px] text-[#52627A] dark:text-slate-400 mt-0.5">
+                                Opcional para galería
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="space-y-2 pt-1 border-t border-[#DEE7F2]/60 dark:border-slate-800">
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => fileInputRef1.current?.click()}
+                              disabled={isUploadingImages || isSaving}
+                              className="flex-1 inline-flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg bg-white hover:bg-[#EEF4FF] dark:bg-slate-800 dark:hover:bg-slate-700 text-[#14213D] dark:text-slate-200 text-xs font-medium border border-[#DEE7F2] dark:border-slate-700 transition cursor-pointer shadow-2xs"
+                            >
+                              <UploadCloud className="w-3.5 h-3.5 text-[#1769FF] dark:text-indigo-400" />
+                              <span>{imageSlots[1].previewUrl ? 'Cambiar' : 'Seleccionar'}</span>
+                            </button>
+                            {imageSlots[1].previewUrl && (
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveSlotImage(1)}
+                                disabled={isUploadingImages || isSaving}
+                                className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-transparent hover:border-rose-200 transition cursor-pointer"
+                                title="Quitar foto"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+
+                          <details className="group">
+                            <summary className="text-[10px] text-[#52627A] hover:text-[#14213D] dark:text-slate-400 cursor-pointer select-none">
+                              ¿Ingresar URL externa?
+                            </summary>
+                            <input
+                              type="url"
+                              value={imageSlots[1].url}
+                              onChange={(e) => handleSlotUrlChange(1, e.target.value)}
+                              placeholder="https://..."
+                              className="w-full mt-1.5 px-2 py-1 text-[11px] rounded-lg bg-white dark:bg-slate-900 border border-[#DEE7F2] dark:border-slate-700 text-[#14213D] dark:text-white"
+                            />
+                          </details>
+                        </div>
+                      </div>
+
+                      {/* SLOT 2: FOTOGRAFÍA ADICIONAL 2 */}
+                      <div className="p-3.5 rounded-2xl bg-[#F8FAFC] dark:bg-slate-900/80 border border-[#DEE7F2] dark:border-slate-800 space-y-2.5 flex flex-col justify-between">
+                        <div>
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs font-bold text-[#14213D] dark:text-white">
+                              Fotografía Adicional 2
+                            </span>
+                            <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-md bg-slate-200 dark:bg-slate-800 text-[#14213D] dark:text-slate-300">
+                              Adicional 2
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-[#52627A] dark:text-slate-400 mb-2">
+                            Tercera toma para la galería.
+                          </p>
+
+                          {imageSlots[2].error && (
+                            <div className="p-2 mb-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-[11px] flex items-center gap-1.5">
+                              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                              <span>{imageSlots[2].error}</span>
+                            </div>
+                          )}
+
+                          {imageSlots[2].previewUrl ? (
+                            <div className="relative aspect-4/3 rounded-xl overflow-hidden bg-white dark:bg-slate-950 border border-[#DEE7F2] dark:border-slate-700">
+                              <img
+                                src={imageSlots[2].previewUrl}
+                                alt="Foto adicional 2"
+                                className="w-full h-full object-cover"
+                              />
+                              {imageSlots[2].file && (
+                                <span className="absolute bottom-1.5 left-1.5 text-[9px] bg-black/70 text-white px-1.5 py-0.5 rounded backdrop-blur-xs">
+                                  Archivo listo para guardar
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <div
+                              onClick={() => fileInputRef2.current?.click()}
+                              className="aspect-4/3 rounded-xl border-2 border-dashed border-[#DEE7F2] hover:border-[#1769FF] dark:border-slate-700 dark:hover:border-indigo-500 bg-white dark:bg-slate-950/60 flex flex-col items-center justify-center p-3 text-center cursor-pointer transition group"
+                            >
+                              <Plus className="w-6 h-6 text-[#94A3B8] group-hover:text-[#1769FF] dark:text-slate-400 dark:group-hover:text-indigo-400 mb-1 transition" />
+                              <span className="text-xs font-semibold text-[#14213D] group-hover:text-[#1769FF] dark:text-slate-200">
+                                Añadir foto 3
+                              </span>
+                              <span className="text-[10px] text-[#52627A] dark:text-slate-400 mt-0.5">
+                                Opcional para galería
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="space-y-2 pt-1 border-t border-[#DEE7F2]/60 dark:border-slate-800">
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => fileInputRef2.current?.click()}
+                              disabled={isUploadingImages || isSaving}
+                              className="flex-1 inline-flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg bg-white hover:bg-[#EEF4FF] dark:bg-slate-800 dark:hover:bg-slate-700 text-[#14213D] dark:text-slate-200 text-xs font-medium border border-[#DEE7F2] dark:border-slate-700 transition cursor-pointer shadow-2xs"
+                            >
+                              <UploadCloud className="w-3.5 h-3.5 text-[#1769FF] dark:text-indigo-400" />
+                              <span>{imageSlots[2].previewUrl ? 'Cambiar' : 'Seleccionar'}</span>
+                            </button>
+                            {imageSlots[2].previewUrl && (
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveSlotImage(2)}
+                                disabled={isUploadingImages || isSaving}
+                                className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-transparent hover:border-rose-200 transition cursor-pointer"
+                                title="Quitar foto"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+
+                          <details className="group">
+                            <summary className="text-[10px] text-[#52627A] hover:text-[#14213D] dark:text-slate-400 cursor-pointer select-none">
+                              ¿Ingresar URL externa?
+                            </summary>
+                            <input
+                              type="url"
+                              value={imageSlots[2].url}
+                              onChange={(e) => handleSlotUrlChange(2, e.target.value)}
+                              placeholder="https://..."
+                              className="w-full mt-1.5 px-2 py-1 text-[11px] rounded-lg bg-white dark:bg-slate-900 border border-[#DEE7F2] dark:border-slate-700 text-[#14213D] dark:text-white"
+                            />
+                          </details>
+                        </div>
+                      </div>
+                    </>
                   )}
                 </div>
 
-                {/* Input file nativo oculto */}
-                <input
-                  type="file"
-                  id="input-product-image-file"
-                  ref={imageFileInputRef}
-                  accept="image/png,image/jpeg,image/webp"
-                  onChange={handleImageFileChange}
-                  disabled={isUploadingImage || isSaving}
-                  className="hidden"
-                />
-
-                {/* Mensaje de error si la validación falla */}
-                {imageUploadError && (
-                  <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 dark:bg-rose-950/40 dark:border-rose-800/80 dark:text-rose-300 text-xs flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4 flex-shrink-0 text-rose-500 dark:text-rose-400" />
-                    <span>{imageUploadError}</span>
-                  </div>
-                )}
-
-                {/* Previsualización de Imagen */}
-                {imagePreviewUrl ? (
-                  <div className="p-3 rounded-xl bg-[#F8FAFC] dark:bg-slate-900/80 border border-[#DEE7F2] dark:border-slate-800 space-y-3">
-                    <div className="flex flex-col sm:flex-row items-center gap-4">
-                      <div className="relative w-full sm:w-44 h-36 rounded-xl overflow-hidden bg-white dark:bg-slate-950 border border-[#DEE7F2] dark:border-slate-700/80 flex-shrink-0 group">
-                        <img
-                          src={imagePreviewUrl}
-                          alt="Previsualización del producto"
-                          className="w-full h-full object-cover"
-                          onError={() => {
-                            setImageUploadError('No se pudo cargar la previsualización de la imagen.');
-                          }}
-                        />
-                        {isUploadingImage && (
-                          <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center gap-1.5 text-white text-xs">
-                            <Loader2 className="w-5 h-5 animate-spin text-[#1769FF] dark:text-indigo-400" />
-                            <span>Subiendo imagen...</span>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="flex-1 space-y-2 text-left w-full">
-                        {selectedImageFile ? (
-                          <div>
-                            <span className="text-xs font-semibold text-[#1769FF] dark:text-indigo-300 block truncate">
-                              {selectedImageFile.name}
-                            </span>
-                            <span className="text-[11px] text-[#52627A] dark:text-slate-400 block">
-                              Tamaño: {(selectedImageFile.size / 1024).toFixed(1)} KB • Formato: {selectedImageFile.type.replace('image/', '').toUpperCase()}
-                            </span>
-                            <span className="text-[10px] text-amber-600 dark:text-amber-400 mt-1 inline-block">
-                              ⚠️ Se subirá y guardará al presionar "Guardar Producto"
-                            </span>
-                          </div>
-                        ) : (
-                          <div>
-                            <span className="text-xs font-semibold text-[#14213D] dark:text-slate-200 block truncate">
-                              Imagen actual del producto
-                            </span>
-                            <span className="text-[11px] text-[#52627A] dark:text-slate-400 block break-all line-clamp-2">
-                              {currentProduct.image_url}
-                            </span>
-                          </div>
-                        )}
-
-                        <div className="flex flex-wrap items-center gap-2 pt-1">
-                          <button
-                            type="button"
-                            onClick={() => imageFileInputRef.current?.click()}
-                            disabled={isUploadingImage || isSaving}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-[#EEF4FF] dark:bg-slate-800 dark:hover:bg-slate-700 text-[#14213D] dark:text-slate-200 text-xs font-medium border border-[#DEE7F2] dark:border-slate-700 transition cursor-pointer shadow-2xs"
-                          >
-                            <UploadCloud className="w-3.5 h-3.5 text-[#1769FF] dark:text-indigo-400" />
-                            <span>Cambiar imagen</span>
-                          </button>
-
-                          {selectedImageFile && currentProduct.id && isValidUUID(currentProduct.id) && (
-                            <button
-                              type="button"
-                              onClick={handleUploadImageNow}
-                              disabled={isUploadingImage || isSaving}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#1769FF] hover:bg-blue-700 dark:bg-indigo-600 dark:hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-medium shadow-2xs transition cursor-pointer"
-                            >
-                              {isUploadingImage ? (
-                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                              ) : (
-                                <CheckCircle2 className="w-3.5 h-3.5" />
-                              )}
-                              <span>Subir ahora</span>
-                            </button>
-                          )}
-
-                          {selectedImageFile && (
-                            <button
-                              type="button"
-                              onClick={handleDiscardSelectedFile}
-                              disabled={isUploadingImage || isSaving}
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-white hover:bg-slate-100 dark:bg-slate-800/80 dark:hover:bg-slate-700 text-[#52627A] dark:text-slate-400 dark:hover:text-white text-xs transition cursor-pointer border border-[#DEE7F2] dark:border-transparent"
-                              title="Descartar archivo seleccionado"
-                            >
-                              <X className="w-3.5 h-3.5" />
-                              <span>Descartar archivo</span>
-                            </button>
-                          )}
-
-                          <button
-                            type="button"
-                            onClick={handleRemoveProductImage}
-                            disabled={isUploadingImage || isSaving}
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-950/60 border border-rose-200 dark:border-rose-800/60 text-rose-700 dark:text-rose-300 text-xs font-medium transition cursor-pointer shadow-2xs"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                            <span>Eliminar imagen</span>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  /* Zona de arrastrar / seleccionar cuando no hay imagen */
-                  <div
-                    onClick={() => imageFileInputRef.current?.click()}
-                    className="border-2 border-dashed border-[#DEE7F2] dark:border-slate-700 hover:border-[#1769FF] dark:hover:border-indigo-500/80 bg-[#F8FAFC] hover:bg-[#EEF4FF]/50 dark:bg-slate-900/40 dark:hover:bg-slate-900/70 rounded-2xl p-5 text-center cursor-pointer transition flex flex-col items-center justify-center gap-2 group"
-                  >
-                    <div className="w-12 h-12 rounded-xl bg-white dark:bg-slate-800 group-hover:bg-[#EEF4FF] dark:group-hover:bg-indigo-950/50 border border-[#DEE7F2] dark:border-slate-700 group-hover:border-[#1769FF]/50 dark:group-hover:border-indigo-500/50 flex items-center justify-center text-[#52627A] group-hover:text-[#1769FF] dark:text-slate-400 dark:group-hover:text-indigo-400 transition shadow-2xs">
-                      <UploadCloud className="w-6 h-6" />
-                    </div>
-                    <div>
-                      <span className="text-xs font-semibold text-[#14213D] group-hover:text-[#1769FF] dark:text-slate-200 dark:group-hover:text-white block">
-                        Toca aquí o haz clic para subir imagen desde tu dispositivo
+                {/* Banner Informativo si el comercio está en Plan FREE */}
+                {!isPaidPlan && (
+                  <div className="p-3.5 rounded-2xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-800/50 flex items-start gap-2.5">
+                    <Sparkles className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                    <div className="text-xs text-amber-900 dark:text-amber-200">
+                      <span className="font-semibold block mb-0.5">
+                        Galería de fotos extendida exclusiva para planes BASIC y PRO
                       </span>
-                      <span className="text-[11px] text-[#52627A] dark:text-slate-400 block mt-0.5">
-                        Formatos soportados: PNG, JPG o WEBP (máximo 5 MB)
+                      <span className="text-amber-700 dark:text-amber-300 text-[11px] leading-relaxed block">
+                        Tu plan FREE incluye 1 fotografía por producto. Con los planes BASIC o PRO puedes registrar hasta 3 fotografías (1 principal y 2 adicionales) para que tus clientes disfruten de una galería interactiva con navegación táctil en tu tienda pública.
                       </span>
                     </div>
-                    <button
-                      type="button"
-                      className="mt-1 px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 group-hover:bg-[#1769FF] dark:group-hover:bg-indigo-600 text-[#14213D] group-hover:text-white dark:text-slate-200 dark:group-hover:text-white text-xs font-medium border border-[#DEE7F2] dark:border-slate-700 group-hover:border-[#1769FF] dark:group-hover:border-indigo-500 transition cursor-pointer shadow-2xs"
-                    >
-                      Seleccionar Archivo
-                    </button>
                   </div>
                 )}
-
-                {/* Opción Manual de Enlace Externo (Preservación y flexibilidad) */}
-                <details className="group pt-1">
-                  <summary className="text-[11px] text-[#52627A] hover:text-[#14213D] dark:text-slate-400 dark:hover:text-slate-300 cursor-pointer flex items-center gap-1 select-none">
-                    <LinkIcon className="w-3 h-3 text-[#52627A] dark:text-slate-400" />
-                    <span>¿Prefieres enlazar una URL de imagen externa? (Opcional)</span>
-                  </summary>
-                  <div className="pt-2 pl-4">
-                    <input
-                      type="url"
-                      value={currentProduct.image_url || ''}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setCurrentProduct({ ...currentProduct, image_url: val });
-                        if (val && !selectedImageFile) {
-                          setImagePreviewUrl(val);
-                        } else if (!val && !selectedImageFile) {
-                          setImagePreviewUrl(null);
-                        }
-                      }}
-                      className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-[#DEE7F2] dark:border-slate-700 text-[#14213D] dark:text-white text-xs focus:outline-none focus:border-[#1769FF] dark:focus:border-indigo-500"
-                      placeholder="https://images.unsplash.com/..."
-                    />
-                  </div>
-                </details>
               </div>
 
               {/* Estado y Opciones */}

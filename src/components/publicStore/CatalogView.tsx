@@ -26,6 +26,7 @@ import {
   GeneralSettings,
 } from '../../types';
 import { getVerticalMotionProfile } from './motionSystem';
+import { getTemplateVisualClasses, getTemplateDefinition } from './storeTemplateSystem';
 
 interface CatalogViewProps {
   storeType: StoreType;
@@ -41,6 +42,7 @@ interface CatalogViewProps {
   primaryColor?: string;
   brandSecondaryColor?: string;
   brandAccentColor?: string;
+  templateId?: string;
 }
 
 // Determinar el color de texto (blanco o negro suave) según el contraste del color de marca
@@ -67,7 +69,11 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
   onRequestAppointment,
   onOpenSizeGuide,
   primaryColor = '#2563eb',
+  templateId,
 }) => {
+  const isSpecialTemplate = Boolean(templateId && templateId !== 'free');
+  const templateVisuals = getTemplateVisualClasses(templateId);
+
   const isRestaurant = storeType === 'restaurante';
   const isFashion = storeType === 'moda';
   const isServices = storeType === 'servicios';
@@ -178,13 +184,13 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
   return (
     <div className="space-y-6">
       {/* BARRA DE HERRAMIENTAS: BUSCADOR & GUÍA DE TALLAS */}
-      <div className="space-y-4">
+      <div className="space-y-3.5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           {/* Campo de Búsqueda Integrado con la Identidad del Comercio */}
           <div className="relative flex-1 max-w-md">
             <Search
               className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-200"
-              style={{ color: searchQuery ? primaryColor : 'inherit' }}
+              style={{ color: searchQuery ? primaryColor : 'currentColor' }}
             />
             <input
               type="text"
@@ -199,7 +205,7 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
                   ? 'Buscar prendas o catálogo...'
                   : 'Buscar productos en el catálogo...'
               }
-              className="w-full pl-10 pr-10 py-2.5 rounded-2xl bg-white dark:bg-stone-900/90 border border-stone-200/80 dark:border-stone-800 text-sm text-stone-900 dark:text-white placeholder-stone-400 shadow-2xs transition-all duration-200 focus:outline-hidden focus:ring-2 focus:ring-opacity-20"
+              className="w-full pl-10 pr-10 py-2.5 rounded-2xl bg-white dark:bg-stone-900/90 border border-stone-200/90 dark:border-stone-800 text-sm text-stone-900 dark:text-white placeholder:text-stone-400 dark:placeholder:text-stone-500 shadow-2xs transition-all duration-200 focus:outline-hidden focus:ring-2 focus:ring-offset-0"
               style={{
                 borderColor: searchQuery ? primaryColor : undefined,
               }}
@@ -213,7 +219,7 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
                   transition={{ duration: 0.15 }}
                   type="button"
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full flex items-center justify-center text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800 transition active:scale-90 cursor-pointer"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full flex items-center justify-center text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800 transition active:scale-90 cursor-pointer"
                   title="Limpiar búsqueda"
                 >
                   <X className="w-3.5 h-3.5" />
@@ -222,12 +228,12 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
             </AnimatePresence>
           </div>
 
-          {/* Botón Guía de Tallas (Específico y auténtico de Moda) */}
+          {/* Botón Guía de Tallas (Específico de Moda) */}
           {isFashion && onOpenSizeGuide && (
             <button
               type="button"
               onClick={onOpenSizeGuide}
-              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-white dark:bg-stone-900/90 hover:bg-stone-50 dark:hover:bg-stone-800 border border-stone-200/80 dark:border-stone-800 text-stone-800 dark:text-stone-200 text-xs font-semibold shadow-2xs transition cursor-pointer self-start sm:self-auto hover:scale-[1.01] active:scale-[0.98]"
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-white dark:bg-stone-900/90 hover:bg-stone-50 dark:hover:bg-stone-800 border border-stone-200/90 dark:border-stone-800 text-stone-800 dark:text-stone-200 text-xs font-semibold shadow-2xs transition cursor-pointer self-start sm:self-auto hover:scale-[1.01] active:scale-[0.98]"
             >
               <Ruler className="w-3.5 h-3.5" style={{ color: primaryColor }} />
               <span>Guía de Tallas & Medidas</span>
@@ -235,78 +241,80 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
           )}
         </div>
 
-        {/* SELECTOR DE CATEGORÍAS: REDISEÑADO CON IDENTIDAD DE MARCA */}
+        {/* SELECTOR DE CATEGORÍAS: SEGMENTADO CON IDENTIDAD DE MARCA */}
         {activeCategories.length > 0 && (
-          <div className="flex items-center gap-2 overflow-x-auto pb-1.5 pt-0.5 no-scrollbar scroll-smooth">
-            {/* Píldora "Todos" */}
-            <button
-              type="button"
-              onClick={() => setSelectedCategoryId('all')}
-              className={`px-4 py-2 rounded-2xl text-xs font-semibold whitespace-nowrap transition-all duration-200 flex items-center gap-2 cursor-pointer shrink-0 select-none ${
-                selectedCategoryId === 'all'
-                  ? 'shadow-sm active:scale-95'
-                  : 'bg-stone-100/90 dark:bg-stone-800/80 hover:bg-stone-200/80 dark:hover:bg-stone-700/80 text-stone-700 dark:text-stone-300 border border-stone-200/70 dark:border-stone-700/60 hover:scale-[1.01] active:scale-95'
-              }`}
-              style={
-                selectedCategoryId === 'all'
-                  ? {
-                      backgroundColor: primaryColor,
-                      color: contrastColor,
-                      boxShadow: `0 2px 10px -2px ${primaryColor}45`,
-                    }
-                  : undefined
-              }
-            >
-              <span>Todos</span>
-              <span
-                className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold leading-none ${
+          <div className="relative">
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-0.5 no-scrollbar scroll-smooth">
+              {/* Pestaña "Todos" */}
+              <button
+                type="button"
+                onClick={() => setSelectedCategoryId('all')}
+                className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-200 flex items-center gap-2 cursor-pointer shrink-0 select-none ${
                   selectedCategoryId === 'all'
-                    ? 'bg-black/15 dark:bg-white/20'
-                    : 'bg-stone-200/90 dark:bg-stone-700/90 text-stone-500 dark:text-stone-400'
+                    ? 'shadow-xs font-bold active:scale-95'
+                    : 'bg-white/80 dark:bg-stone-900/80 hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-600 dark:text-stone-300 border border-stone-200/80 dark:border-stone-800 hover:scale-[1.01] active:scale-95'
                 }`}
+                style={
+                  selectedCategoryId === 'all'
+                    ? {
+                        backgroundColor: primaryColor,
+                        color: contrastColor,
+                        boxShadow: `0 2px 10px -2px ${primaryColor}40`,
+                      }
+                    : undefined
+                }
               >
-                {publicProducts.length}
-              </span>
-            </button>
-
-            {/* Píldoras de Categorías Reales */}
-            {activeCategories.map((cat) => {
-              const count = publicProducts.filter((p) => p.category_id === cat.id).length;
-              const isSelected = selectedCategoryId === cat.id;
-
-              return (
-                <button
-                  key={cat.id}
-                  type="button"
-                  onClick={() => setSelectedCategoryId(cat.id)}
-                  className={`px-4 py-2 rounded-2xl text-xs font-semibold whitespace-nowrap transition-all duration-200 flex items-center gap-2 cursor-pointer shrink-0 select-none ${
-                    isSelected
-                      ? 'shadow-sm active:scale-95'
-                      : 'bg-stone-100/90 dark:bg-stone-800/80 hover:bg-stone-200/80 dark:hover:bg-stone-700/80 text-stone-700 dark:text-stone-300 border border-stone-200/70 dark:border-stone-700/60 hover:scale-[1.01] active:scale-95'
+                <span>Todos</span>
+                <span
+                  className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold leading-none ${
+                    selectedCategoryId === 'all'
+                      ? 'bg-black/15 dark:bg-white/20'
+                      : 'bg-stone-100 dark:bg-stone-800 text-stone-500 dark:text-stone-400'
                   }`}
-                  style={
-                    isSelected
-                      ? {
-                          backgroundColor: primaryColor,
-                          color: contrastColor,
-                          boxShadow: `0 2px 10px -2px ${primaryColor}45`,
-                        }
-                      : undefined
-                  }
                 >
-                  <span>{cat.name}</span>
-                  <span
-                    className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold leading-none ${
+                  {publicProducts.length}
+                </span>
+              </button>
+
+              {/* Pestañas de Categorías Reales */}
+              {activeCategories.map((cat) => {
+                const count = publicProducts.filter((p) => p.category_id === cat.id).length;
+                const isSelected = selectedCategoryId === cat.id;
+
+                return (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setSelectedCategoryId(cat.id)}
+                    className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-200 flex items-center gap-2 cursor-pointer shrink-0 select-none ${
                       isSelected
-                        ? 'bg-black/15 dark:bg-white/20'
-                        : 'bg-stone-200/90 dark:bg-stone-700/90 text-stone-500 dark:text-stone-400'
+                        ? 'shadow-xs font-bold active:scale-95'
+                        : 'bg-white/80 dark:bg-stone-900/80 hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-600 dark:text-stone-300 border border-stone-200/80 dark:border-stone-800 hover:scale-[1.01] active:scale-95'
                     }`}
+                    style={
+                      isSelected
+                        ? {
+                            backgroundColor: primaryColor,
+                            color: contrastColor,
+                            boxShadow: `0 2px 10px -2px ${primaryColor}40`,
+                          }
+                        : undefined
+                    }
                   >
-                    {count}
-                  </span>
-                </button>
-              );
-            })}
+                    <span>{cat.name}</span>
+                    <span
+                      className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold leading-none ${
+                        isSelected
+                          ? 'bg-black/15 dark:bg-white/20'
+                          : 'bg-stone-100 dark:bg-stone-800 text-stone-500 dark:text-stone-400'
+                      }`}
+                    >
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
       </div>
@@ -350,6 +358,8 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
           className={
             isListLayout
               ? 'flex flex-col gap-3.5'
+              : isSpecialTemplate
+              ? templateVisuals.catalogGrid
               : 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6'
           }
         >
@@ -381,12 +391,21 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
             const specialty = (product.attributes?.specialty as string) || '';
             const professionalName = (product.attributes?.professional_name as string) || '';
 
-            // Proporción visual de la fotografía adaptada armónicamente a la vertical
-            const imageAspectClass = isFashion
-              ? 'aspect-[3/4]'
-              : isRestaurant || isServices
-              ? 'aspect-[16/10]'
-              : 'aspect-[4/3]';
+            // Proporción visual de la fotografía adaptada armónicamente a la vertical o al modelo especial
+            const imageAspectClass = (() => {
+              if (isSpecialTemplate) {
+                if (templateId === 'g2' || templateId === 'c2' || templateId === 'b1' || templateId === 'g8') return 'aspect-[16/9]';
+                if (templateId === 'm2' || templateId === 'm1' || templateId === 'm3') return 'aspect-[3/4]';
+                if (templateId === 'c1' || templateId === 'c3' || templateId === 'c4') return 'aspect-[1/1]';
+                if (templateId === 'g1' || templateId === 'g5' || templateId === 'g6' || templateId === 'g7' || templateId === 'm4' || templateId === 'b2' || templateId === 'b3' || templateId === 'b4' || templateId === 's2' || templateId === 'g3') return 'aspect-[4/3]';
+                if (templateId === 's1' || templateId === 's4' || templateId === 's3') return 'aspect-[16/10]';
+              }
+              return isFashion
+                ? 'aspect-[3/4]'
+                : isRestaurant || isServices
+                ? 'aspect-[16/10]'
+                : 'aspect-[4/3]';
+            })();
 
             return (
               <motion.div
@@ -394,13 +413,17 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
                 id={`prod-${product.id}`}
                 variants={itemVariants}
                 onClick={() => onSelectProduct(product)}
-                className={`group rounded-3xl bg-white dark:bg-stone-900/90 border border-stone-200/80 dark:border-stone-800/80 hover:border-stone-300 dark:hover:border-stone-700 p-3.5 sm:p-4 transition-all duration-300 ${motionProfile.cardElevationClass} active:scale-[0.985] cursor-pointer relative overflow-hidden flex ${
+                className={`group ${
+                  isSpecialTemplate
+                    ? `${templateVisuals.cardWrapper} ${templateVisuals.densityClass}`
+                    : 'rounded-2xl sm:rounded-3xl bg-white dark:bg-stone-900 border border-stone-200/80 dark:border-stone-800/80 hover:border-stone-300 dark:hover:border-stone-700 p-3.5 sm:p-4'
+                } transition-all duration-300 ${motionProfile.cardElevationClass} hover:shadow-md active:scale-[0.985] cursor-pointer relative overflow-hidden flex ${
                   isListLayout ? 'flex-col sm:flex-row gap-4' : 'flex-col justify-between'
                 }`}
                 style={
                   isFeatured
                     ? {
-                        borderColor: `${primaryColor}45`,
+                        borderColor: `${primaryColor}55`,
                       }
                     : undefined
                 }
@@ -411,10 +434,10 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
                   <div
                     className={`relative w-full ${
                       isListLayout ? 'h-40 sm:h-full' : imageAspectClass
-                    } rounded-2xl overflow-hidden bg-stone-100 dark:bg-stone-800/80 border border-stone-200/60 dark:border-stone-800/60 mb-3 select-none`}
+                    } rounded-xl sm:rounded-2xl overflow-hidden bg-stone-100 dark:bg-stone-800/80 border border-stone-200/60 dark:border-stone-800/60 mb-3 select-none`}
                   >
                     {hasBrokenImage ? (
-                      /* Fallback Visual Neutro y Elegante (Sin textos ficticios ni de otros comercios) */
+                      /* Fallback Visual Neutro y Elegante */
                       <div
                         className="w-full h-full flex flex-col items-center justify-center gap-2 p-4 text-center transition-colors"
                         style={{ backgroundColor: `${primaryColor}0a` }}
@@ -496,24 +519,42 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
                   <div className="space-y-1.5">
                     {/* Etiqueta de Categoría o Especialidad Real */}
                     {(categoryName || specialty) && (
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-stone-400 dark:text-stone-500 block truncate">
+                      <span
+                        className={
+                          isSpecialTemplate
+                            ? `${templateVisuals.badgeClass} block truncate max-w-fit mb-1`
+                            : 'text-[10px] font-bold uppercase tracking-wider text-stone-400 dark:text-stone-500 block truncate'
+                        }
+                      >
                         {specialty || categoryName}
                       </span>
                     )}
 
                     {/* Nombre del Producto */}
-                    <h3 className="text-base font-bold text-stone-900 dark:text-stone-100 leading-snug line-clamp-1 group-hover:text-stone-950 dark:group-hover:text-white transition-colors">
+                    <h3
+                      className={`leading-snug line-clamp-1 group-hover:text-stone-950 dark:group-hover:text-white transition-colors ${
+                        isSpecialTemplate
+                          ? `${templateVisuals.typographyHeading} text-stone-900 dark:text-stone-100`
+                          : 'text-base font-bold text-stone-900 dark:text-stone-100'
+                      }`}
+                    >
                       {product.name}
                     </h3>
 
                     {/* Descripción Real */}
                     {product.description && (
-                      <p className="text-xs text-stone-500 dark:text-stone-400 line-clamp-2 leading-relaxed">
+                      <p
+                        className={`line-clamp-2 leading-relaxed ${
+                          isSpecialTemplate
+                            ? templateVisuals.typographyBody
+                            : 'text-xs text-stone-500 dark:text-stone-400'
+                        }`}
+                      >
                         {product.description}
                       </p>
                     )}
 
-                    {/* Atributos Reales de Vertical (Solo cuando existen en los datos) */}
+                    {/* Atributos Reales de Vertical */}
                     {/* MODA: Tallas y Muestras de Color */}
                     {isFashion && (sizes.length > 0 || colors.length > 0) && (
                       <div className="pt-1 flex flex-wrap items-center gap-2 text-[10px]">
@@ -568,7 +609,7 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
                       </div>
                     )}
 
-                    {/* SERVICIOS: Duración y Profesional Asignado (Solo si existen) */}
+                    {/* SERVICIOS: Duración y Profesional Asignado */}
                     {isService && (duration !== null || professionalName) && (
                       <div className="pt-1 flex flex-wrap items-center gap-2.5 text-[11px] text-stone-600 dark:text-stone-300">
                         {duration !== null && (
@@ -594,7 +635,7 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
                       <span className="text-xs text-stone-500 dark:text-stone-400 font-semibold select-none">
                         Bs
                       </span>
-                      <span className="text-lg font-black text-stone-900 dark:text-white tracking-tight">
+                      <span className="text-lg sm:text-xl font-black text-stone-950 dark:text-white tracking-tight tabular-nums">
                         {product.price.toLocaleString('es-BO', {
                           minimumFractionDigits: product.price % 1 === 0 ? 0 : 2,
                           maximumFractionDigits: 2,
@@ -617,7 +658,7 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
                           e.stopPropagation();
                           onRequestAppointment(product.id);
                         }}
-                        className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all duration-200 shadow-2xs cursor-pointer ${
+                        className={`min-h-[40px] px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all duration-200 shadow-2xs cursor-pointer ${
                           !product.is_available
                             ? 'bg-stone-100 dark:bg-stone-800 text-stone-400 dark:text-stone-500 cursor-not-allowed border border-stone-200 dark:border-stone-700/60 select-none'
                             : 'active:scale-95 hover:brightness-105 hover:shadow-xs'
@@ -647,7 +688,7 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
                             onQuickAddToCart(product);
                           }
                         }}
-                        className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all duration-200 shadow-2xs cursor-pointer ${
+                        className={`min-h-[40px] px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all duration-200 shadow-2xs cursor-pointer ${
                           !product.is_available
                             ? 'bg-stone-100 dark:bg-stone-800 text-stone-400 dark:text-stone-500 cursor-not-allowed border border-stone-200 dark:border-stone-700/60 select-none'
                             : 'active:scale-95 hover:brightness-105 hover:shadow-xs'

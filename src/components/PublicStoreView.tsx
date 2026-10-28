@@ -57,6 +57,8 @@ import {
   fetchRestaurantSettings,
   fetchPublicActivePromotions,
   getCachedStorePromotions,
+  isStorePaidPlan,
+  isStoreProPlan,
 } from '../lib/storeAdminService';
 import { useRouter } from '../context/RouterContext';
 import { useAuth } from '../context/AuthContext';
@@ -64,6 +66,10 @@ import { useStorePWA } from '../lib/pwaTenantService';
 
 // Subcomponentes del Módulo 5
 import { PublicStoreHeader } from './publicStore/PublicStoreHeader';
+import { StoreBannersCarousel } from './publicStore/StoreBannersCarousel';
+import { StoreStoriesBar } from './publicStore/StoreStoriesBar';
+import { StoreStoryViewerModal } from './publicStore/StoreStoryViewerModal';
+import { StoreLocationMap } from './publicStore/StoreLocationMap';
 import { CatalogView } from './publicStore/CatalogView';
 import { ProductDetailModal } from './publicStore/ProductDetailModal';
 import { CartDrawer } from './publicStore/CartDrawer';
@@ -85,6 +91,7 @@ import { StorePWAInstallButton } from './publicStore/StorePWAInstallButton';
 import { StoreHighlights } from './publicStore/StoreHighlights';
 import { PublicStorePromotions } from './publicStore/PublicStorePromotions';
 import { ChatWidget } from './chat/ChatWidget';
+import { resolveStoreTemplate } from './publicStore/storeTemplateSystem';
 
 interface PublicStoreViewProps {
   slug: string;
@@ -98,6 +105,10 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
   const [store, setStore] = useState<Store | null>(null);
   const [profile, setProfile] = useState<StoreProfileSettings | null>(null);
   const [appearance, setAppearance] = useState<StoreAppearanceSettings | null>(null);
+
+  // Tiendas Públicas 2.0: El diseño actual aprobado es oficialmente la versión FREE de MAXINEGO
+  // Modelos especiales de BASIC y PRO son activados según el plan del comercio.
+  const activeTemplateId = resolveStoreTemplate(store, appearance);
   const [schedule, setSchedule] = useState<StoreScheduleDay[]>([]);
   const [shipping, setShipping] = useState<StoreShippingSettings | null>(null);
   const [scheduledOrders, setScheduledOrders] = useState<StoreScheduledOrdersSettings | null>(null);
@@ -138,6 +149,9 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
 
   // Modal Historial de Pedidos del Cliente
   const [isOrdersHistoryOpen, setIsOrdersHistoryOpen] = useState(false);
+
+  // Modal / Visor de Estados Multimedia (Módulo 4: Plan PRO)
+  const [activeStoryIndex, setActiveStoryIndex] = useState<number | null>(null);
 
   // Auto-cierre de la notificación de producto agregado
   useEffect(() => {
@@ -516,8 +530,21 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
   const pastAppointmentsCount = getCustomerAppointments(store.id).length;
   const totalCustomerActivity = pastOrdersCount + pastAppointmentsCount;
 
+  // Banners comerciales: Exclusivo para planes BASIC y PRO con banners registrados
+  const canShowBanners =
+    isStorePaidPlan(store) &&
+    Array.isArray(appearance.banners) &&
+    appearance.banners.length > 0;
+
+  // Estados multimedia: Exclusivo para Plan PRO con estados registrados
+  const canShowStories =
+    isStoreProPlan(store) &&
+    Array.isArray(appearance.stories) &&
+    appearance.stories.length > 0;
+
   return (
     <div
+      data-template-id={activeTemplateId}
       className={`w-full min-h-screen flex flex-col ${
         isFashion
           ? 'bg-[#FAF8F5] dark:bg-[#101012] text-stone-900 dark:text-stone-100'
@@ -547,8 +574,20 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
         <div className="h-14 flex items-center justify-between px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto w-full">
           {/* Identidad de marca del comercio */}
           <div className="flex items-center gap-2.5 min-w-0">
+            {profile.logoUrl || store.logo_url ? (
+              <img
+                src={profile.logoUrl || store.logo_url}
+                alt={profile.name || store.name}
+                className="w-7 h-7 rounded-lg object-cover shrink-0 border border-stone-200/80 dark:border-stone-700/80 shadow-2xs"
+                onError={(e) => {
+                  (e.target as HTMLElement).style.display = 'none';
+                }}
+              />
+            ) : null}
             <div
-              className="w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 text-white shadow-2xs"
+              className={`w-7 h-7 rounded-lg items-center justify-center font-bold text-xs shrink-0 text-white shadow-2xs ${
+                profile.logoUrl || store.logo_url ? 'hidden' : 'flex'
+              }`}
               style={{ backgroundColor: primaryColor }}
             >
               {(profile.name || store.name).charAt(0).toUpperCase()}
@@ -574,7 +613,7 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
             {/* 2. Acceso a pedidos / citas */}
             <button
               onClick={() => setIsOrdersHistoryOpen(true)}
-              className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs ${
+              className={`text-xs font-semibold px-3 py-1.5 rounded-xl border transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs ${
                 isFashion
                   ? 'border-stone-200/80 dark:border-stone-800 text-stone-700 dark:text-stone-200 hover:bg-stone-200/60 dark:hover:bg-stone-900'
                   : isServices
@@ -622,12 +661,12 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
               id="public-store-cart-trigger"
               className={
                 isFashion
-                  ? 'bg-stone-900 hover:bg-stone-800 text-white dark:bg-white dark:hover:bg-stone-200 dark:text-stone-950 font-bold text-xs px-3.5 py-1.5 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer'
+                  ? 'bg-stone-900 hover:bg-stone-800 text-white dark:bg-white dark:hover:bg-stone-200 dark:text-stone-950 font-bold text-xs px-3.5 py-1.5 rounded-xl shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer active:scale-95'
                   : isServices
-                  ? 'bg-emerald-800 hover:bg-emerald-700 text-white dark:bg-emerald-600 dark:hover:bg-emerald-500 font-bold text-xs px-3.5 py-1.5 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer'
+                  ? 'bg-emerald-800 hover:bg-emerald-700 text-white dark:bg-emerald-600 dark:hover:bg-emerald-500 font-bold text-xs px-3.5 py-1.5 rounded-xl shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer active:scale-95'
                   : isRestaurant
-                  ? 'bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs px-3.5 py-1.5 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer'
-                  : 'bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs px-3.5 py-1.5 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer'
+                  ? 'bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs px-3.5 py-1.5 rounded-xl shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer active:scale-95'
+                  : 'bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs px-3.5 py-1.5 rounded-xl shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer active:scale-95'
               }
               title={isServices ? "Ver citas seleccionadas" : "Ver canasta de compras"}
             >
@@ -640,7 +679,7 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
                       ? 'px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-500/15 text-rose-600 dark:text-rose-300 border border-rose-500/20'
                       : isServices
                       ? 'px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-950/40 text-emerald-200 border border-emerald-500/30'
-                      : 'px-1.5 py-0.2 bg-stone-950/30 text-white rounded text-[10px] font-bold'
+                      : 'px-1.5 py-0.5 bg-black/25 text-white rounded text-[10px] font-bold'
                   }
                 >
                   {totalCartCount}
@@ -654,10 +693,10 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
                 onClick={() => navigate(`/admin/${store.id}`)}
                 className={
                   isFashion
-                    ? 'hidden sm:inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-stone-100 dark:bg-stone-900 text-stone-800 dark:text-stone-200 border border-stone-200/80 dark:border-stone-800 hover:bg-stone-200 transition cursor-pointer'
+                    ? 'hidden sm:inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-xl bg-stone-100 dark:bg-stone-900 text-stone-800 dark:text-stone-200 border border-stone-200/80 dark:border-stone-800 hover:bg-stone-200 transition cursor-pointer'
                     : isServices
-                    ? 'hidden sm:inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-emerald-50 dark:bg-[#121B15] text-emerald-800 dark:text-emerald-300 border border-emerald-900/15 dark:border-emerald-500/20 hover:bg-emerald-100 transition cursor-pointer'
-                    : 'hidden sm:inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800/40 hover:bg-amber-100 transition cursor-pointer'
+                    ? 'hidden sm:inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-xl bg-emerald-50 dark:bg-[#121B15] text-emerald-800 dark:text-emerald-300 border border-emerald-900/15 dark:border-emerald-500/20 hover:bg-emerald-100 transition cursor-pointer'
+                    : 'hidden sm:inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800/40 hover:bg-amber-100 transition cursor-pointer'
                 }
               >
                 <span>Admin</span>
@@ -679,7 +718,28 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
           onOpenCart={() => setIsCartOpen(true)}
           onOpenOrders={() => setIsOrdersHistoryOpen(true)}
           primaryColor={primaryColor}
+          templateId={activeTemplateId}
         />
+
+        {/* BANNERS COMERCIALES (Módulo 2: Exclusivo para Planes BASIC y PRO con banners registrados) */}
+        {canShowBanners && appearance.banners && (
+          <StoreBannersCarousel
+            banners={appearance.banners}
+            brandPrimaryColor={primaryColor}
+            storeName={store.name}
+          />
+        )}
+
+        {/* ESTADOS MULTIMEDIA (Módulo 4: Exclusivo para Plan PRO con estados registrados) */}
+        {canShowStories && appearance.stories && (
+          <StoreStoriesBar
+            stories={appearance.stories}
+            storeName={profile.name || store.name}
+            storeLogoUrl={profile.logoUrl || store.logo_url}
+            brandColor={primaryColor}
+            onOpenStory={(idx) => setActiveStoryIndex(idx)}
+          />
+        )}
 
         {/* DESTACADOS DEL COMERCIO (Sistema Dinámico, Configurable y Auténtico) */}
         <StoreHighlights
@@ -767,45 +827,59 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
             primaryColor={primaryColor}
             brandSecondaryColor={appearance?.brandSecondaryColor}
             brandAccentColor={appearance?.brandAccentColor}
+            templateId={activeTemplateId}
           />
         </div>
 
 
 
         {/* BLOQUE DE ATENCIÓN DIRECTA Y CONSULTAS */}
-        {(profile.whatsapp || profile.phone) && (
-          <div className="my-10 p-6 sm:p-8 rounded-3xl border flex flex-col sm:flex-row items-center justify-between gap-6 shadow-2xs transition bg-white/70 dark:bg-stone-900/60 border-stone-200/80 dark:border-stone-800/80">
-            <div className="space-y-1 text-center sm:text-left">
-              <span
-                className="text-[11px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full border inline-block"
-                style={{
-                  backgroundColor: `${primaryColor}12`,
-                  color: primaryColor,
-                  borderColor: `${primaryColor}33`,
-                }}
+        {(profile.whatsapp || profile.phone) && (() => {
+          const rawWa = (profile.whatsapp || profile.phone || '').replace(/\D/g, '');
+          const waNumber = rawWa.startsWith('591') ? rawWa : `591${rawWa}`;
+          return (
+            <div className="my-8 sm:my-10 p-6 sm:p-8 rounded-3xl border flex flex-col sm:flex-row items-center justify-between gap-6 shadow-2xs transition bg-gradient-to-br from-white via-white to-stone-50/70 dark:from-stone-900/90 dark:via-stone-900/70 dark:to-stone-950/80 border-stone-200/90 dark:border-stone-800">
+              <div className="space-y-1.5 text-center sm:text-left">
+                <span
+                  className="text-[11px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full border inline-block"
+                  style={{
+                    backgroundColor: `${primaryColor}14`,
+                    color: primaryColor,
+                    borderColor: `${primaryColor}30`,
+                  }}
+                >
+                  Atención Directa
+                </span>
+                <h4 className="text-lg sm:text-xl font-extrabold text-stone-900 dark:text-white">
+                  ¿Tienes alguna consulta antes de realizar tu pedido?
+                </h4>
+                <p className="text-xs sm:text-sm text-stone-600 dark:text-stone-400 max-w-xl leading-relaxed">
+                  Contáctanos directamente por WhatsApp para asistirte con consultas sobre productos, pedidos o disponibilidad de {profile.name || store.name}.
+                </p>
+              </div>
+              <a
+                href={`https://wa.me/${waNumber}?text=${encodeURIComponent(
+                  `Hola ${profile.name || store.name}, tengo una consulta sobre sus productos.`
+                )}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="shrink-0 whitespace-nowrap min-h-[44px] px-6 py-2.5 rounded-xl font-bold text-xs shadow-xs transition-all flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white active:scale-95 cursor-pointer"
               >
-                Atención Directa
-              </span>
-              <h4 className="text-lg sm:text-xl font-bold text-stone-900 dark:text-white pt-1">
-                ¿Tienes alguna consulta antes de realizar tu pedido?
-              </h4>
-              <p className="text-xs sm:text-sm text-stone-600 dark:text-stone-400 max-w-xl">
-                Contáctanos directamente por WhatsApp para asistirte con consultas sobre productos, pedidos o disponibilidad de {profile.name || store.name}.
-              </p>
+                <MessageCircle className="w-4 h-4 fill-current" />
+                <span>Contactar por WhatsApp</span>
+              </a>
             </div>
-            <a
-              href={`https://wa.me/${(profile.whatsapp || profile.phone || '').replace(/\D/g, '')}?text=${encodeURIComponent(
-                `Hola ${profile.name || store.name}, tengo una consulta sobre sus productos.`
-              )}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="whitespace-nowrap px-5 py-2.5 rounded-xl font-bold text-xs shadow-xs transition flex items-center gap-2 text-white hover:opacity-95 active:scale-98"
-              style={{ backgroundColor: primaryColor }}
-            >
-              <MessageCircle className="w-4 h-4" />
-              <span>Contactar por WhatsApp</span>
-            </a>
-          </div>
+          );
+        })()}
+
+        {/* SECCIÓN: UBICACIÓN VISIBLE DEL COMERCIO (Google Maps - Módulo 5) */}
+        {profile?.location?.isConfigured && (
+          <StoreLocationMap
+            storeName={profile.name || store.name}
+            storeAddress={profile.address}
+            location={profile.location}
+            primaryColor={primaryColor}
+          />
         )}
       </div>
 
@@ -953,6 +1027,7 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
           product={selectedProduct}
           storeType={store.store_type}
           storeName={profile.name || store.name}
+          isPaidPlan={isStorePaidPlan(store)}
           categories={categories}
           fashionSettings={fashionSettings || undefined}
           restaurantSettings={restaurantSettings || undefined}
@@ -1046,6 +1121,19 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
         />
       )}
 
+      {/* VISUALIZADOR DE ESTADOS (Módulo 4: Exclusivo para Plan PRO) */}
+      {canShowStories && appearance.stories && (
+        <StoreStoryViewerModal
+          stories={appearance.stories}
+          initialIndex={activeStoryIndex ?? 0}
+          isOpen={activeStoryIndex !== null}
+          onClose={() => setActiveStoryIndex(null)}
+          storeName={profile.name || store.name}
+          storeLogoUrl={profile.logoUrl || store.logo_url}
+          brandColor={primaryColor}
+        />
+      )}
+
       {/* CHATBOT DE ATENCIÓN INTELIGENTE (GOOGLE GEMINI + SUPABASE) */}
       {store && (
         <ChatWidget
@@ -1054,6 +1142,8 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
           storeType={store.store_type}
           primaryColor={primaryColor}
           hasFloatingCart={cartItems.length > 0}
+          qrImageUrl={paymentSettings?.qrImageUrl || null}
+          storeWhatsapp={profile?.whatsapp || profile?.phone || ''}
         />
       )}
     </div>

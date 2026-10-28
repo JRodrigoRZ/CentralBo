@@ -19,13 +19,19 @@ import {
   X,
   Link as LinkIcon,
   ShieldCheck,
+  Compass,
+  ExternalLink,
+  Edit2,
+  Trash2,
+  Navigation,
 } from 'lucide-react';
-import { Store, StoreProfileSettings } from '../../types';
+import { Store, StoreProfileSettings, StoreLocationSettings } from '../../types';
 import {
   getStoreProfile,
   fetchStoreProfile,
   saveStoreProfile,
   uploadStoreLogo,
+  buildGoogleMapsLocation,
   ALLOWED_LOGO_MIME_TYPES,
   MAX_LOGO_SIZE_BYTES,
 } from '../../lib/storeAdminService';
@@ -60,6 +66,85 @@ export const MiTiendaPerfil: React.FC<MiTiendaPerfilProps> = ({ store }) => {
       }
     };
   }, [previewLogoUrl]);
+
+  // Estados dedicados para Módulo 5: Ubicación de mi comercio (Google Maps)
+  const [isEditingLocation, setIsEditingLocation] = useState<boolean>(false);
+  const [locationQueryInput, setLocationQueryInput] = useState<string>('');
+  const [locationNotesInput, setLocationNotesInput] = useState<string>('');
+  const [locationPreview, setLocationPreview] = useState<StoreLocationSettings | null>(null);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [locationSuccess, setLocationSuccess] = useState<string | null>(null);
+
+  const handleStartAddOrEditLocation = () => {
+    setIsEditingLocation(true);
+    const existing = profile.location;
+    setLocationQueryInput(existing?.query || profile.address || '');
+    setLocationNotesInput(existing?.referenceNotes || '');
+    setLocationPreview(existing || null);
+    setLocationError(null);
+    setLocationSuccess(null);
+  };
+
+  const handlePreviewLocation = () => {
+    setLocationError(null);
+    if (!locationQueryInput || !locationQueryInput.trim()) {
+      setLocationError('Por favor ingresa una referencia válida: coordenadas (ej. -16.5321, -68.0865), dirección o enlace de Google Maps.');
+      return;
+    }
+    const built = buildGoogleMapsLocation(locationQueryInput, locationNotesInput);
+    if (!built) {
+      setLocationError('No se pudo interpretar la ubicación. Asegúrate de ingresar coordenadas, enlace o dirección válida.');
+      return;
+    }
+    setLocationPreview(built);
+  };
+
+  const handleConfirmLocation = async () => {
+    if (!locationPreview) {
+      handlePreviewLocation();
+      return;
+    }
+
+    const updatedProfile: StoreProfileSettings = {
+      ...profile,
+      location: locationPreview,
+    };
+
+    setProfile(updatedProfile);
+    setIsEditingLocation(false);
+    setLocationSuccess('Ubicación de Google Maps confirmada.');
+    setTimeout(() => setLocationSuccess(null), 4000);
+
+    // Guardar inmediatamente en Supabase
+    saveStoreProfile(store.id, updatedProfile).catch((err) => {
+      console.warn('[MiTiendaPerfil] Error guardando ubicación de mapa:', err);
+    });
+  };
+
+  const handleRemoveLocation = async () => {
+    const updatedProfile: StoreProfileSettings = {
+      ...profile,
+      location: undefined,
+    };
+
+    setProfile(updatedProfile);
+    setIsEditingLocation(false);
+    setLocationPreview(null);
+    setLocationSuccess('Ubicación de Google Maps retirada. Tu dirección escrita se conserva intacta.');
+    setTimeout(() => setLocationSuccess(null), 4000);
+
+    // Guardar inmediatamente en Supabase
+    saveStoreProfile(store.id, updatedProfile).catch((err) => {
+      console.warn('[MiTiendaPerfil] Error retirando ubicación de mapa:', err);
+    });
+  };
+
+  const handleCopyFromTextAddress = () => {
+    if (profile.address && profile.address.trim()) {
+      setLocationQueryInput(profile.address.trim());
+      setLocationError(null);
+    }
+  };
 
   // Cargar datos reales desde Supabase garantizando persistencia centralizada
   useEffect(() => {
@@ -605,6 +690,233 @@ export const MiTiendaPerfil: React.FC<MiTiendaPerfilProps> = ({ store }) => {
               className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-[#17243D] border border-[#DEE7F2] dark:border-[#263653] text-[#14213D] dark:text-[#F8FAFC] placeholder-[#94A3B8] dark:placeholder-[#7E90B0] text-xs focus:outline-none focus:border-[#1769FF] dark:focus:border-[#3B82F6] focus:ring-1 focus:ring-[#1769FF]/20 shadow-2xs transition"
               placeholder="Ej. Av. Ballivián #1234, Calacoto, La Paz - Bolivia"
             />
+          </div>
+
+          {/* Ubicación de mi comercio (Google Maps - Módulo 5) */}
+          <div className="sm:col-span-2 p-4 sm:p-5 rounded-2xl bg-[#F8FAFC] dark:bg-[#17243D]/60 border border-[#DEE7F2] dark:border-[#263653] space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h4 className="text-xs font-bold text-[#14213D] dark:text-[#F8FAFC] uppercase tracking-wider flex items-center gap-2">
+                  <Compass className="w-4 h-4 text-[#1769FF] dark:text-[#3B82F6]" />
+                  <span>Ubicación de mi comercio</span>
+                  {profile.location?.isConfigured && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30">
+                      Ubicación confirmada
+                    </span>
+                  )}
+                </h4>
+                <p className="text-[11px] text-[#52627A] dark:text-[#B8C6DA] mt-0.5">
+                  Indica dónde se encuentra tu negocio para que tus clientes puedan verlo en Google Maps.
+                </p>
+              </div>
+
+              {!isEditingLocation && (
+                <div className="flex items-center gap-2">
+                  {profile.location?.isConfigured ? (
+                    <>
+                      <a
+                        href={profile.location.mapsUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-[#EEF4FF] dark:bg-[#101B32] dark:hover:bg-[#1E2D4A] text-[#1769FF] dark:text-[#3B82F6] text-xs font-semibold border border-[#DEE7F2] dark:border-[#263653] shadow-2xs transition"
+                        title="Abrir en Google Maps"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        <span>Ver en Maps</span>
+                      </a>
+                      <button
+                        type="button"
+                        onClick={handleStartAddOrEditLocation}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#1769FF] hover:bg-blue-700 text-white text-xs font-semibold shadow-2xs transition cursor-pointer"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                        <span>Actualizar</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleRemoveLocation}
+                        className="p-1.5 rounded-xl text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/40 transition cursor-pointer"
+                        title="Retirar ubicación del mapa"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleStartAddOrEditLocation}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#1769FF] hover:bg-blue-700 text-white text-xs font-semibold shadow-2xs transition cursor-pointer active:scale-95"
+                    >
+                      <MapPin className="w-3.5 h-3.5" />
+                      <span>Agregar ubicación</span>
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Mensajes de retroalimentación */}
+            {locationSuccess && (
+              <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-700 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-300 flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                <span>{locationSuccess}</span>
+              </div>
+            )}
+            {locationError && (
+              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700 dark:bg-rose-950/40 dark:border-rose-800 dark:text-rose-300 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{locationError}</span>
+              </div>
+            )}
+
+            {/* Caso 1: Ubicación confirmada y NO en modo edición */}
+            {!isEditingLocation && profile.location?.isConfigured && (
+              <div className="space-y-3">
+                <div className="text-xs text-[#52627A] dark:text-[#B8C6DA] flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                  <span>Punto confirmado: <strong>{profile.location.query}</strong></span>
+                  {profile.location.referenceNotes && (
+                    <span className="italic text-[11px]">«{profile.location.referenceNotes}»</span>
+                  )}
+                </div>
+                <div className="w-full h-48 sm:h-56 rounded-xl overflow-hidden border border-[#DEE7F2] dark:border-[#263653] bg-white dark:bg-[#101B32]">
+                  <iframe
+                    title="Vista previa del mapa del comercio"
+                    src={profile.location.embedUrl}
+                    className="w-full h-full border-0"
+                    loading="lazy"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Caso 2: Sin ubicación registrada y NO en modo edición */}
+            {!isEditingLocation && !profile.location?.isConfigured && (
+              <div className="p-6 rounded-xl border border-dashed border-[#DEE7F2] dark:border-[#263653] text-center flex flex-col items-center justify-center space-y-2 bg-white/60 dark:bg-[#101B32]/40">
+                <div className="w-10 h-10 rounded-xl bg-[#EEF4FF] dark:bg-[#17243D] text-[#1769FF] dark:text-[#3B82F6] flex items-center justify-center">
+                  <MapPin className="w-5 h-5" />
+                </div>
+                <p className="text-xs font-bold text-[#14213D] dark:text-[#F8FAFC]">
+                  Todavía no se ha definido una ubicación en el mapa
+                </p>
+                <p className="text-[11px] text-[#52627A] dark:text-[#B8C6DA] max-w-sm">
+                  Indica las coordenadas o dirección de tu establecimiento para que tus clientes puedan verlo en Google Maps.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleStartAddOrEditLocation}
+                  className="mt-1 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#1769FF] hover:bg-blue-700 text-white text-xs font-semibold shadow-2xs transition cursor-pointer"
+                >
+                  <MapPin className="w-3.5 h-3.5" />
+                  <span>Agregar ubicación</span>
+                </button>
+              </div>
+            )}
+
+            {/* Caso 3: Modo edición / configuración activa */}
+            {isEditingLocation && (
+              <div className="p-4 rounded-xl bg-white dark:bg-[#101B32] border border-[#DEE7F2] dark:border-[#263653] space-y-3.5">
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-semibold text-[#14213D] dark:text-[#F8FAFC]">
+                      Referencia o coordenadas para Google Maps
+                    </label>
+                    {profile.address && profile.address.trim() && (
+                      <button
+                        type="button"
+                        onClick={handleCopyFromTextAddress}
+                        className="text-[11px] text-[#1769FF] dark:text-[#3B82F6] hover:underline cursor-pointer flex items-center gap-1"
+                      >
+                        <span>Copiar mi dirección escrita</span>
+                      </button>
+                    )}
+                  </div>
+                  <input
+                    type="text"
+                    value={locationQueryInput}
+                    onChange={(e) => setLocationQueryInput(e.target.value)}
+                    placeholder="Ej. -16.5321, -68.0865 ó Av. Ballivián #1234, Calacoto, La Paz"
+                    className="w-full px-3.5 py-2 rounded-xl bg-[#F8FAFC] dark:bg-[#17243D] border border-[#DEE7F2] dark:border-[#263653] text-[#14213D] dark:text-[#F8FAFC] placeholder-[#94A3B8] text-xs focus:outline-none focus:border-[#1769FF] shadow-2xs"
+                  />
+                  <p className="text-[10px] text-[#52627A] dark:text-[#B8C6DA]">
+                    Puedes ingresar coordenadas numéricas (latitud, longitud), un enlace copiado de Google Maps o la dirección exacta.
+                  </p>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-xs font-semibold text-[#14213D] dark:text-[#F8FAFC]">
+                    Referencia visual complementaria (opcional)
+                  </label>
+                  <input
+                    type="text"
+                    value={locationNotesInput}
+                    onChange={(e) => setLocationNotesInput(e.target.value)}
+                    placeholder="Ej. Frente a la plaza principal, planta baja, puerta azul"
+                    className="w-full px-3.5 py-2 rounded-xl bg-[#F8FAFC] dark:bg-[#17243D] border border-[#DEE7F2] dark:border-[#263653] text-[#14213D] dark:text-[#F8FAFC] placeholder-[#94A3B8] text-xs focus:outline-none focus:border-[#1769FF] shadow-2xs"
+                  />
+                </div>
+
+                {/* Acciones de Previsualización */}
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={handlePreviewLocation}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#1769FF] hover:bg-blue-700 text-white text-xs font-semibold shadow-2xs transition cursor-pointer"
+                  >
+                    <Compass className="w-3.5 h-3.5" />
+                    <span>Previsualizar en el mapa</span>
+                  </button>
+
+                  {locationPreview && (
+                    <button
+                      type="button"
+                      onClick={handleConfirmLocation}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-2xs transition cursor-pointer"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>Confirmar ubicación</span>
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEditingLocation(false);
+                      setLocationPreview(profile.location || null);
+                      setLocationError(null);
+                    }}
+                    className="px-3.5 py-2 rounded-xl bg-white hover:bg-[#EEF4FF] dark:bg-[#17243D] dark:hover:bg-[#1E2D4A] text-[#52627A] dark:text-[#B8C6DA] border border-[#DEE7F2] dark:border-[#263653] text-xs font-medium transition cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+
+                {/* Vista previa en vivo del mapa mientras edita */}
+                {locationPreview && (
+                  <div className="pt-2 space-y-2">
+                    <div className="flex items-center justify-between text-xs text-stone-600 dark:text-stone-300">
+                      <span>Vista previa de Google Maps:</span>
+                      <a
+                        href={locationPreview.mapsUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[11px] text-[#1769FF] dark:text-[#3B82F6] hover:underline flex items-center gap-1"
+                      >
+                        <span>Abrir en nueva pestaña</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </div>
+                    <div className="w-full h-48 sm:h-56 rounded-xl overflow-hidden border border-[#DEE7F2] dark:border-[#263653] bg-white dark:bg-[#101B32]">
+                      <iframe
+                        title="Previsualización de Google Maps"
+                        src={locationPreview.embedUrl}
+                        className="w-full h-full border-0"
+                        loading="lazy"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div>
