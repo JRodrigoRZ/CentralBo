@@ -92,6 +92,7 @@ import { StoreHighlights } from './publicStore/StoreHighlights';
 import { PublicStorePromotions } from './publicStore/PublicStorePromotions';
 import { ChatWidget } from './chat/ChatWidget';
 import { resolveStoreTemplate } from './publicStore/storeTemplateSystem';
+import { StoreModelHeroShowcase } from './publicStore/StoreModelHeroShowcase';
 
 interface PublicStoreViewProps {
   slug: string;
@@ -131,6 +132,7 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all');
   const [cartToast, setCartToast] = useState<{
     productName: string;
     quantity: number;
@@ -354,6 +356,35 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
       mounted = false;
     };
   }, [slug]);
+
+  // Sincronización en tiempo real de cambios de apariencia / modelo
+  useEffect(() => {
+    if (!store?.id) return;
+
+    const handleAppearanceChanged = (event: any) => {
+      const detail = event?.detail;
+      if (detail && (detail.tenantId === store.id || detail.tenantId === store.slug) && detail.appearance) {
+        setAppearance(detail.appearance);
+      }
+    };
+
+    const handleStorage = (e: StorageEvent) => {
+      if (store.id && e.key && (e.key.includes(store.id) || e.key.includes(store.slug))) {
+        const fresh = getCachedStoreAppearance(store.id);
+        if (fresh) {
+          setAppearance(fresh);
+        }
+      }
+    };
+
+    window.addEventListener('maxinego:store_appearance_changed', handleAppearanceChanged);
+    window.addEventListener('storage', handleStorage);
+
+    return () => {
+      window.removeEventListener('maxinego:store_appearance_changed', handleAppearanceChanged);
+      window.removeEventListener('storage', handleStorage);
+    };
+  }, [store?.id, store?.slug]);
 
   // Manejadores del Carrito (Canasta acumulativa)
   const handleAddToCart = (item: CartItem, openDrawer: boolean = false) => {
@@ -719,6 +750,18 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
           onOpenOrders={() => setIsOrdersHistoryOpen(true)}
           primaryColor={primaryColor}
           templateId={activeTemplateId}
+          categories={categories}
+          products={products}
+          selectedCategoryId={selectedCategoryId}
+          onSelectCategory={setSelectedCategoryId}
+        />
+
+        {/* HERO SHOWCASE DEL MODELO ACTIVO (Exclusivo para modelos especiales; Oculto en Plan FREE y en G5-G8 con cabecera integrada) */}
+        <StoreModelHeroShowcase
+          templateId={activeTemplateId}
+          storeName={profile?.name || store.name}
+          primaryColor={primaryColor}
+          categories={categories}
         />
 
         {/* BANNERS COMERCIALES (Módulo 2: Exclusivo para Planes BASIC y PRO con banners registrados) */}
@@ -727,6 +770,7 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
             banners={appearance.banners}
             brandPrimaryColor={primaryColor}
             storeName={store.name}
+            templateId={activeTemplateId}
           />
         )}
 
@@ -763,7 +807,7 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
         />
 
         {/* SECCIÓN PRINCIPAL: CATÁLOGO PÚBLICO (Sección 2) */}
-        <div className="space-y-4 pt-2">
+        <div id="catalog-view-section" className="space-y-4 pt-2">
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 pb-2 border-b border-stone-200/70 dark:border-stone-800/70">
             <div className="space-y-1">
               <div className="flex items-center gap-2">
@@ -828,6 +872,8 @@ export const PublicStoreView: React.FC<PublicStoreViewProps> = ({ slug }) => {
             brandSecondaryColor={appearance?.brandSecondaryColor}
             brandAccentColor={appearance?.brandAccentColor}
             templateId={activeTemplateId}
+            selectedCategoryId={selectedCategoryId}
+            onSelectCategory={setSelectedCategoryId}
           />
         </div>
 

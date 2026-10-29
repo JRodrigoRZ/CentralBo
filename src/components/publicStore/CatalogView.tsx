@@ -43,6 +43,8 @@ interface CatalogViewProps {
   brandSecondaryColor?: string;
   brandAccentColor?: string;
   templateId?: string;
+  selectedCategoryId?: string;
+  onSelectCategory?: (categoryId: string) => void;
 }
 
 // Determinar el color de texto (blanco o negro suave) según el contraste del color de marca
@@ -70,6 +72,8 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
   onOpenSizeGuide,
   primaryColor = '#2563eb',
   templateId,
+  selectedCategoryId: propSelectedCategoryId,
+  onSelectCategory: propOnSelectCategory,
 }) => {
   const isSpecialTemplate = Boolean(templateId && templateId !== 'free');
   const templateVisuals = getTemplateVisualClasses(templateId);
@@ -79,8 +83,74 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
   const isServices = storeType === 'servicios';
   const shouldReduceMotion = useReducedMotion();
 
+  // Color adaptativo según modelo activo o paleta de marca
+  const getButtonVisuals = (productAvailable: boolean) => {
+    if (!productAvailable) {
+      return { backgroundColor: undefined, color: undefined };
+    }
+    if (templateId === 'g5') {
+      return { backgroundColor: '#EA580C', color: '#ffffff' };
+    }
+    if (templateId === 'g6') {
+      return { backgroundColor: '#059669', color: '#ffffff' };
+    }
+    if (templateId === 'g7') {
+      return { backgroundColor: '#B45309', color: '#ffffff' };
+    }
+    if (templateId === 'g8') {
+      return { backgroundColor: '#F59E0B', color: '#18181b' };
+    }
+    return { backgroundColor: primaryColor, color: contrastColor };
+  };
+
+  // Estilo visual del selector de categorías según modelo activo
+  const getActiveTabStyle = (isSelected: boolean) => {
+    if (!isSelected) return undefined;
+    if (templateId === 'g5') {
+      return {
+        backgroundColor: '#EA580C',
+        color: '#ffffff',
+        boxShadow: '0 2px 10px -2px rgba(234, 88, 12, 0.45)',
+      };
+    }
+    if (templateId === 'g6') {
+      return {
+        backgroundColor: '#059669',
+        color: '#ffffff',
+        boxShadow: '0 2px 10px -2px rgba(5, 150, 105, 0.45)',
+      };
+    }
+    if (templateId === 'g7') {
+      return {
+        backgroundColor: '#B45309',
+        color: '#ffffff',
+        boxShadow: '0 2px 10px -2px rgba(180, 83, 9, 0.45)',
+      };
+    }
+    if (templateId === 'g8') {
+      return {
+        backgroundColor: '#F59E0B',
+        color: '#18181b',
+        boxShadow: '0 2px 10px -2px rgba(245, 158, 11, 0.45)',
+      };
+    }
+    return {
+      backgroundColor: primaryColor,
+      color: contrastColor,
+      boxShadow: `0 2px 10px -2px ${primaryColor}40`,
+    };
+  };
+
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all');
+  const [internalSelectedCategoryId, setInternalSelectedCategoryId] = useState<string>('all');
+
+  const selectedCategoryId = propSelectedCategoryId !== undefined ? propSelectedCategoryId : internalSelectedCategoryId;
+  const setSelectedCategoryId = (id: string) => {
+    setInternalSelectedCategoryId(id);
+    if (propOnSelectCategory) {
+      propOnSelectCategory(id);
+    }
+  };
   const [copiedProductId, setCopiedProductId] = useState<string | null>(null);
   const [imgErrors, setImgErrors] = useState<Record<string, boolean>>({});
 
@@ -254,15 +324,7 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
                     ? 'shadow-xs font-bold active:scale-95'
                     : 'bg-white/80 dark:bg-stone-900/80 hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-600 dark:text-stone-300 border border-stone-200/80 dark:border-stone-800 hover:scale-[1.01] active:scale-95'
                 }`}
-                style={
-                  selectedCategoryId === 'all'
-                    ? {
-                        backgroundColor: primaryColor,
-                        color: contrastColor,
-                        boxShadow: `0 2px 10px -2px ${primaryColor}40`,
-                      }
-                    : undefined
-                }
+                style={getActiveTabStyle(selectedCategoryId === 'all')}
               >
                 <span>Todos</span>
                 <span
@@ -291,15 +353,7 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
                         ? 'shadow-xs font-bold active:scale-95'
                         : 'bg-white/80 dark:bg-stone-900/80 hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-600 dark:text-stone-300 border border-stone-200/80 dark:border-stone-800 hover:scale-[1.01] active:scale-95'
                     }`}
-                    style={
-                      isSelected
-                        ? {
-                            backgroundColor: primaryColor,
-                            color: contrastColor,
-                            boxShadow: `0 2px 10px -2px ${primaryColor}40`,
-                          }
-                        : undefined
-                    }
+                    style={getActiveTabStyle(isSelected)}
                   >
                     <span>{cat.name}</span>
                     <span
@@ -663,11 +717,7 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
                             ? 'bg-stone-100 dark:bg-stone-800 text-stone-400 dark:text-stone-500 cursor-not-allowed border border-stone-200 dark:border-stone-700/60 select-none'
                             : 'active:scale-95 hover:brightness-105 hover:shadow-xs'
                         }`}
-                        style={
-                          product.is_available
-                            ? { backgroundColor: primaryColor, color: contrastColor }
-                            : undefined
-                        }
+                        style={getButtonVisuals(product.is_available)}
                       >
                         <Calendar className="w-3.5 h-3.5 transition-transform duration-200 group-hover:scale-105" />
                         <span>Agendar Cita</span>
@@ -693,11 +743,7 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
                             ? 'bg-stone-100 dark:bg-stone-800 text-stone-400 dark:text-stone-500 cursor-not-allowed border border-stone-200 dark:border-stone-700/60 select-none'
                             : 'active:scale-95 hover:brightness-105 hover:shadow-xs'
                         }`}
-                        style={
-                          product.is_available
-                            ? { backgroundColor: primaryColor, color: contrastColor }
-                            : undefined
-                        }
+                        style={getButtonVisuals(product.is_available)}
                       >
                         {!product.is_available ? (
                           <span>Agotado</span>

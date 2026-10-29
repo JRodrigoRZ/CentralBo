@@ -440,6 +440,12 @@ export const MiTiendaApariencia: React.FC<MiTiendaAparienciaProps> = ({ store })
         appearance={appearance}
         onSelectTemplate={handleSelectTemplate}
         onProAttempt={handleProFeatureAttempt}
+        onUpdateAppearance={(updated) => {
+          setAppearance(updated);
+          saveStoreAppearance(store.id, updated).catch((err) => {
+            console.warn('[MiTiendaApariencia] Error al guardar personalización de apariencia:', err);
+          });
+        }}
         isSaving={isSaving}
       />
 

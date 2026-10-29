@@ -348,6 +348,13 @@ export interface StoreStoryItem {
   createdAt: string;
 }
 
+export interface StoreG7Settings {
+  tagline?: string;       // Inscripción comercial editable (máx 40 caracteres, ej: "CAFÉ & BOUTIQUE EDITORIAL", "CHIFA", "RESTAURANTE BOUTIQUE", etc.)
+  title?: string;         // Título principal editable de la portada (máx 80 caracteres. Si está vacío, fallback al nombre real del comercio)
+  description?: string;   // Descripción comercial editable de la portada (máx 240 caracteres. Si está vacía, fallback al perfil de la tienda o se omite)
+  coverImageUrl?: string; // Fotografía de portada del comercio detrás del texto
+}
+
 export interface StoreAppearanceSettings {
   theme: 'light' | 'dark';
   // Exclusivo Plan Pro
@@ -367,6 +374,8 @@ export interface StoreAppearanceSettings {
   showHighlights?: boolean;
   highlightsLayout?: StoreHighlightsLayout;
   highlights?: StoreHighlightItem[];
+  // Personalización exclusiva del Modelo G7 (Café & Boutique Editorial)
+  g7Settings?: StoreG7Settings;
 }
 
 export interface StoreSchedulePeriod {

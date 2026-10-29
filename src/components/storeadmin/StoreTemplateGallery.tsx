@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Layout,
   CheckCircle2,
@@ -14,6 +14,12 @@ import {
   ShoppingBag,
   ExternalLink,
   Info,
+  Coffee,
+  Upload,
+  Image as ImageIcon,
+  Trash2,
+  Loader2,
+  Check,
 } from 'lucide-react';
 import { Store, StoreAppearanceSettings, Product, StoreProfileSettings } from '../../types';
 import {
@@ -27,7 +33,11 @@ import {
   OFFICIAL_FREE_TEMPLATE_ID,
   getTemplateVisualClasses,
 } from '../publicStore/storeTemplateSystem';
-import { getStorePlan } from '../../lib/storeAdminService';
+import {
+  getStorePlan,
+  uploadStoreCoverImage,
+  saveStoreAppearance,
+} from '../../lib/storeAdminService';
 
 interface StoreTemplateGalleryProps {
   store: Store;
@@ -35,6 +45,7 @@ interface StoreTemplateGalleryProps {
   onSelectTemplate: (templateId: string) => void;
   onProAttempt: (featureName: string) => void;
   isSaving?: boolean;
+  onUpdateAppearance?: (updated: StoreAppearanceSettings) => void;
 }
 
 /**
@@ -398,6 +409,7 @@ export const StoreTemplateGallery: React.FC<StoreTemplateGalleryProps> = ({
   onSelectTemplate,
   onProAttempt,
   isSaving,
+  onUpdateAppearance,
 }) => {
   const plan = getStorePlan(store.id);
   const isFree = plan === 'free';
@@ -413,6 +425,201 @@ export const StoreTemplateGallery: React.FC<StoreTemplateGalleryProps> = ({
   // Modal de Previsualización en Vivo con datos reales
   const [previewTemplate, setPreviewTemplate] = useState<SpecialTemplateDefinition | null>(null);
   const [previewViewport, setPreviewViewport] = useState<'mobile' | 'desktop'>('mobile');
+
+  // Estados de Personalización Exclusiva del Modelo G7 (Café & Boutique Editorial)
+  const isChifaStore = Boolean(
+    store.slug?.toLowerCase().includes('chifabill') || 
+    store.name?.toLowerCase().includes('chifa')
+  );
+  const defaultG7Tagline = isChifaStore ? 'CHIFA' : 'CAFÉ & BOUTIQUE EDITORIAL';
+
+  const [g7Tagline, setG7Tagline] = useState<string>(() => {
+    if (typeof appearance.g7Settings?.tagline === 'string' && appearance.g7Settings.tagline.trim().length > 0) {
+      return appearance.g7Settings.tagline;
+    }
+    return defaultG7Tagline;
+  });
+  const fallbackG7Title = store.name || 'Mi Comercio';
+  const fallbackG7Description = (store.profile as any)?.description || '';
+
+  const [g7Title, setG7Title] = useState<string>(() => {
+    return appearance.g7Settings?.title || '';
+  });
+  const [g7Description, setG7Description] = useState<string>(() => {
+    return appearance.g7Settings?.description || '';
+  });
+
+  const [isUploadingG7Cover, setIsUploadingG7Cover] = useState(false);
+  const [g7SaveSuccess, setG7SaveSuccess] = useState<string | null>(null);
+  const [g7SaveError, setG7SaveError] = useState<string | null>(null);
+  const g7CoverInputRef = useRef<HTMLInputElement>(null);
+
+  // Sincronizar estado local de tagline, title y description si cambia appearance
+  useEffect(() => {
+    if (typeof appearance.g7Settings?.tagline === 'string' && appearance.g7Settings.tagline.trim().length > 0) {
+      setG7Tagline(appearance.g7Settings.tagline);
+    } else {
+      setG7Tagline(defaultG7Tagline);
+    }
+    if (typeof appearance.g7Settings?.title === 'string') {
+      setG7Title(appearance.g7Settings.title);
+    }
+    if (typeof appearance.g7Settings?.description === 'string') {
+      setG7Description(appearance.g7Settings.description);
+    }
+  }, [appearance.g7Settings?.tagline, appearance.g7Settings?.title, appearance.g7Settings?.description, defaultG7Tagline]);
+
+  const handleG7TaglineChange = (val: string) => {
+    if (val.length <= 40) {
+      setG7Tagline(val);
+      onUpdateAppearance?.({
+        ...appearance,
+        g7Settings: {
+          ...(appearance.g7Settings || {}),
+          tagline: val,
+          title: g7Title.trim() || undefined,
+          description: g7Description.trim() || undefined,
+        },
+      });
+    }
+  };
+
+  const handleApplyG7Suggestion = (sug: string) => {
+    setG7Tagline(sug);
+    onUpdateAppearance?.({
+      ...appearance,
+      g7Settings: {
+        ...(appearance.g7Settings || {}),
+        tagline: sug,
+        title: g7Title.trim() || undefined,
+        description: g7Description.trim() || undefined,
+      },
+    });
+  };
+
+  const handleG7TitleChange = (val: string) => {
+    if (val.length <= 80) {
+      setG7Title(val);
+      onUpdateAppearance?.({
+        ...appearance,
+        g7Settings: {
+          ...(appearance.g7Settings || {}),
+          tagline: g7Tagline,
+          title: val,
+          description: g7Description.trim() || undefined,
+        },
+      });
+    }
+  };
+
+  const handleG7DescriptionChange = (val: string) => {
+    if (val.length <= 240) {
+      setG7Description(val);
+      onUpdateAppearance?.({
+        ...appearance,
+        g7Settings: {
+          ...(appearance.g7Settings || {}),
+          tagline: g7Tagline,
+          title: g7Title.trim() || undefined,
+          description: val,
+        },
+      });
+    }
+  };
+
+  const handleG7CoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+
+    if (!isPro) {
+      onProAttempt('Personalización de Modelo G7');
+      return;
+    }
+
+    setIsUploadingG7Cover(true);
+    setG7SaveError(null);
+    setG7SaveSuccess(null);
+
+    try {
+      const res = await uploadStoreCoverImage(store.id, file);
+      if (res.success && res.publicUrl) {
+        const updatedSettings = {
+          ...(appearance.g7Settings || {}),
+          tagline: g7Tagline.trim() || defaultG7Tagline,
+          title: g7Title.trim() || undefined,
+          description: g7Description.trim() || undefined,
+          coverImageUrl: res.publicUrl,
+        };
+        const updatedAppearance = {
+          ...appearance,
+          g7Settings: updatedSettings,
+        };
+        onUpdateAppearance?.(updatedAppearance);
+        setG7SaveSuccess('Fotografía de portada actualizada con éxito.');
+        setTimeout(() => setG7SaveSuccess(null), 4000);
+      } else {
+        setG7SaveError(res.error || 'No se pudo subir la fotografía.');
+      }
+    } catch (err: any) {
+      setG7SaveError(err?.message || 'Error inesperado al subir fotografía.');
+    } finally {
+      setIsUploadingG7Cover(false);
+    }
+  };
+
+  const handleRemoveG7Cover = () => {
+    const updatedSettings = {
+      ...(appearance.g7Settings || {}),
+      tagline: g7Tagline.trim() || defaultG7Tagline,
+      title: g7Title.trim() || undefined,
+      description: g7Description.trim() || undefined,
+      coverImageUrl: undefined,
+    };
+    const updatedAppearance = {
+      ...appearance,
+      g7Settings: updatedSettings,
+    };
+    onUpdateAppearance?.(updatedAppearance);
+    setG7SaveSuccess('Fotografía eliminada. Se usará el fondo cálido oficial por defecto.');
+    setTimeout(() => setG7SaveSuccess(null), 3500);
+  };
+
+  const handleSaveG7Settings = async () => {
+    if (!isPro) {
+      onProAttempt('Personalización de Modelo G7');
+      return;
+    }
+
+    setG7SaveError(null);
+    setG7SaveSuccess(null);
+
+    const finalTagline = g7Tagline.trim() || defaultG7Tagline;
+    const updatedSettings = {
+      ...(appearance.g7Settings || {}),
+      tagline: finalTagline,
+      title: g7Title.trim() || undefined,
+      description: g7Description.trim() || undefined,
+      coverImageUrl: appearance.g7Settings?.coverImageUrl,
+    };
+    const updatedAppearance = {
+      ...appearance,
+      g7Settings: updatedSettings,
+    };
+
+    try {
+      const res = await saveStoreAppearance(store.id, updatedAppearance);
+      if (res.success) {
+        onUpdateAppearance?.(updatedAppearance);
+        setG7SaveSuccess('Personalización del Modelo G7 guardada con éxito.');
+        setTimeout(() => setG7SaveSuccess(null), 4000);
+      } else {
+        setG7SaveError(res.error || 'No se pudieron guardar los ajustes de G7.');
+      }
+    } catch (err: any) {
+      setG7SaveError(err?.message || 'Error al guardar la personalización.');
+    }
+  };
 
   const handleSelect = (tmplId: string, tmplName: string, requiredTier: 'basic' | 'pro') => {
     if (isFree) {
@@ -588,10 +795,25 @@ export const StoreTemplateGallery: React.FC<StoreTemplateGalleryProps> = ({
 
                 {/* Botón Seleccionar / Bloqueado */}
                 {isCurrentActive ? (
-                  <span className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-bold cursor-default">
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>Seleccionado</span>
-                  </span>
+                  <div className="flex-1 flex items-center gap-1.5">
+                    <span className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-bold cursor-default">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>Seleccionado</span>
+                    </span>
+                    {template.id === 'g7' && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const el = document.getElementById('panel-personalizacion-g7');
+                          el?.scrollIntoView({ behavior: 'smooth' });
+                        }}
+                        className="px-2.5 py-2 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 dark:bg-amber-950/60 dark:text-amber-200 dark:border-amber-800 text-xs font-serif font-bold transition cursor-pointer"
+                        title="Personalizar elementos de G7"
+                      >
+                        Personalizar ↓
+                      </button>
+                    )}
+                  </div>
                 ) : isAllowed ? (
                   <button
                     type="button"
@@ -617,6 +839,361 @@ export const StoreTemplateGallery: React.FC<StoreTemplateGalleryProps> = ({
           );
         })}
       </div>
+
+      {/* PANEL DE PERSONALIZACIÓN EXCLUSIVA DE MODELO G7 (ELEMENTOS EDITABLES EN G7) */}
+      {activeTemplateId === 'g7' && (
+        <div
+          id="panel-personalizacion-g7"
+          className="p-5 sm:p-6 rounded-3xl bg-gradient-to-br from-[#FAF5EE] via-[#F8EFE4] to-[#F1E4D3] dark:from-[#1D1714] dark:via-[#261E1A] dark:to-[#171210] border-2 border-amber-300/80 dark:border-amber-700/60 shadow-lg space-y-6 text-stone-900 dark:text-[#FAF5EE]"
+        >
+          {/* Header del Panel */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-amber-200/80 dark:border-amber-900/40">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-[#B45309] text-white flex items-center justify-center shadow-sm shrink-0">
+                <Coffee className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="text-sm sm:text-base font-serif font-bold text-amber-950 dark:text-[#FAF5EE] flex items-center gap-2">
+                  <span>ELEMENTOS EDITABLES EN G7</span>
+                </h4>
+                <p className="text-xs font-serif text-amber-900/80 dark:text-stone-300">
+                  G7 — Café & Boutique Editorial • Exclusivo Plan PRO • Personalizable por cada comercio
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-serif font-bold px-3 py-1 rounded-full bg-amber-200/80 text-amber-900 dark:bg-amber-900/60 dark:text-amber-200 border border-amber-300 dark:border-amber-700 uppercase tracking-wider">
+                Modelo G7 Activo
+              </span>
+            </div>
+          </div>
+
+          {/* Mensajes de Éxito o Error */}
+          {g7SaveSuccess && (
+            <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-900 dark:bg-emerald-950/60 dark:border-emerald-500/40 dark:text-emerald-300 text-xs flex items-center gap-2 shadow-2xs">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+              <span className="font-medium">{g7SaveSuccess}</span>
+            </div>
+          )}
+
+          {g7SaveError && (
+            <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-300 text-rose-900 dark:bg-rose-950/60 dark:border-rose-500/40 dark:text-rose-300 text-xs flex items-center gap-2 shadow-2xs">
+              <Info className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
+              <span className="font-medium">{g7SaveError}</span>
+            </div>
+          )}
+
+          {/* Grilla con los 5 bloques oficiales de personalización de G7 */}
+          <div className="space-y-5">
+            {/* Fila Superior: Bloques 1, 2 y 3 (Textos y Propuesta de Valor) */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              {/* 1. Inscripción comercial superior (editable) */}
+              <div className="p-4 sm:p-5 rounded-2xl bg-white/90 dark:bg-stone-900/90 border border-amber-200/90 dark:border-stone-800 space-y-3.5 shadow-xs flex flex-col justify-between">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h5 className="text-xs font-serif font-bold text-amber-950 dark:text-[#FAF5EE] uppercase tracking-wider flex items-center gap-2">
+                      <span className="w-5 h-5 rounded-full bg-amber-100 text-amber-900 dark:bg-amber-900/60 dark:text-amber-200 flex items-center justify-center text-[10px] font-bold">1</span>
+                      <span>Inscripción superior (editable)</span>
+                    </h5>
+                    <span className="text-[11px] font-mono font-semibold text-amber-900/70 dark:text-amber-300">
+                      {g7Tagline.length}/40
+                    </span>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-medium text-stone-600 dark:text-stone-400 mb-1">
+                      Inscripción en píldora superior
+                    </label>
+                    <input
+                      type="text"
+                      maxLength={40}
+                      value={g7Tagline}
+                      onChange={(e) => handleG7TaglineChange(e.target.value)}
+                      placeholder={defaultG7Tagline}
+                      className="w-full px-3 py-2 rounded-xl border border-amber-300 dark:border-stone-700 bg-[#FAF8F5] dark:bg-stone-950 text-stone-900 dark:text-white text-xs font-serif font-bold uppercase tracking-wider focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-2xs"
+                    />
+                    <p className="text-[11px] text-stone-500 dark:text-stone-400 mt-1 leading-relaxed">
+                      Texto breve sobre el título. Se conserva independiente y no altera el nombre del comercio.
+                    </p>
+                  </div>
+
+                  {/* Sugerencias rápidas */}
+                  <div className="space-y-1.5 pt-1">
+                    <span className="text-[10px] font-serif font-bold text-amber-900 dark:text-amber-300 uppercase tracking-wider">
+                      Ejemplos sugeridos:
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {[
+                        ...(isChifaStore ? ['CHIFA'] : []),
+                        'CAFÉ & BOUTIQUE EDITORIAL',
+                        'RESTAURANTE BOUTIQUE',
+                        'SABORES DE CASA',
+                        'COCINA ARTESANAL',
+                        'PASTELERÍA FINA',
+                        'FUSIÓN GASTRONÓMICA',
+                        'TU RINCÓN FAVORITO',
+                      ].map((sug) => (
+                        <button
+                          key={sug}
+                          type="button"
+                          onClick={() => handleApplyG7Suggestion(sug)}
+                          className={`text-[10px] font-serif px-2.5 py-1 rounded-lg border transition cursor-pointer ${
+                            g7Tagline === sug
+                              ? 'bg-amber-600 text-white border-amber-600 font-bold'
+                              : 'bg-amber-50 text-amber-950 border-amber-200 hover:border-amber-400 dark:bg-stone-800 dark:text-stone-200 dark:border-stone-700'
+                          }`}
+                        >
+                          {sug}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. Título principal de la portada (editable) */}
+              <div className="p-4 sm:p-5 rounded-2xl bg-white/90 dark:bg-stone-900/90 border border-amber-200/90 dark:border-stone-800 space-y-3.5 shadow-xs flex flex-col justify-between">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h5 className="text-xs font-serif font-bold text-amber-950 dark:text-[#FAF5EE] uppercase tracking-wider flex items-center gap-2">
+                      <span className="w-5 h-5 rounded-full bg-amber-100 text-amber-900 dark:bg-amber-900/60 dark:text-amber-200 flex items-center justify-center text-[10px] font-bold">2</span>
+                      <span>Título principal de la portada</span>
+                    </h5>
+                    <span className="text-[11px] font-mono font-semibold text-amber-900/70 dark:text-amber-300">
+                      {g7Title.length}/80
+                    </span>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-medium text-stone-600 dark:text-stone-400 mb-1">
+                      Encabezado protagonista
+                    </label>
+                    <input
+                      type="text"
+                      maxLength={80}
+                      value={g7Title}
+                      onChange={(e) => handleG7TitleChange(e.target.value)}
+                      placeholder={fallbackG7Title}
+                      className="w-full px-3 py-2 rounded-xl border border-amber-300 dark:border-stone-700 bg-[#FAF8F5] dark:bg-stone-950 text-stone-900 dark:text-white text-xs font-serif font-bold tracking-normal focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-2xs"
+                    />
+                    <div className="mt-2 p-2 rounded-xl bg-amber-50/70 dark:bg-stone-950/60 border border-amber-200/60 dark:border-stone-800 text-[11px] text-stone-600 dark:text-stone-400 space-y-1">
+                      <p className="font-serif leading-relaxed">
+                        <strong className="text-amber-950 dark:text-amber-200">Fallback automático:</strong> Si se deja vacío, se mostrará siempre el nombre real de tu comercio (<span className="font-semibold text-amber-900 dark:text-amber-300">{fallbackG7Title}</span>).
+                      </p>
+                      <p className="text-[10px] text-stone-500 dark:text-stone-400 italic">
+                        Nunca se impondrán títulos fijos de cafetería a tu negocio.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 3. Descripción comercial de la portada (editable) */}
+              <div className="p-4 sm:p-5 rounded-2xl bg-white/90 dark:bg-stone-900/90 border border-amber-200/90 dark:border-stone-800 space-y-3.5 shadow-xs flex flex-col justify-between">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h5 className="text-xs font-serif font-bold text-amber-950 dark:text-[#FAF5EE] uppercase tracking-wider flex items-center gap-2">
+                      <span className="w-5 h-5 rounded-full bg-amber-100 text-amber-900 dark:bg-amber-900/60 dark:text-amber-200 flex items-center justify-center text-[10px] font-bold">3</span>
+                      <span>Descripción comercial de portada</span>
+                    </h5>
+                    <span className="text-[11px] font-mono font-semibold text-amber-900/70 dark:text-amber-300">
+                      {g7Description.length}/240
+                    </span>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-medium text-stone-600 dark:text-stone-400 mb-1">
+                      Texto descriptivo o propuesta gastronómica
+                    </label>
+                    <textarea
+                      rows={3}
+                      maxLength={240}
+                      value={g7Description}
+                      onChange={(e) => handleG7DescriptionChange(e.target.value)}
+                      placeholder={fallbackG7Description || 'Descripción oficial de tu negocio (o vacía sin inventar frases)'}
+                      className="w-full px-3 py-2 rounded-xl border border-amber-300 dark:border-stone-700 bg-[#FAF8F5] dark:bg-stone-950 text-stone-900 dark:text-white text-xs font-serif leading-relaxed focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-2xs resize-none"
+                    />
+                    <div className="mt-2 p-2 rounded-xl bg-amber-50/70 dark:bg-stone-950/60 border border-amber-200/60 dark:border-stone-800 text-[11px] text-stone-600 dark:text-stone-400 space-y-1">
+                      <p className="font-serif leading-relaxed">
+                        <strong className="text-amber-950 dark:text-amber-200">Fallback automático:</strong> Si se deja vacía, se usará la descripción del perfil de tu tienda. Si no tienes descripción, se omitirá limpiamente.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Fila Inferior: Bloques 4 y 5 (Fotografía de Portada y Categorías Visuales) */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              {/* 4. Fotografía de portada (editable) */}
+              <div className="p-4 sm:p-5 rounded-2xl bg-white/90 dark:bg-stone-900/90 border border-amber-200/90 dark:border-stone-800 space-y-3.5 shadow-xs flex flex-col justify-between">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h5 className="text-xs font-serif font-bold text-amber-950 dark:text-[#FAF5EE] uppercase tracking-wider flex items-center gap-2">
+                      <span className="w-5 h-5 rounded-full bg-amber-100 text-amber-900 dark:bg-amber-900/60 dark:text-amber-200 flex items-center justify-center text-[10px] font-bold">4</span>
+                      <span>Fotografía de portada (editable)</span>
+                    </h5>
+                  </div>
+
+                  {/* Vista previa de la foto de portada actual */}
+                  <div className="relative h-32 rounded-xl overflow-hidden border border-amber-200 dark:border-stone-700 bg-stone-900 shadow-2xs">
+                    {appearance.g7Settings?.coverImageUrl ? (
+                      <img
+                        src={appearance.g7Settings.coverImageUrl}
+                        alt="Portada de mi tienda G7"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-r from-[#2D1A12] via-[#3E2419] to-[#1E110B] flex flex-col items-center justify-center text-amber-200/70 p-2 text-center">
+                        <ImageIcon className="w-6 h-6 mb-1 opacity-70" />
+                        <span className="text-[10px] font-serif">Fondo cálido oficial por defecto</span>
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent flex flex-col justify-end p-2.5 text-white">
+                      <span className="text-[9px] uppercase tracking-widest text-amber-300 font-serif font-bold">
+                        {g7Tagline || defaultG7Tagline}
+                      </span>
+                      <span className="text-xs font-serif font-bold truncate">
+                        {g7Title || fallbackG7Title}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Acciones de carga / eliminación */}
+                  <div className="flex items-center gap-2">
+                    <input
+                      ref={g7CoverInputRef}
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      className="hidden"
+                      onChange={handleG7CoverUpload}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => g7CoverInputRef.current?.click()}
+                      disabled={isUploadingG7Cover}
+                      className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-[#B45309] hover:bg-[#92400e] text-white font-serif text-xs font-bold transition shadow-xs cursor-pointer active:scale-95 disabled:opacity-60"
+                    >
+                      {isUploadingG7Cover ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span>Subiendo...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="w-3.5 h-3.5" />
+                          <span>{appearance.g7Settings?.coverImageUrl ? 'Cambiar fotografía' : 'Subir fotografía'}</span>
+                        </>
+                      )}
+                    </button>
+
+                    {appearance.g7Settings?.coverImageUrl && (
+                      <button
+                        type="button"
+                        onClick={handleRemoveG7Cover}
+                        className="p-2 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 hover:bg-rose-50 text-stone-600 hover:text-rose-600 dark:bg-stone-800 dark:text-stone-300 dark:hover:text-rose-400 transition cursor-pointer"
+                        title="Quitar foto y usar degradado oficial"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Lista de especificaciones */}
+                  <ul className="space-y-1 text-[11px] text-stone-600 dark:text-stone-400 font-serif pt-1">
+                    <li className="flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-600 shrink-0" />
+                      <span>Imagen representativa real de tu negocio o platos insignia.</span>
+                    </li>
+                    <li className="flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-600 shrink-0" />
+                      <span>Se muestra detrás del título y la descripción comercial.</span>
+                    </li>
+                    <li className="flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-600 shrink-0" />
+                      <span>Formato recomendado: horizontal (16:9 o 4:3). Se adapta a móvil y PC.</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+
+              {/* 5. Categorías visuales (automáticas) */}
+              <div className="p-4 sm:p-5 rounded-2xl bg-white/90 dark:bg-stone-900/90 border border-amber-200/90 dark:border-stone-800 space-y-3.5 shadow-xs flex flex-col justify-between">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h5 className="text-xs font-serif font-bold text-amber-950 dark:text-[#FAF5EE] uppercase tracking-wider flex items-center gap-2">
+                      <span className="w-5 h-5 rounded-full bg-amber-100 text-amber-900 dark:bg-amber-900/60 dark:text-amber-200 flex items-center justify-center text-[10px] font-bold">5</span>
+                      <span>Categorías visuales (automáticas)</span>
+                    </h5>
+                  </div>
+
+                  {/* Previsualización de los recuadros fotográficos */}
+                  <div className="p-2.5 rounded-xl bg-amber-50/60 dark:bg-stone-950 border border-amber-200/60 dark:border-stone-800">
+                    <div className="flex items-center justify-center gap-2.5 overflow-x-auto py-1">
+                      {(isChifaStore ? [
+                        { name: 'Cena', icon: '🥢' },
+                        { name: 'Desayunos', icon: '🥟' },
+                        { name: 'Postres', icon: '🍰' },
+                        { name: 'Bebidas', icon: '🥤' },
+                      ] : [
+                        { name: 'Especialidades', icon: '🍲' },
+                        { name: 'Platos', icon: '🍽️' },
+                        { name: 'Postres', icon: '🍰' },
+                        { name: 'Bebidas', icon: '🥤' },
+                      ]).map((item, idx) => (
+                        <div key={idx} className="flex flex-col items-center">
+                          <div className="w-12 h-12 rounded-xl bg-white dark:bg-stone-800 border-2 border-amber-300 dark:border-stone-700 flex items-center justify-center text-lg shadow-2xs">
+                            {item.icon}
+                          </div>
+                          <span className="text-[10px] font-serif font-medium text-stone-700 dark:text-stone-300 mt-1">
+                            {item.name}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Lista de especificaciones */}
+                  <ul className="space-y-1 text-[11px] text-stone-600 dark:text-stone-400 font-serif pt-1">
+                    <li className="flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-600 shrink-0" />
+                      <span>Se nutre automáticamente de las categorías y platos reales de tu tienda.</span>
+                    </li>
+                    <li className="flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-600 shrink-0" />
+                      <span>Prioriza la foto de cada categoría o la imagen del primer plato asignado.</span>
+                    </li>
+                    <li className="flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-600 shrink-0" />
+                      <span>Sin sesgo cafetero: si no hay foto, muestra cubiertos e iconos gastronómicos neutros.</span>
+                    </li>
+                    <li className="flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-600 shrink-0" />
+                      <span>Al pulsar un recuadro en la tienda pública, filtra el catálogo al instante.</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Botón de Guardado */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-amber-200/80 dark:border-amber-900/40">
+            <p className="text-xs font-serif text-stone-600 dark:text-stone-400">
+              Los cambios se reflejarán inmediatamente en tu tienda pública y se conservan de forma permanente.
+            </p>
+            <button
+              type="button"
+              onClick={handleSaveG7Settings}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-[#B45309] hover:bg-[#92400e] text-white font-serif font-bold text-xs shadow-md transition active:scale-95 cursor-pointer"
+            >
+              <CheckCircle2 className="w-4 h-4" />
+              <span>Guardar Personalización G7</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* MODAL DE PREVISUALIZACIÓN EN VIVO (Con datos auténticos del comercio) */}
       {previewTemplate && (
@@ -801,22 +1378,68 @@ export const StoreTemplateGallery: React.FC<StoreTemplateGalleryProps> = ({
                   )}
 
                   {previewTemplate.id === 'g7' && (
-                    <div className="p-3.5 rounded-2xl bg-gradient-to-r from-[#FAF5EE] to-[#F2E8DC] text-[#2C241E] border border-amber-200/90 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <span className="text-[10px] font-serif uppercase tracking-widest text-amber-800 font-bold">CAFÉ & BOUTIQUE</span>
-                          <h5 className="font-serif italic text-sm font-bold leading-tight">Más que café, una experiencia</h5>
+                    <div className="space-y-3">
+                      {/* Portada Fotográfica Editorial en Previsualización */}
+                      <div className="relative rounded-2xl overflow-hidden min-h-[190px] sm:min-h-[220px] flex flex-col justify-end p-4 sm:p-5 border border-amber-200/60 dark:border-amber-900/40 shadow-sm">
+                        {appearance.g7Settings?.coverImageUrl ? (
+                          <div
+                            className="absolute inset-0 bg-cover bg-center"
+                            style={{ backgroundImage: `url(${appearance.g7Settings.coverImageUrl})` }}
+                          />
+                        ) : (
+                          <div className="absolute inset-0 bg-gradient-to-br from-[#2D1A12] via-[#3E2419] to-[#1E110B]" />
+                        )}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/60 to-black/30" />
+                        <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/50 to-transparent" />
+
+                        <div className="relative z-10 space-y-2 text-white">
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-100/90 text-amber-950 border border-amber-300 text-[9px] font-serif font-bold uppercase tracking-widest shadow-2xs">
+                            <Sparkles className="w-3 h-3 text-amber-800" />
+                            <span>{appearance.g7Settings?.tagline || g7Tagline || defaultG7Tagline}</span>
+                          </div>
+                          <h5 className="font-serif font-bold text-base sm:text-lg leading-tight text-white">
+                            {appearance.g7Settings?.title || g7Title || fallbackG7Title}
+                          </h5>
+                          {(appearance.g7Settings?.description || g7Description || fallbackG7Description) ? (
+                            <p className="font-serif text-[11px] text-stone-200 leading-snug line-clamp-2 max-w-sm">
+                              {appearance.g7Settings?.description || g7Description || fallbackG7Description}
+                            </p>
+                          ) : null}
+                          <div className="pt-1">
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#B45309] text-white font-serif font-bold text-[10px] shadow-xs">
+                              Ver nuestro menú →
+                            </span>
+                          </div>
                         </div>
-                        <span className="px-2.5 py-1 rounded-xl bg-amber-800 text-white text-[10px] font-serif font-bold shadow-xs">
-                          Ver selección →
-                        </span>
                       </div>
-                      <div className="flex gap-2 overflow-x-auto py-1">
-                        {['☕ Cafés', '🍰 Postres', '🥐 Sándwiches', '🥤 Bebidas'].map((cat, i) => (
-                          <span key={i} className="px-2 py-0.5 rounded-full bg-white text-amber-900 text-[10px] font-serif font-medium shrink-0 border border-amber-200 shadow-2xs">
-                            {cat}
-                          </span>
-                        ))}
+
+                      {/* Recuadros fotográficos de categorías en Previsualización */}
+                      <div className="space-y-1.5">
+                        <span className="text-[10px] font-serif font-bold uppercase tracking-wider text-amber-900 dark:text-amber-200">
+                          Explorar por categoría
+                        </span>
+                        <div className="flex gap-2.5 overflow-x-auto py-1">
+                          {(isChifaStore ? [
+                            { name: 'Cena', icon: '🥢' },
+                            { name: 'Desayunos', icon: '🥟' },
+                            { name: 'Postres', icon: '🍰' },
+                            { name: 'Bebidas', icon: '🥤' },
+                          ] : [
+                            { name: 'Especialidades', icon: '🍲' },
+                            { name: 'Platos', icon: '🍽️' },
+                            { name: 'Postres', icon: '🍰' },
+                            { name: 'Bebidas', icon: '🥤' },
+                          ]).map((cat, i) => (
+                            <div key={i} className="flex flex-col items-center shrink-0">
+                              <div className="w-13 h-13 rounded-2xl bg-amber-50 dark:bg-stone-800 border border-amber-200 dark:border-stone-700 flex items-center justify-center text-lg shadow-2xs">
+                                {cat.icon}
+                              </div>
+                              <span className="text-[10px] font-serif font-semibold text-stone-700 dark:text-stone-300 mt-1">
+                                {cat.name}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   )}

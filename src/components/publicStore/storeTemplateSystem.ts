@@ -701,22 +701,72 @@ export function getIndustryFromStore(store?: Store | null): StoreIndustry {
   if (rawType === 'servicios') return 'servicios';
   if (rawType === 'billar') return 'billar';
 
-  // 2. Detección por atributos de perfil o slug si aplica
+  // 2. Detección por atributos de perfil, categoría, slug o nombre si aplica
   const slug = (store.slug || '').toLowerCase();
   const name = (store.name || '').toLowerCase();
   const profile = (store.profile as any) || {};
-  const profIndustry = (profile.industry || '').toLowerCase();
+  const profIndustry = (profile.industry || profile.category || (store as any).category || '').toLowerCase();
 
-  if (profIndustry === 'billar' || slug.includes('billar') || name.includes('billar') || slug.includes('snooker') || slug.includes('pool-club')) {
+  if (
+    profIndustry === 'billar' ||
+    slug.includes('billar') ||
+    name.includes('billar') ||
+    slug.includes('snooker') ||
+    slug.includes('pool-club') ||
+    slug.includes('pool')
+  ) {
     return 'billar';
   }
-  if (profIndustry === 'gastronomia' || profIndustry === 'restaurante' || slug.includes('sushi') || slug.includes('burger') || slug.includes('pizza') || slug.includes('cafe')) {
+
+  if (
+    profIndustry === 'gastronomia' ||
+    profIndustry === 'restaurante' ||
+    profIndustry === 'comida' ||
+    slug.includes('chifa') ||
+    name.includes('chifa') ||
+    slug.includes('sushi') ||
+    name.includes('sushi') ||
+    slug.includes('burger') ||
+    name.includes('burger') ||
+    slug.includes('pizza') ||
+    name.includes('pizza') ||
+    slug.includes('cafe') ||
+    name.includes('cafe') ||
+    slug.includes('restaurante') ||
+    name.includes('restaurante') ||
+    slug.includes('gastro') ||
+    name.includes('gastro') ||
+    slug.includes('wok') ||
+    slug.includes('bistro') ||
+    slug.includes('parrilla') ||
+    slug.includes('cocina')
+  ) {
     return 'gastronomia';
   }
-  if (profIndustry === 'moda' || profIndustry === 'calzado' || slug.includes('boutique') || slug.includes('moda') || slug.includes('outfit')) {
+
+  if (
+    profIndustry === 'moda' ||
+    profIndustry === 'calzado' ||
+    slug.includes('boutique') ||
+    name.includes('boutique') ||
+    slug.includes('moda') ||
+    name.includes('moda') ||
+    slug.includes('outfit') ||
+    slug.includes('shoes') ||
+    slug.includes('ropa')
+  ) {
     return 'moda';
   }
-  if (profIndustry === 'servicios' || profIndustry === 'spa' || profIndustry === 'barberia' || slug.includes('spa') || slug.includes('barber')) {
+
+  if (
+    profIndustry === 'servicios' ||
+    profIndustry === 'spa' ||
+    profIndustry === 'barberia' ||
+    slug.includes('spa') ||
+    slug.includes('barber') ||
+    name.includes('barber') ||
+    slug.includes('clinica')
+  ) {
     return 'servicios';
   }
 
@@ -724,7 +774,7 @@ export function getIndustryFromStore(store?: Store | null): StoreIndustry {
 }
 
 /**
- * Obtiene la lista de los 4 modelos correspondientes al rubro del comercio
+ * Obtiene la lista de los modelos correspondientes al rubro del comercio
  */
 export function getIndustryTemplates(industry: StoreIndustry): SpecialTemplateDefinition[] {
   switch (industry) {
@@ -773,8 +823,8 @@ export function isTemplateAllowedForPlan(
     return false;
   }
 
-  // El modelo debe pertenecer estrictamente al rubro del comercio
-  if (tmpl.industry !== industry) {
+  // El modelo debe pertenecer al rubro del comercio (o admitirse si el comercio está clasificado en general)
+  if (tmpl.industry !== industry && industry !== 'general') {
     return false;
   }
 
@@ -783,7 +833,7 @@ export function isTemplateAllowedForPlan(
     return tmpl.tier === 'basic';
   }
 
-  // Plan PRO permite tanto los de tier 'basic' como los de 'pro' de su rubro
+  // Plan PRO permite tanto los de tier 'basic' como los de 'pro'
   if (plan === 'pro') {
     return true;
   }
@@ -815,7 +865,7 @@ export function resolveStoreTemplate(
     return OFFICIAL_FREE_TEMPLATE_ID;
   }
 
-  const plan = getStorePlan(store.id);
+  const plan = getStorePlan(store);
   const industry = getIndustryFromStore(store);
 
   if (isTemplateAllowedForPlan(requestedTemplateId, plan, industry)) {

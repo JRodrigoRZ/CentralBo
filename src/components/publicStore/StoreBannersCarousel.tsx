@@ -6,12 +6,14 @@ interface StoreBannersCarouselProps {
   banners: StoreBannerItem[];
   brandPrimaryColor?: string;
   storeName?: string;
+  templateId?: string | null;
 }
 
 export const StoreBannersCarousel: React.FC<StoreBannersCarouselProps> = ({
   banners,
   brandPrimaryColor = '#1769FF',
   storeName,
+  templateId,
 }) => {
   // Ordenar banners por el campo 'order' o por índice
   const sortedBanners = React.useMemo(() => {
@@ -81,6 +83,23 @@ export const StoreBannersCarousel: React.FC<StoreBannersCarouselProps> = ({
 
   const activeBanner = sortedBanners[currentIndex];
 
+  // Marco y contenedor adaptado al modelo sin alterar la imagen del comercio
+  const getContainerClasses = () => {
+    if (templateId === 'g5') {
+      return 'relative w-full overflow-hidden rounded-3xl border border-orange-500/40 bg-stone-950/90 shadow-[0_4px_25px_rgba(234,88,12,0.14)] focus:outline-none transition-shadow';
+    }
+    if (templateId === 'g6') {
+      return 'relative w-full overflow-hidden rounded-3xl border border-emerald-500/35 bg-stone-950/90 shadow-[0_4px_25px_rgba(16,185,129,0.12)] focus:outline-none transition-shadow';
+    }
+    if (templateId === 'g7') {
+      return 'relative w-full overflow-hidden rounded-3xl border border-amber-200/90 dark:border-amber-800/50 bg-[#FAF5EE]/95 dark:bg-stone-900/95 shadow-md focus:outline-none transition-shadow';
+    }
+    if (templateId === 'g8') {
+      return 'relative w-full overflow-hidden rounded-3xl border border-amber-500/45 bg-[#0B0C0E] shadow-[0_4px_30px_rgba(245,158,11,0.15)] ring-1 ring-amber-500/25 focus:outline-none transition-shadow';
+    }
+    return 'relative w-full overflow-hidden rounded-2xl sm:rounded-3xl border border-stone-200/80 dark:border-slate-800 bg-stone-100 dark:bg-slate-900/60 shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 transition-shadow';
+  };
+
   return (
     <section
       ref={containerRef}
@@ -92,7 +111,7 @@ export const StoreBannersCarousel: React.FC<StoreBannersCarouselProps> = ({
       role="region"
       aria-roledescription="carousel"
       aria-label={`Banners comerciales de ${storeName || 'la tienda'}`}
-      className="relative w-full overflow-hidden rounded-2xl sm:rounded-3xl border border-stone-200/80 dark:border-slate-800 bg-stone-100 dark:bg-slate-900/60 shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 transition-shadow"
+      className={getContainerClasses()}
       style={
         {
           '--tw-ring-color': brandPrimaryColor,
