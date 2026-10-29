@@ -1,21 +1,35 @@
 import { createClient } from '@supabase/supabase-js';
+import { randomBytes } from 'node:crypto';
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://wuerdwkcpurbtcwyqjep.supabase.co';
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
+const configuredSuperadminUserId = process.env.SUPERADMIN_AUTH_USER_ID?.trim();
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function generateSecurePassword(): string {
-  const charsUpper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-  const charsLower = 'abcdefghijklmnopqrstuvwxyz';
-  const charsNum = '0123456789';
-  const charsSpecial = '!@#$%&*';
-  let pass = '';
-  for (let i = 0; i < 3; i++) {
-    pass += charsUpper[Math.floor(Math.random() * charsUpper.length)];
-    pass += charsLower[Math.floor(Math.random() * charsLower.length)];
-    pass += charsNum[Math.floor(Math.random() * charsNum.length)];
-    pass += charsSpecial[Math.floor(Math.random() * charsSpecial.length)];
-  }
-  return pass;
+  // 192 bits aleatorios más caracteres que garantizan las clases habituales
+  // exigidas por los proveedores de identidad.
+  return `${randomBytes(24).toString('base64url')}Aa1!`;
+}
+
+function extractBearerToken(authorizationHeader: unknown): string | null {
+  if (typeof authorizationHeader !== 'string') return null;
+  const match = authorizationHeader.match(/^Bearer\s+([^\s]+)$/i);
+  return match?.[1] || null;
+}
+
+function isExistingAuthUserError(error: any): boolean {
+  if (!error) return false;
+  const normalizedMessage = typeof error.message === 'string' ? error.message.toLowerCase() : '';
+  return (
+    error.code === 'email_exists' ||
+    error.code === 'user_already_exists' ||
+    (error.status === 422 && (
+      normalizedMessage.includes('already registered') ||
+      normalizedMessage.includes('already exists') ||
+      normalizedMessage.includes('already been registered')
+    ))
+  );
 }
 
 function normalizeSlug(raw: string): string {
@@ -55,26 +69,101 @@ function isSlugUniqueViolation(error: any): boolean {
   );
 }
 
+type RollbackStepStatus = 'not_required' | 'succeeded' | 'failed' | 'skipped';
+
+interface RollbackResult {
+  complete: boolean;
+  storeDeletion: RollbackStepStatus;
+  authUserDeletion: RollbackStepStatus;
+}
+
+function getSafeErrorDetails(error: any): Record<string, string | number> {
+  const details: Record<string, string | number> = {};
+  if (typeof error?.name === 'string') details.name = error.name;
+  if (typeof error?.code === 'string' || typeof error?.code === 'number') details.code = error.code;
+  if (typeof error?.status === 'string' || typeof error?.status === 'number') details.status = error.status;
+  return Object.keys(details).length > 0 ? details : { name: 'unknown_error' };
+}
+
 async function performRollback(
   supabase: any,
   createdStoreId: string | null,
   userId: string | undefined,
   isNewAuthUser: boolean
-) {
+): Promise<RollbackResult> {
+  const result: RollbackResult = {
+    complete: true,
+    storeDeletion: createdStoreId ? 'failed' : 'not_required',
+    authUserDeletion: isNewAuthUser && userId ? 'failed' : 'not_required'
+  };
+
   if (createdStoreId) {
     try {
-      await supabase.from('stores').delete().eq('id', createdStoreId);
+      const { error: storeDeleteError } = await supabase
+        .from('stores')
+        .delete()
+        .eq('id', createdStoreId);
+
+      if (storeDeleteError) {
+        result.complete = false;
+        console.error('[CentralBo API] Rollback incompleto', {
+          operation: 'delete_new_store',
+          resourceId: createdStoreId,
+          ...getSafeErrorDetails(storeDeleteError)
+        });
+      } else {
+        result.storeDeletion = 'succeeded';
+      }
     } catch (err) {
-      console.error('[CentralBo API] Error en rollback de stores:', err);
+      result.complete = false;
+      console.error('[CentralBo API] Rollback incompleto', {
+        operation: 'delete_new_store',
+        resourceId: createdStoreId,
+        ...getSafeErrorDetails(err)
+      });
     }
   }
+
   if (isNewAuthUser && userId) {
-    try {
-      await supabase.auth.admin.deleteUser(userId);
-    } catch (err) {
-      console.error('[CentralBo API] Error en rollback de Auth user:', err);
+    // Si la tienda nueva no pudo eliminarse, conservar el usuario nuevo evita
+    // dejar una tienda apuntando a una cuenta eliminada. La limpieza queda
+    // marcada para revisión manual, sin reintentos destructivos automáticos.
+    if (createdStoreId && result.storeDeletion !== 'succeeded') {
+      result.authUserDeletion = 'skipped';
+      result.complete = false;
+      console.error('[CentralBo API] Rollback incompleto', {
+        operation: 'preserve_new_auth_user_after_store_delete_failure',
+        resourceId: userId
+      });
+    } else {
+      try {
+        const { error: authUserDeleteError } = await supabase.auth.admin.deleteUser(userId);
+        if (authUserDeleteError) {
+          result.complete = false;
+          console.error('[CentralBo API] Rollback incompleto', {
+            operation: 'delete_new_auth_user',
+            resourceId: userId,
+            ...getSafeErrorDetails(authUserDeleteError)
+          });
+        } else {
+          result.authUserDeletion = 'succeeded';
+        }
+      } catch (err) {
+        result.complete = false;
+        console.error('[CentralBo API] Rollback incompleto', {
+          operation: 'delete_new_auth_user',
+          resourceId: userId,
+          ...getSafeErrorDetails(err)
+        });
+      }
     }
   }
+
+  return result;
+}
+
+function getRollbackResponseStatus(result: RollbackResult): 'completed' | 'manual_review_required' {
+  return result.complete ? 'completed' : 'manual_review_required';
 }
 
 export default async function handler(req: any, res: any) {
@@ -83,7 +172,7 @@ export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
   res.setHeader(
     'Access-Control-Allow-Headers',
-    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
+    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization'
   );
 
   if (req.method === 'OPTIONS') {
@@ -94,11 +183,23 @@ export default async function handler(req: any, res: any) {
     return res.status(405).json({ success: false, error: 'Método no permitido' });
   }
 
-  // Verificación estricta de credencial de servicio administrativo
-  if (!supabaseServiceRoleKey) {
-    return res.status(500).json({
+  // Fallar de forma cerrada si falta cualquier configuración privada necesaria.
+  if (
+    !supabaseServiceRoleKey ||
+    !configuredSuperadminUserId ||
+    !UUID_PATTERN.test(configuredSuperadminUserId)
+  ) {
+    return res.status(503).json({
       success: false,
-      error: 'Error de configuración del servidor: SUPABASE_SERVICE_ROLE_KEY no está configurada en las variables de entorno.'
+      error: 'La operación administrativa no está disponible por una configuración incompleta del servidor.'
+    });
+  }
+
+  const token = extractBearerToken(req.headers?.authorization || req.headers?.Authorization);
+  if (!token) {
+    return res.status(401).json({
+      success: false,
+      error: 'Se requiere una sesión administrativa válida.'
     });
   }
 
@@ -111,6 +212,24 @@ export default async function handler(req: any, res: any) {
   });
 
   try {
+    // Validar el JWT con Supabase Auth y autorizar exclusivamente el UUID privado
+    // configurado por el propietario. No se confía en roles del frontend,
+    // user_metadata ni store_users.
+    const { data: authData, error: authValidationError } = await supabase.auth.getUser(token);
+    if (authValidationError || !authData?.user) {
+      return res.status(401).json({
+        success: false,
+        error: 'La sesión administrativa no es válida o ha expirado.'
+      });
+    }
+
+    if (authData.user.id.toLowerCase() !== configuredSuperadminUserId.toLowerCase()) {
+      return res.status(403).json({
+        success: false,
+        error: 'El usuario autenticado no está autorizado para crear comercios.'
+      });
+    }
+
     let body = req.body;
     if (typeof body === 'string') {
       try {
@@ -133,7 +252,7 @@ export default async function handler(req: any, res: any) {
     const targetPlanId = body.planId || body.plan || 'basic';
     const targetStatus = body.status || 'activo';
 
-    if (!targetEmail) {
+    if (typeof targetEmail !== 'string' || !targetEmail.trim()) {
       return res.status(400).json({ success: false, error: 'El correo electrónico es obligatorio' });
     }
 
@@ -141,9 +260,7 @@ export default async function handler(req: any, res: any) {
     const cleanOwnerName = targetOwnerName.trim();
     const tempPassword = generateSecurePassword();
 
-    // 1. Crear usuario en Supabase Auth
-    let authResponseUser: any = null;
-
+    // 1. Crear exclusivamente un usuario nuevo en Supabase Auth.
     const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
       email: cleanEmail,
       password: tempPassword,
@@ -156,48 +273,21 @@ export default async function handler(req: any, res: any) {
     });
 
     if (authError) {
-      if (authError.message?.toLowerCase().includes('already') || authError.status === 422) {
-        const { data: listData, error: listError } = await supabase.auth.admin.listUsers();
-        if (listError) {
-          return res.status(500).json({
-            success: false,
-            error: `Error al consultar usuarios de Supabase Auth: ${listError.message}`
-          });
-        }
-        const existing = listData?.users?.find((u: any) => u.email?.toLowerCase() === cleanEmail);
-        if (existing) {
-          userId = existing.id;
-          authResponseUser = existing;
-          isNewAuthUser = false; // Usuario preexistente: NUNCA eliminar en rollback
-
-          // Sincronizar contraseña del usuario existente con la credencial generada
-          const { error: updateError } = await supabase.auth.admin.updateUserById(existing.id, {
-            password: tempPassword,
-            email_confirm: true,
-            user_metadata: {
-              full_name: cleanOwnerName,
-              phone: targetPhone,
-              role: 'admin'
-            }
-          });
-
-          if (updateError) {
-            return res.status(500).json({
-              success: false,
-              error: `Error al actualizar credenciales del usuario existente: ${updateError.message}`
-            });
-          }
-        } else {
-          return res.status(400).json({ success: false, error: authError.message });
-        }
-      } else {
-        return res.status(400).json({ success: false, error: authError.message });
+      if (isExistingAuthUserError(authError)) {
+        return res.status(409).json({
+          success: false,
+          error: 'El correo electrónico ya pertenece a una cuenta registrada.'
+        });
       }
-    } else {
-      userId = authUser?.user?.id;
-      authResponseUser = authUser?.user;
-      isNewAuthUser = true; // Usuario creado en esta solicitud: DEBE eliminarse en rollback si falla stores o store_users
+
+      return res.status(400).json({
+        success: false,
+        error: 'No se pudo crear la cuenta del administrador del comercio.'
+      });
     }
+
+    userId = authUser?.user?.id;
+    isNewAuthUser = true; // Solo usuarios creados por esta solicitud pueden eliminarse en rollback.
 
     if (!userId) {
       return res.status(500).json({
@@ -281,12 +371,16 @@ export default async function handler(req: any, res: any) {
     }
 
     if (storeError || !insertedStore) {
-      console.error('[CentralBo API] Error guardando en stores tras reintentos, ejecutando rollback:', storeError);
-      await performRollback(supabase, createdStoreId, userId, isNewAuthUser);
+      console.error('[CentralBo API] Fallo al crear comercio; iniciando rollback', {
+        operation: 'create_store',
+        ...getSafeErrorDetails(storeError)
+      });
+      const rollbackResult = await performRollback(supabase, createdStoreId, userId, isNewAuthUser);
 
       return res.status(500).json({
         success: false,
-        error: `Error guardando en stores: ${storeError?.message || 'Fallo desconocido'}`
+        error: 'No se pudo crear el comercio en el almacenamiento central.',
+        rollback: getRollbackResponseStatus(rollbackResult)
       });
     }
 
@@ -308,12 +402,16 @@ export default async function handler(req: any, res: any) {
       .single();
 
     if (storeUserError || !storeUserData) {
-      console.error('[CentralBo API] Error al vincular en store_users, ejecutando rollback integral...');
-      await performRollback(supabase, createdStoreId, userId, isNewAuthUser);
+      console.error('[CentralBo API] Fallo al asociar administrador; iniciando rollback', {
+        operation: 'create_store_user',
+        ...getSafeErrorDetails(storeUserError)
+      });
+      const rollbackResult = await performRollback(supabase, createdStoreId, userId, isNewAuthUser);
 
       return res.status(500).json({
         success: false,
-        error: `Error al vincular el administrador en store_users: ${storeUserError?.message || 'Fallo al asociar usuario con comercio'}`
+        error: 'No se pudo asociar el administrador con el comercio.',
+        rollback: getRollbackResponseStatus(rollbackResult)
       });
     }
 
@@ -331,95 +429,40 @@ export default async function handler(req: any, res: any) {
       store_type: targetStoreType,
       planId: targetPlanId,
       plan_id: targetPlanId,
-      initialPassword: tempPassword,
       ownerName: cleanOwnerName,
       ownerEmail: cleanEmail,
       ownerPhone: targetPhone
     };
 
-    const resultOwner = {
-      id: userId,
-      email: cleanEmail,
-      ownerEmail: cleanEmail,
-      owner_email: cleanEmail,
-      name: cleanOwnerName,
-      ownerName: cleanOwnerName,
-      owner_name: cleanOwnerName,
-      fullName: cleanOwnerName,
-      full_name: cleanOwnerName,
-      phone: targetPhone,
-      ownerPhone: targetPhone,
-      owner_phone: targetPhone,
-      role: 'admin',
-      initialPassword: tempPassword,
-      password: tempPassword,
-      tempPassword: tempPassword,
-      ...(authResponseUser || {})
-    };
-
+    // Contrato mínimo requerido por el frontend actual. La contraseña se
+    // devuelve una sola vez y no se replica en otros objetos de la respuesta.
     const resultCredentials = {
-      email: cleanEmail,
+      storeId: createdStoreId,
+      storeName: targetStoreName,
+      storeSlug: finalAssignedSlug,
+      ownerName: cleanOwnerName,
+      ownerEmail: cleanEmail,
+      ownerPhone: targetPhone,
       initialPassword: tempPassword,
-      password: tempPassword,
-      tempPassword: tempPassword
+      createdAt: insertedStore.created_at || new Date().toISOString()
     };
 
     return res.status(200).json({
       success: true,
       message: 'Comercio y administrador creados con éxito',
-      name: targetStoreName,
-      storeName: targetStoreName,
-      store_name: targetStoreName,
-      slug: finalAssignedSlug,
-      storeSlug: finalAssignedSlug,
-      store_slug: finalAssignedSlug,
-      ownerName: cleanOwnerName,
-      owner_name: cleanOwnerName,
-      fullName: cleanOwnerName,
-      full_name: cleanOwnerName,
-      ownerEmail: cleanEmail,
-      owner_email: cleanEmail,
-      email: cleanEmail,
-      ownerPhone: targetPhone,
-      owner_phone: targetPhone,
-      phone: targetPhone,
-      initialPassword: tempPassword,
-      password: tempPassword,
-      tempPassword: tempPassword,
       store: resultStore,
-      storeUser: storeUserData,
-      owner: resultOwner,
-      admin: resultOwner,
-      user: resultOwner,
-      storeOwner: resultOwner,
-      store_owner: resultOwner,
-      credentials: resultCredentials,
-      auth: {
-        user: resultOwner,
-        initialPassword: tempPassword,
-        credentials: resultCredentials
-      },
-      data: {
-        success: true,
-        name: targetStoreName,
-        storeName: targetStoreName,
-        slug: finalAssignedSlug,
-        ownerName: cleanOwnerName,
-        ownerEmail: cleanEmail,
-        ownerPhone: targetPhone,
-        initialPassword: tempPassword,
-        store: resultStore,
-        storeUser: storeUserData,
-        owner: resultOwner,
-        credentials: resultCredentials
-      }
+      credentials: resultCredentials
     });
   } catch (error: any) {
-    console.error('[CentralBo API] Excepción no controlada en creación de comercio:', error);
-    await performRollback(supabase, createdStoreId, userId, isNewAuthUser);
+    console.error('[CentralBo API] Excepción no controlada en creación de comercio', {
+      operation: 'create_store_owner',
+      ...getSafeErrorDetails(error)
+    });
+    const rollbackResult = await performRollback(supabase, createdStoreId, userId, isNewAuthUser);
     return res.status(500).json({
       success: false,
-      error: error.message || 'Error interno del servidor'
+      error: 'Error interno del servidor al crear el comercio.',
+      rollback: getRollbackResponseStatus(rollbackResult)
     });
   }
 }
