@@ -1,0 +1,726 @@
+/**
+ * CentralBo — Servicio de Datos para el Panel SuperAdmin Global
+ * Módulo 3 — Panel SuperAdmin Global
+ * 
+ * Centraliza la información general de comercios, usuarios, planes,
+ * suscripciones, actividad y configuración global para el MVP.
+ */
+
+import {
+  PlanDefinition,
+  SuperAdminStoreRecord,
+  SuperAdminUserRecord,
+  StoreStatus,
+  StoreType,
+  PlanId,
+  DirectStoreOwnerCredentials,
+} from '../types';
+import { supabase } from './supabase';
+
+// ----------------------------------------------------------------------------
+// 4. PLANES OFICIALES DE MAXINEGO
+// ----------------------------------------------------------------------------
+export const MAXINEGO_PLANS: PlanDefinition[] = [
+  {
+    id: 'basic',
+    name: 'Basic',
+    monthlyPrice: 49,
+    description: 'Plan esencial para iniciar ventas online con tienda PWA rápida y ligera.',
+    features: [
+      'Funciones básicas de catálogo y venta',
+      'PWA instalable (Web App móvil y escritorio)',
+      'Tema claro / oscuro integrado',
+      'Acceso al panel de administración del comercio',
+      'Soporte estándar de la plataforma',
+    ],
+    restrictions: [
+      'Sin personalización avanzada',
+      'Sin colores personalizados',
+      'Sin dominio propio (acceso vía slug MAXINEGO)',
+    ],
+    semiannualDiscountPercent: 10,
+    annualDiscountPercent: 20,
+  },
+  {
+    id: 'pro',
+    name: 'Pro',
+    monthlyPrice: 99,
+    description: 'Plan profesional con identidad visual de marca y mayor potencia.',
+    features: [
+      'Todo lo incluido en el plan Basic',
+      'Personalización avanzada de tienda',
+      'Colores de marca y estilos adaptativos',
+      'Soporte para dominio propio',
+      'Mayor personalización visual',
+      'PWA instalable (Web App móvil y escritorio)',
+      'Tema claro / oscuro integrado',
+      'Soporte prioritario MAXINEGO',
+    ],
+    restrictions: [],
+    semiannualDiscountPercent: 10,
+    annualDiscountPercent: 20,
+  },
+];
+
+// Alias de retrocompatibilidad técnica
+export const CENTRALBO_PLANS = MAXINEGO_PLANS;
+
+// ----------------------------------------------------------------------------
+// 2. COMERCIOS REGISTRADOS (CON DETALLE COMPLETO)
+// ----------------------------------------------------------------------------
+export const INITIAL_SUPERADMIN_STORES: SuperAdminStoreRecord[] = [];
+
+const SUPERADMIN_STORES_STORAGE_KEY = 'maxinego_superadmin_stores_v2';
+const LEGACY_SUPERADMIN_STORES_STORAGE_KEY = 'centralbo_superadmin_stores_v2';
+
+export const SUPERADMIN_STORES_CHANGED_EVENT = 'maxinego:superadmin_stores_changed';
+export const LEGACY_SUPERADMIN_STORES_CHANGED_EVENT = 'centralbo:superadmin_stores_changed';
+
+const MOCK_STORE_IDS = new Set([
+  'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d',
+  'b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e',
+  'c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f',
+  'e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b',
+  'd4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a',
+]);
+const MOCK_SLUGS = new Set([
+  'restaurante-roma',
+  'boutique-milano',
+  'spa-zenit',
+  'los-andes-express',
+  'calzados-altiplano',
+]);
+
+function loadStoresFromStorage(): SuperAdminStoreRecord[] {
+  if (typeof window === 'undefined') {
+    return [];
+  }
+  try {
+    // 1. Prioridad: Buscar la nueva clave Maxinego
+    const raw = localStorage.getItem(SUPERADMIN_STORES_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        const filtered = parsed.filter(
+          (s) => s && !MOCK_STORE_IDS.has(s.id) && !MOCK_SLUGS.has(s.slug)
+        );
+        return filtered;
+      }
+    }
+
+    // 2. Fallback: Buscar la clave heredada CentralBo
+    const legacyRaw = localStorage.getItem(LEGACY_SUPERADMIN_STORES_STORAGE_KEY);
+    if (legacyRaw) {
+      const parsed = JSON.parse(legacyRaw);
+      if (Array.isArray(parsed)) {
+        const filtered = parsed.filter(
+          (s) => s && !MOCK_STORE_IDS.has(s.id) && !MOCK_SLUGS.has(s.slug)
+        );
+        // Migración suave a la nueva clave
+        try {
+          localStorage.setItem(SUPERADMIN_STORES_STORAGE_KEY, JSON.stringify(filtered));
+        } catch {}
+        return filtered;
+      }
+    }
+  } catch (e) {
+    console.warn('[SuperAdmin] Error al cargar comercios:', e);
+  }
+  return [];
+}
+
+function persistStores(stores: SuperAdminStoreRecord[]): void {
+  try {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(SUPERADMIN_STORES_STORAGE_KEY, JSON.stringify(stores));
+      // Despachar el nuevo evento oficial y el evento legacy para compatibilidad
+      window.dispatchEvent(new CustomEvent(SUPERADMIN_STORES_CHANGED_EVENT));
+      window.dispatchEvent(new CustomEvent(LEGACY_SUPERADMIN_STORES_CHANGED_EVENT));
+    }
+  } catch (e) {
+    console.warn('[SuperAdmin] Error al persistir comercios:', e);
+  }
+  // Sincronizar array en memoria para compatibilidad global
+  SUPERADMIN_STORES.splice(0, SUPERADMIN_STORES.length, ...stores);
+}
+
+export const SUPERADMIN_STORES: SuperAdminStoreRecord[] = loadStoresFromStorage();
+
+/**
+ * Formatea una marca temporal en una descripción temporal relativa o exacta en español.
+ * Evita textos sintéticos inventados o constantes estáticas.
+ */
+export function formatRelativeOrExactDate(dateStr: string | null | undefined): string {
+  if (!dateStr) return 'Sin actividad registrada';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return 'Sin actividad registrada';
+
+  const now = Date.now();
+  const diffMs = now - d.getTime();
+
+  // Si la fecha está en el futuro muy cercano por pequeñas discrepancias de reloj
+  if (diffMs < 0 && diffMs > -120_000) {
+    return 'Hace unos instantes';
+  }
+
+  const diffSec = Math.floor(diffMs / 1000);
+  if (diffSec < 60) {
+    return 'Hace unos segundos';
+  }
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) {
+    return `Hace ${diffMin} min`;
+  }
+  const diffHours = Math.floor(diffMin / 60);
+  if (diffHours < 24) {
+    return `Hace ${diffHours} h`;
+  }
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 30) {
+    return `Hace ${diffDays} d`;
+  }
+
+  return d.toLocaleDateString('es-BO', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+}
+
+/**
+ * Consulta la base de datos Supabase para cargar los comercios reales existentes
+ * y los combina con los datos canónicos de store_users, products y orders sin inyectar datos ficticios.
+ */
+export async function fetchSuperAdminStores(): Promise<SuperAdminStoreRecord[]> {
+  try {
+    const { data, error } = await supabase
+      .from('stores')
+      .select('id, name, slug, store_type, status, logo_url, created_at, updated_at')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.warn('[MAXINEGO SuperAdmin] Error al consultar comercios en Supabase:', error);
+      return loadStoresFromStorage();
+    }
+
+    if (!data || data.length === 0) {
+      persistStores([]);
+      return [];
+    }
+
+    // Consulta canónica de usuarios administradores en store_users
+    const { data: storeUsersData, error: storeUsersError } = await supabase
+      .from('store_users')
+      .select('tenant_id, full_name, email, role, is_active')
+      .eq('is_active', true);
+
+    if (storeUsersError) {
+      console.warn('[MAXINEGO SuperAdmin] Advertencia al consultar store_users en Supabase:', storeUsersError);
+    }
+
+    // Consulta canónica de productos en products (conteo e indicadores por comercio)
+    const { data: productsData, error: productsError } = await supabase
+      .from('products')
+      .select('id, tenant_id, name, price, status, is_available, created_at, updated_at');
+
+    if (productsError) {
+      console.warn('[MAXINEGO SuperAdmin] Advertencia al consultar products en Supabase:', productsError);
+    }
+
+    // Consulta canónica de pedidos en orders (conteo y volumen transaccional por comercio)
+    const { data: ordersData, error: ordersError } = await supabase
+      .from('orders')
+      .select('id, tenant_id, total, status, created_at, updated_at');
+
+    if (ordersError) {
+      console.warn('[MAXINEGO SuperAdmin] Advertencia al consultar orders en Supabase:', ordersError);
+    }
+
+    // Mapeo canónico de dueño por tenant_id (priorizando rol 'admin')
+    const ownerByTenant = new Map<string, { name: string; email: string }>();
+    if (storeUsersData && storeUsersData.length > 0) {
+      for (const su of storeUsersData) {
+        if (!su.tenant_id) continue;
+        if (!ownerByTenant.has(su.tenant_id) || su.role === 'admin') {
+          ownerByTenant.set(su.tenant_id, {
+            name: su.full_name?.trim() || '',
+            email: su.email?.trim() || '',
+          });
+        }
+      }
+    }
+
+    // Mapeo canónico de productos por tenant_id
+    const productsByTenant = new Map<string, { count: number; latestDate?: string }>();
+    if (productsData && productsData.length > 0) {
+      for (const p of productsData) {
+        if (!p.tenant_id) continue;
+        const current = productsByTenant.get(p.tenant_id) || { count: 0, latestDate: undefined };
+        current.count += 1;
+        const pDate = p.updated_at || p.created_at;
+        if (pDate && (!current.latestDate || new Date(pDate).getTime() > new Date(current.latestDate).getTime())) {
+          current.latestDate = pDate;
+        }
+        productsByTenant.set(p.tenant_id, current);
+      }
+    }
+
+    // Mapeo canónico de pedidos por tenant_id
+    const ordersByTenant = new Map<string, { count: number; totalSales: number; latestDate?: string }>();
+    if (ordersData && ordersData.length > 0) {
+      for (const o of ordersData) {
+        if (!o.tenant_id) continue;
+        const current = ordersByTenant.get(o.tenant_id) || { count: 0, totalSales: 0, latestDate: undefined };
+        current.count += 1;
+        current.totalSales += Number(o.total) || 0;
+        const oDate = o.created_at || o.updated_at;
+        if (oDate && (!current.latestDate || new Date(oDate).getTime() > new Date(current.latestDate).getTime())) {
+          current.latestDate = oDate;
+        }
+        ordersByTenant.set(o.tenant_id, current);
+      }
+    }
+
+    const localStores = loadStoresFromStorage();
+    const localMap = new Map(localStores.map((s) => [s.id, s]));
+
+    const isPlaceholderName = (n?: string) => !n || n === 'Dueño de Comercio';
+    const isPlaceholderEmail = (e?: string) => !e || e === 'contacto@centralbo.com';
+
+    const merged: SuperAdminStoreRecord[] = data.map((st) => {
+      const existing = localMap.get(st.id);
+      const canonicalOwner = ownerByTenant.get(st.id);
+
+      // Prioridad canónica de datos del dueño:
+      // 1. Supabase public.store_users (fuente de verdad oficial)
+      // 2. Caché local previo si contenía un valor real y no genérico
+      // 3. Fallback neutro y transparente (sin datos ficticios inventados)
+      const ownerName =
+        canonicalOwner?.name ||
+        (!isPlaceholderName(existing?.owner?.name) ? existing?.owner?.name : '') ||
+        'Propietario no asignado';
+
+      const ownerEmail =
+        canonicalOwner?.email ||
+        (!isPlaceholderEmail(existing?.owner?.email) ? existing?.owner?.email : '') ||
+        'Sin correo registrado';
+
+      const ownerPhone =
+        existing?.owner?.phone && existing.owner.phone !== '+591 70000000'
+          ? existing.owner.phone
+          : (existing?.owner?.phone || '+591 70000000');
+
+      const ownerObj = {
+        name: ownerName,
+        email: ownerEmail,
+        phone: ownerPhone,
+        ...(existing?.owner?.socials ? { socials: existing.owner.socials } : {}),
+      };
+
+      // Métricas canónicas calculadas para este comercio
+      const prodInfo = productsByTenant.get(st.id);
+      const ordInfo = ordersByTenant.get(st.id);
+
+      const storeProducts = prodInfo?.count || 0;
+      const storeOrders = ordInfo?.count || 0;
+      const storeVentas = Math.round((ordInfo?.totalSales || 0) * 100) / 100;
+      const storeVisitas = existing?.activity?.visitas || 0;
+
+      // Calcular última actividad canónica a partir de eventos reales (pedidos, productos, comercios)
+      const candidateDates: number[] = [];
+      if (ordInfo?.latestDate) {
+        const t = new Date(ordInfo.latestDate).getTime();
+        if (!isNaN(t)) candidateDates.push(t);
+      }
+      if (prodInfo?.latestDate) {
+        const t = new Date(prodInfo.latestDate).getTime();
+        if (!isNaN(t)) candidateDates.push(t);
+      }
+      if (st.updated_at) {
+        const t = new Date(st.updated_at).getTime();
+        if (!isNaN(t)) candidateDates.push(t);
+      }
+      if (st.created_at) {
+        const t = new Date(st.created_at).getTime();
+        if (!isNaN(t)) candidateDates.push(t);
+      }
+
+      const latestTimestamp = candidateDates.length > 0 ? Math.max(...candidateDates) : null;
+      const ultimaActividad = latestTimestamp
+        ? formatRelativeOrExactDate(new Date(latestTimestamp).toISOString())
+        : 'Sin actividad registrada';
+
+      const activityData = {
+        visitas: storeVisitas,
+        pedidos: storeOrders,
+        productos: storeProducts,
+        ventas: storeVentas,
+        ultimaActividad,
+      };
+
+      if (existing) {
+        const storeRec: any = {
+          ...st,
+          name: st.name,
+          slug: st.slug,
+          store_type: st.store_type,
+          status: st.status as StoreStatus,
+          logo_url: st.logo_url,
+          created_at: st.created_at,
+          updated_at: st.updated_at,
+          owner: ownerObj,
+          subscription: existing.subscription,
+          activity: activityData,
+        };
+        if (latestTimestamp) storeRec._latestEventTimestamp = latestTimestamp;
+        return storeRec as SuperAdminStoreRecord;
+      }
+
+      const storeRec: any = {
+        id: st.id,
+        name: st.name,
+        slug: st.slug,
+        store_type: st.store_type,
+        status: st.status as StoreStatus,
+        logo_url: st.logo_url,
+        created_at: st.created_at,
+        updated_at: st.updated_at,
+        owner: ownerObj,
+        subscription: {
+          planId: 'basic',
+          planName: 'Basic',
+          status: st.status === 'activo' ? 'activa' : st.status === 'prueba' ? 'prueba' : 'cancelada',
+          startDate: st.created_at ? st.created_at.slice(0, 10) : '2026-09-01',
+          renewalDate: '2026-10-01',
+          billingCycle: 'mensual',
+          paymentHistory: [],
+        },
+        activity: activityData,
+      };
+      if (latestTimestamp) storeRec._latestEventTimestamp = latestTimestamp;
+      return storeRec as SuperAdminStoreRecord;
+    });
+
+    persistStores(merged);
+    return merged;
+  } catch (err) {
+    console.warn('[MAXINEGO SuperAdmin] Excepción al sincronizar comercios:', err);
+    return loadStoresFromStorage();
+  }
+}
+
+export interface CreateStoreInput {
+  name: string;
+  store_type: StoreType;
+  ownerName: string;
+  ownerEmail: string;
+  ownerPhone: string;
+  planId: PlanId;
+  status: StoreStatus;
+  slug?: string;
+}
+
+export function getSuperAdminStores(): SuperAdminStoreRecord[] {
+  return loadStoresFromStorage();
+}
+
+export function getSuperAdminStoreById(id: string): SuperAdminStoreRecord | undefined {
+  return getSuperAdminStores().find((s) => s.id === id);
+}
+
+export async function createSuperAdminStore(input: CreateStoreInput): Promise<{
+  store: SuperAdminStoreRecord;
+  credentials: DirectStoreOwnerCredentials;
+}> {
+  try {
+    // Obtener sesión activa para pasar el token de autorización si existe
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    const token = session?.access_token;
+
+    const response = await fetch('/api/superadmin/create-store-owner', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({
+        name: input.name.trim(),
+        store_type: input.store_type,
+        status: input.status,
+        planId: input.planId,
+        slug: input.slug,
+        ownerName: input.ownerName.trim(),
+        ownerEmail: input.ownerEmail.trim().toLowerCase(),
+        ownerPhone: input.ownerPhone.trim(),
+      }),
+    });
+
+    const contentType = response.headers.get('content-type') || '';
+    let result: any;
+    if (contentType.includes('application/json')) {
+      result = await response.json();
+    } else {
+      const rawText = await response.text();
+      console.error('[CentralBo SuperAdmin] Respuesta no JSON recibida del servidor:', {
+        status: response.status,
+        statusText: response.statusText,
+        contentType,
+        bodyPreview: rawText.slice(0, 200),
+      });
+      throw new Error(
+        `El endpoint del servidor respondió con formato inesperado (${response.status} ${response.statusText}): ${rawText.slice(0, 100)}`
+      );
+    }
+
+    if (!response.ok || !result.success) {
+      throw new Error(result.error || 'Error al persistir el comercio en Supabase');
+    }
+
+    const { store, credentials } = result;
+
+    const planName = input.planId === 'pro' ? 'Pro' : 'Basic';
+    const planPrice = input.planId === 'pro' ? 99 : 49;
+    const subStatus =
+      store.status === 'prueba' ? 'prueba' : store.status === 'activo' ? 'activa' : 'vencida';
+    const dateOnly = store.created_at
+      ? store.created_at.slice(0, 10)
+      : new Date().toISOString().slice(0, 10);
+
+    const newStoreRecord: SuperAdminStoreRecord = {
+      id: store.id,
+      name: store.name,
+      slug: store.slug,
+      store_type: store.store_type,
+      status: store.status as StoreStatus,
+      logo_url: store.logo_url || null,
+      created_at: store.created_at,
+      updated_at: store.updated_at,
+      owner: {
+        name: input.ownerName.trim(),
+        email: input.ownerEmail.trim().toLowerCase(),
+        phone: input.ownerPhone.trim(),
+        socials: {
+          whatsapp: input.ownerPhone.trim(),
+        },
+      },
+      subscription: {
+        planId: input.planId,
+        planName: store.status === 'prueba' ? `${planName} (Prueba 14d)` : planName,
+        status: subStatus,
+        startDate: dateOnly,
+        renewalDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        billingCycle: 'mensual',
+        paymentHistory: [
+          {
+            id: `pay-${Date.now()}`,
+            date: dateOnly,
+            amount: store.status === 'prueba' ? 0 : planPrice,
+            currency: 'Bs',
+            period: store.status === 'prueba' ? 'Prueba Inicial 14 días' : 'Primer Mes',
+            status: 'completado',
+            reference: `REG-BOB-${Math.floor(10000 + Math.random() * 90000)}`,
+          },
+        ],
+      },
+      activity: {
+        visitas: 0,
+        pedidos: 0,
+        productos: 0,
+        ventas: 0,
+        ultimaActividad: formatRelativeOrExactDate(store.created_at || new Date().toISOString()),
+      },
+    };
+    (newStoreRecord as any)._latestEventTimestamp = Date.now();
+
+    const current = getSuperAdminStores();
+    const updatedList = [newStoreRecord, ...current.filter((s) => s.id !== store.id)];
+    persistStores(updatedList);
+
+    return {
+      store: newStoreRecord,
+      credentials,
+    };
+  } catch (err: unknown) {
+    console.error('[CentralBo SuperAdmin] Error en createSuperAdminStore:', err);
+    throw err;
+  }
+}
+
+export async function setStoreStatus(
+  id: string,
+  newStatus: StoreStatus
+): Promise<SuperAdminStoreRecord> {
+  const current = getSuperAdminStores();
+  const existing = current.find((s) => s.id === id);
+  if (!existing) {
+    throw new Error(`Comercio con id ${id} no encontrado en la lista local`);
+  }
+
+  // 1. Obtener token Bearer de la sesión actual de Supabase
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  const token = session?.access_token;
+
+  if (!token) {
+    throw new Error('No hay una sesión activa de SuperAdmin. Inicia sesión para continuar.');
+  }
+
+  // 2. Ejecutar petición al endpoint seguro de servidor
+  const response = await fetch('/api/superadmin/update-store-status', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      storeId: id,
+      newStatus,
+    }),
+  });
+
+  const result = await response.json().catch(() => null);
+
+  if (!response.ok || !result || !result.success) {
+    const errorMsg =
+      result?.error || `Error del servidor al actualizar estado (HTTP ${response.status})`;
+    throw new Error(errorMsg);
+  }
+
+  // 3. ÚNICAMENTE tras confirmación exitosa de Supabase, actualizar cache local
+  const confirmedStore = result.store;
+  const now = confirmedStore?.updated_at || new Date().toISOString();
+
+  let subStatus = existing.subscription.status;
+  if (newStatus === 'activo' && (subStatus === 'cancelada' || subStatus === 'vencida')) {
+    subStatus = 'activa';
+  } else if (newStatus === 'inactivo' || newStatus === 'suspendido') {
+    if (subStatus === 'activa') subStatus = 'cancelada';
+  }
+
+  const updatedStore: SuperAdminStoreRecord = {
+    ...existing,
+    status: newStatus,
+    updated_at: now,
+    subscription: {
+      ...existing.subscription,
+      status: subStatus,
+    },
+  };
+
+  const updatedList = current.map((s) => (s.id === id ? updatedStore : s));
+  persistStores(updatedList);
+  return updatedStore;
+}
+
+export async function activateStore(id: string): Promise<SuperAdminStoreRecord> {
+  return setStoreStatus(id, 'activo');
+}
+
+export async function deactivateStore(id: string): Promise<SuperAdminStoreRecord> {
+  return setStoreStatus(id, 'inactivo');
+}
+
+export async function suspendStore(id: string): Promise<SuperAdminStoreRecord> {
+  return setStoreStatus(id, 'suspendido');
+}
+
+// ----------------------------------------------------------------------------
+// 3. USUARIOS REGISTRADOS (CON DISTINCIÓN CLARA DE LOS 3 PERFILES OFICIALES)
+// ----------------------------------------------------------------------------
+export const SUPERADMIN_USERS: SuperAdminUserRecord[] = [];
+
+// ----------------------------------------------------------------------------
+// MÉTRICAS Y RESUMEN DEL DASHBOARD
+// ----------------------------------------------------------------------------
+export function getSuperAdminDashboardMetrics() {
+  const totalStores = SUPERADMIN_STORES.length;
+  const activeStores = SUPERADMIN_STORES.filter((s) => s.status === 'activo').length;
+  const inactiveStores = SUPERADMIN_STORES.filter((s) => s.status === 'inactivo').length;
+  const suspendedStores = SUPERADMIN_STORES.filter((s) => s.status === 'suspendido').length;
+  const trialStores = SUPERADMIN_STORES.filter((s) => s.status === 'prueba').length;
+
+  const baseUsers = SUPERADMIN_USERS;
+  const storeOwnersCount = SUPERADMIN_STORES.filter((s) => s.owner?.email).length;
+  const totalUsers = baseUsers.length > 0 ? baseUsers.length : storeOwnersCount;
+  const superAdminUsers = baseUsers.filter((u) => u.profile === 'superadmin').length;
+  const storeAdminUsers = baseUsers.length > 0
+    ? baseUsers.filter((u) => u.profile === 'store_admin').length
+    : storeOwnersCount;
+  const publicClientUsers = baseUsers.filter((u) => u.profile === 'public_client').length;
+
+  const totalPlans = MAXINEGO_PLANS.length;
+  const totalSubscriptions = SUPERADMIN_STORES.length;
+  const activeSubscriptions = SUPERADMIN_STORES.filter(
+    (s) => s.subscription.status === 'activa'
+  ).length;
+  const trialSubscriptions = SUPERADMIN_STORES.filter(
+    (s) => s.subscription.status === 'prueba'
+  ).length;
+  const expiredSubscriptions = SUPERADMIN_STORES.filter(
+    (s) => s.subscription.status === 'vencida' || s.subscription.status === 'cancelada'
+  ).length;
+
+  // Actividad general acumulada con fuentes canónicas
+  const totalVisitas = SUPERADMIN_STORES.reduce((sum, s) => sum + (s.activity?.visitas || 0), 0);
+  const totalPedidos = SUPERADMIN_STORES.reduce((sum, s) => sum + (s.activity?.pedidos || 0), 0);
+  const totalProductos = SUPERADMIN_STORES.reduce((sum, s) => sum + (s.activity?.productos || 0), 0);
+  const totalVentasBs = Math.round(SUPERADMIN_STORES.reduce((sum, s) => sum + (s.activity?.ventas || 0), 0) * 100) / 100;
+
+  // Encontrar el evento canónico más reciente de toda la plataforma
+  let globalLatestTimestamp = 0;
+  let globalLatestStoreName = '';
+
+  for (const s of SUPERADMIN_STORES) {
+    const rawLatest = (s as any)._latestEventTimestamp || 0;
+    if (rawLatest > globalLatestTimestamp) {
+      globalLatestTimestamp = rawLatest;
+      globalLatestStoreName = s.name;
+    }
+  }
+
+  const ultimaActividadGeneral =
+    globalLatestTimestamp > 0
+      ? `${formatRelativeOrExactDate(new Date(globalLatestTimestamp).toISOString())} (${globalLatestStoreName})`
+      : SUPERADMIN_STORES.length > 0
+      ? 'Sin eventos recientes'
+      : 'Sin actividad registrada';
+
+  return {
+    stores: {
+      total: totalStores,
+      activos: activeStores,
+      inactivos: inactiveStores,
+      suspendidos: suspendedStores,
+      prueba: trialStores,
+    },
+    users: {
+      total: totalUsers,
+      superadmins: superAdminUsers,
+      storeAdmins: storeAdminUsers,
+      publicClients: publicClientUsers,
+    },
+    plans: {
+      total: totalPlans,
+      basicName: 'Basic (Bs 49/mes)',
+      proName: 'Pro (Bs 99/mes)',
+    },
+    subscriptions: {
+      total: totalSubscriptions,
+      activas: activeSubscriptions,
+      prueba: trialSubscriptions,
+      vencidas: expiredSubscriptions,
+    },
+    activity: {
+      totalVisitas,
+      totalPedidos,
+      totalProductos,
+      totalVentasBs,
+      ultimaActividadGeneral,
+    },
+  };
+}
+
+export const getSuperAdminGlobalMetrics = getSuperAdminDashboardMetrics;

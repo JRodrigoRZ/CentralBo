@@ -1,0 +1,506 @@
+import { createClient } from '@supabase/supabase-js';
+import { GoogleGenAI } from '@google/genai';
+
+const supabaseUrl =
+  process.env.VITE_SUPABASE_URL ||
+  process.env.SUPABASE_URL ||
+  'https://wuerdwkcpurbtcwyqjep.supabase.co';
+
+const supabaseServiceRoleKey =
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
+
+const supabaseAnonKey =
+  process.env.VITE_SUPABASE_ANON_KEY ||
+  process.env.SUPABASE_ANON_KEY ||
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1ZXJkd2tjcHVyYnRjd3lxamVwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg3NDk3NjksImV4cCI6MjEwNDMyNTc2OX0.H-lIv4hMO8ER3JhosGy6FSlNceWEvSEdja9FWBVfN8c';
+
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function isValidUUID(str: unknown): boolean {
+  return typeof str === 'string' && UUID_REGEX.test(str.trim());
+}
+
+function isQrPaymentQuery(query: string): boolean {
+  if (!query || typeof query !== 'string') return false;
+  const q = query.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const hasQrKeyword = q.includes('qr') || q.includes('q.r');
+  const hasPayKeyword =
+    q.includes('paga') ||
+    q.includes('pago') ||
+    q.includes('cobro') ||
+    q.includes('transfer') ||
+    q.includes('cuenta');
+
+  if (hasQrKeyword) return true;
+  if (
+    hasPayKeyword &&
+    (q.includes('codigo') || q.includes('escan') || q.includes('foto') || q.includes('imagen'))
+  ) {
+    return true;
+  }
+  return false;
+}
+
+export default async function handler(req: any, res: any) {
+  // Configuración de encabezados CORS y seguridad
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,POST');
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization'
+  );
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
+  if (req.method !== 'POST') {
+    return res.status(405).json({
+      success: false,
+      error: 'Método no permitido. Solo se admite POST.',
+    });
+  }
+
+  try {
+    const body = req.body || {};
+    const storeIdentifier =
+      body.store_id || body.storeId || body.tenant_id || body.tenantId || body.slug || req.query?.store_id;
+    const userMessage =
+      body.message || (Array.isArray(body.messages) ? body.messages[body.messages.length - 1]?.content : null);
+    const history = Array.isArray(body.history)
+      ? body.history
+      : Array.isArray(body.messages) && body.messages.length > 1
+      ? body.messages.slice(0, -1)
+      : [];
+
+    if (!storeIdentifier || typeof storeIdentifier !== 'string' || !storeIdentifier.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: 'Identificador de la tienda (store_id) es obligatorio.',
+      });
+    }
+
+    if (!userMessage || typeof userMessage !== 'string' || !userMessage.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: 'El mensaje del usuario es obligatorio.',
+      });
+    }
+
+    // 1. Inicializar cliente de Supabase
+    const clientKey = supabaseServiceRoleKey || supabaseAnonKey;
+    const supabase = createClient(supabaseUrl, clientKey);
+
+    // 2. Consultar información de la tienda en Supabase
+    let storeQuery = supabase
+      .from('stores')
+      .select('id, name, slug, store_type, status, logo_url, profile, appearance, schedule, shipping, payment_settings, vertical_config');
+
+    if (isValidUUID(storeIdentifier)) {
+      storeQuery = storeQuery.eq('id', storeIdentifier.trim());
+    } else {
+      storeQuery = storeQuery.eq('slug', storeIdentifier.trim().toLowerCase());
+    }
+
+    const { data: store, error: storeError } = await storeQuery.maybeSingle();
+
+    if (storeError || !store) {
+      return res.status(404).json({
+        success: false,
+        error: 'Tienda no encontrada en la plataforma.',
+      });
+    }
+
+    if (!['activo', 'prueba'].includes(store.status)) {
+      return res.status(403).json({
+        success: false,
+        error: 'La tienda se encuentra temporalmente inactiva o deshabilitada.',
+      });
+    }
+
+    // 3. Consultar categorías activas de la tienda
+    const { data: categories } = await supabase
+      .from('categories')
+      .select('id, name')
+      .eq('tenant_id', store.id)
+      .eq('status', 'activo');
+
+    const categoryMap = new Map<string, string>();
+    if (categories && Array.isArray(categories)) {
+      categories.forEach((cat: any) => categoryMap.set(cat.id, cat.name));
+    }
+
+    // 4. Consultar productos activos y disponibles de la tienda
+    const { data: products, error: prodError } = await supabase
+      .from('products')
+      .select('id, name, description, price, is_available, status, attributes, category_id')
+      .eq('tenant_id', store.id)
+      .eq('status', 'activo')
+      .eq('is_available', true)
+      .order('name', { ascending: true })
+      .limit(80);
+
+    if (prodError) {
+      console.warn('[Chat API] Advertencia al obtener productos:', prodError.message);
+    }
+
+    const isServices = store.store_type === 'servicios';
+
+    // 5. Consultar promociones vigentes (opcional y seguro)
+    const todayStr = new Date().toISOString().split('T')[0];
+    let promotionsSummary = '';
+    try {
+      const { data: promos } = await supabase
+        .from('promotions')
+        .select('code, discount_type, discount_value, min_purchase')
+        .eq('tenant_id', store.id)
+        .eq('is_active', true)
+        .lte('start_date', todayStr)
+        .gte('end_date', todayStr);
+
+      if (promos && promos.length > 0) {
+        promotionsSummary = '\nPROMOCIONES ACTIVAS DISPONIBLES:\n' + promos.map((p: any) => 
+          `- Código: "${p.code}" -> ${p.discount_type === 'percentage' ? `${p.discount_value}% de descuento` : `Bs. ${p.discount_value} de descuento`} (Compra mínima: Bs. ${p.min_purchase || 0})`
+        ).join('\n');
+      }
+    } catch {
+      // Si la tabla no existe o falla, continuar sin interrumpir
+    }
+
+    // 5b. Consultar profesionales activos básicos exclusivamente para comercios de tipo 'servicios' (AM-03)
+    let profesionalesSummary = '';
+    if (isServices) {
+      try {
+        const { data: profs, error: profsError } = await supabase
+          .from('professionals')
+          .select('id, name, specialty, service_ids')
+          .eq('tenant_id', store.id)
+          .eq('is_active', true)
+          .order('name', { ascending: true })
+          .limit(20);
+
+        if (!profsError && profs && Array.isArray(profs) && profs.length > 0) {
+          profesionalesSummary =
+            '\nPROFESIONALES ACTIVOS REGISTRADOS:\n' +
+            profs
+              .map((prof: any) => {
+                const spec = prof.specialty ? ` - Especialidad: ${prof.specialty}` : '';
+                return `• ${prof.name}${spec}`;
+              })
+              .join('\n');
+        } else {
+          profesionalesSummary = '\nPROFESIONALES ACTIVOS REGISTRADOS:\nActualmente no hay profesionales registrados en el sistema.';
+        }
+      } catch (profErr) {
+        console.warn('[Chat API] Advertencia al consultar profesionales:', profErr);
+        profesionalesSummary = '\nPROFESIONALES ACTIVOS REGISTRADOS:\nActualmente no hay profesionales registrados en el sistema.';
+      }
+    }
+
+    // 6. Preparar datos de perfil y configuración
+    const profile = (store.profile && typeof store.profile === 'object' ? store.profile : {}) as Record<string, any>;
+    const payment = (store.payment_settings && typeof store.payment_settings === 'object' ? store.payment_settings : {}) as Record<string, any>;
+
+    const nombre_tienda = store.name || profile.name || 'la tienda';
+    const rawWhatsapp =
+      profile.whatsapp ||
+      profile.phone ||
+      (store as any).whatsapp ||
+      (store as any).phone ||
+      payment.whatsapp ||
+      '';
+
+    const cleanWhatsapp = typeof rawWhatsapp === 'string' ? rawWhatsapp.replace(/\D/g, '') : '';
+    const hasWhatsapp = cleanWhatsapp.length >= 7;
+    const whatsapp_tienda = hasWhatsapp ? rawWhatsapp : '';
+
+    const rawQr =
+      body.qrImageUrl ||
+      body.qr_image_url ||
+      payment.qrImageUrl ||
+      payment.qr_image_url ||
+      payment.qrUrl ||
+      payment.qr_url ||
+      profile.qrImageUrl ||
+      profile.qr_image_url ||
+      profile.qrUrl ||
+      profile.qr_url ||
+      (store as any).qrImageUrl ||
+      (store as any).qr_image_url ||
+      (store as any).qr_url ||
+      '';
+
+    const isQrSimpleActive = payment.qrSimple !== false;
+    const hasQr =
+      typeof rawQr === 'string' &&
+      (rawQr.trim().startsWith('http') || rawQr.trim().startsWith('data:image/')) &&
+      isQrSimpleActive;
+    const qr_url_tienda = hasQr ? rawQr.trim() : '';
+
+    // Formatear catálogo de productos/servicios para {lista_productos}
+    const lista_productos = (products && products.length > 0)
+      ? products.map((p: any) => {
+          const catName = p.category_id ? categoryMap.get(p.category_id) || 'General' : 'General';
+          const desc = p.description ? ` - ${p.description.replace(/\n/g, ' ')}` : '';
+
+          // Extracción segura de duración registrada para servicios (AM-03)
+          let durationStr = '';
+          const rawDuration = p.attributes?.duration_minutes ?? p.attributes?.duration;
+          if (typeof rawDuration === 'number' && Number.isFinite(rawDuration) && rawDuration > 0) {
+            durationStr = ` | Duración: ${rawDuration} min`;
+          } else if (typeof rawDuration === 'string' && /^\d+$/.test(rawDuration.trim())) {
+            const parsed = parseInt(rawDuration.trim(), 10);
+            if (parsed > 0) {
+              durationStr = ` | Duración: ${parsed} min`;
+            }
+          }
+
+          return `• ${p.name} | Precio: Bs. ${p.price}${durationStr} | Categoría: ${catName}${desc}`;
+        }).join('\n')
+      : isServices
+      ? 'Actualmente no hay servicios registrados en el catálogo.'
+      : 'Actualmente no hay productos registrados en el catálogo.';
+
+    const qrInstruction = hasQr
+      ? `4. GESTIÓN Y ASISTENCIA DE PAGO POR CÓDIGO QR (MÓDULO 3):
+   - Cuando el cliente manifieste su intención de pagar mediante QR (ejemplos: "Quiero pagar con QR", "¿Tienen QR?", "Muéstrame el QR para pagar", "¿Cómo puedo pagar por QR?", "Pásame el código QR", "Voy a pagar por QR", "¿Dónde está el QR de pago?" o cualquier consulta similar sobre pago con QR):
+     * Responde de manera breve, amigable y cercana identificando el comercio. Ejemplo exacto: "¡Claro! 💜 Este es el código QR de ${nombre_tienda} para que puedas realizar tu pago."
+     * Muestra obligatoriamente la imagen auténtica del código QR del comercio usando formato Markdown exacto:
+       ![Código QR de Pago - ${nombre_tienda}](${qr_url_tienda})
+     * Explica de forma clara y breve el procedimiento de pago y la instrucción obligatoria del comprobante:
+       "Puedes escanear este QR desde tu aplicación bancaria para realizar el pago.\n\nUna vez realizado el pago, recuerda enviar tu comprobante por WhatsApp junto con el pedido que tienes en tu carrito. Así el comercio podrá revisar la información de tu pago. 📲"
+     * Recuerda al cliente que para confirmar su compra debe completar su pedido en el carrito usando la opción de "Pago mediante QR" y enviarlo al WhatsApp de ${nombre_tienda}.
+     * REGLAS ESTRICTAS DE SEGURIDAD PARA EL QR:
+       - No deformes ni recortes la imagen.
+       - No uses imágenes de ejemplo ni URLs inventadas.
+       - No uses el QR de MAXINEGO ni de otra tienda.
+       - ESTÁ TERMINANTEMENTE PROHIBIDO afirmar o simular que el pago fue recibido, validado o verificado automáticamente. MAXINEGO no realiza verificación bancaria automática.
+       - No vacíes ni alteres el carrito del cliente. El comprobante será adjuntado manualmente por el cliente dentro de WhatsApp.`
+      : `4. GESTIÓN Y ASISTENCIA DE PAGO POR CÓDIGO QR (MÓDULO 3 - COMERCIO SIN QR):
+   - Si el cliente pregunta por pago con QR o solicita un código QR:
+     * La tienda ${nombre_tienda} NO tiene un código QR de cobro disponible en este momento.
+     * Responde de forma transparente: "Por el momento, este comercio no tiene un código QR de pago disponible."
+     * Informa cordialmente sobre los otros métodos de pago que tenga la tienda (por ejemplo efectivo contraentrega o coordinación directa al enviar el pedido por WhatsApp).
+     * ESTÁ ESTRICTAMENTE PROHIBIDO generar imágenes rotas en Markdown como ![Código QR de Pago]() o inventar códigos QR, cuentas bancarias o enlaces ficticios.`;
+
+    const cierreInstruction = hasWhatsapp
+      ? `5. CIERRE DE PEDIDO Y DERIVACIÓN A WHATSAPP:
+   - Una vez confirmados los productos, la entrega y el método de pago, genera un resumen final limpio y claro con:
+     * Resumen de productos y total en Bs.
+     * Modalidad (Retiro o Delivery con su dirección).
+     * Método de pago.
+   - Instrucción obligatoria final: Pídele al cliente que envíe ese pedido directamente al WhatsApp oficial del comercio (${whatsapp_tienda}) para que el local comience a prepararlo de inmediato. Incluye el enlace directo formateado de WhatsApp:
+     https://wa.me/${cleanWhatsapp}?text=[mensaje_codificado_del_pedido]`
+      : `5. CIERRE DE PEDIDO (TIENDA SIN WHATSAPP REGISTRADO):
+   - Una vez confirmados los productos, la entrega y el método de pago, genera un resumen final limpio y claro con:
+     * Resumen de productos y total en Bs.
+     * Modalidad (Retiro o Delivery con su dirección).
+     * Método de pago.
+   - ESTÁ ESTRICTAMENTE PROHIBIDO generar enlaces rotos de WhatsApp como "https://wa.me/" o inventar números de teléfono.
+   - Instrucción obligatoria final: Como el comercio no tiene un número de WhatsApp registrado, indícale amablemente al cliente que su pedido queda anotado y pídele su nombre y número de teléfono de contacto para que el personal de la tienda lo coordine, o indícale que puede acercarse directamente al local.`;
+
+    // 7. Construir System Instruction del Agente Max (Diferenciando 'servicios' vs comercios generales / restaurantes)
+    let systemInstruction = '';
+
+    if (isServices) {
+      systemInstruction = `Eres el "Agente Max", el asistente comercial inteligente oficial de la tienda de servicios "${nombre_tienda}" en MAXINEGO.
+Tu objetivo es atender a los clientes, resolver dudas sobre los servicios profesionales ofrecidos, sus precios y duración, y guiarlos cordialmente hacia la reserva de citas.
+
+DATOS DEL COMERCIO:
+- Tipo de comercio: Servicios Profesionales
+- WhatsApp oficial: ${hasWhatsapp ? `${whatsapp_tienda} (wa.me/${cleanWhatsapp})` : 'No registrado (ESTRICTAMENTE PROHIBIDO generar enlaces a https://wa.me/)'}
+- QR de pago disponible: ${hasQr ? qr_url_tienda : 'No registrado (ESTRICTAMENTE PROHIBIDO mostrar etiquetas de imagen de QR)'}
+
+CATÁLOGO DE SERVICIOS DISPONIBLES:
+${lista_productos}
+${profesionalesSummary}
+
+=== REGLAS ESTRICTAS DE SEGURIDAD Y SERVICIOS ===
+1. CATÁLOGO CERRADO DE SERVICIOS (PROHIBIDO INVENTAR):
+   - Solo puedes ofrecer y hablar de los servicios que están explícitamente en el catálogo suministrado.
+   - Si el cliente pregunta por un servicio que NO está en la lista, responde amablemente: "Actualmente no ofrecemos [servicio] en nuestro catálogo. Te sugiero revisar nuestras opciones disponibles en pantalla."
+   - Nunca inventes servicios, precios, duraciones ni condiciones que no figuren en los datos.
+   - Si el cliente pregunta por la duración de un servicio y NO está especificada en la lista, reconoce amablemente que la duración exacta no está indicada y sugiere consultar directamente con el comercio.
+
+2. PROFESIONALES REGISTRADOS:
+   - Solo puedes mencionar los profesionales que figuren explícitamente en la lista de profesionales registrados.
+   - Si el cliente pregunta por un profesional que no está en la lista o si no hay profesionales registrados, indícalo amablemente sin inventar nombres ni especialidades.
+
+3. PRECIOS Y MONEDA:
+   - Todos los precios son estrictamente en Bolivianos (Bs.). Muestra siempre el monto con el prefijo "Bs." (ejemplo: Bs. 80).
+
+4. GESTIÓN DE CITAS Y RESERVAS:
+   - Este comercio ofrece servicios profesionales. NO apliques instrucciones de comida, delivery, zonas de entrega ni retiro físico de productos a menos que el cliente pregunte expresamente por productos físicos disponibles.
+   - Cuando el cliente pregunte por disponibilidad de citas, horarios exactos o exprese la intención de agendar/reservar:
+     * Brinda primero la información confirmada del servicio (precio, duración y profesional si están disponibles en los datos).
+     * Explica amablemente que para elegir la fecha y el horario disponible debe utilizar la opción "Reservar Cita" disponible en la pantalla de la tienda.
+     * ESTÁ ESTRICTAMENTE PROHIBIDO afirmar que has creado, reservado, modificado, cancelado o confirmado una cita dentro de este chat, ya que la selección y confirmación de turnos se realiza exclusivamente mediante el sistema de reservas de la tienda.
+     * No inventes cupos, turnos ni horarios disponibles.
+
+${qrInstruction}
+
+${cierreInstruction}
+
+6. TONO Y LÍMITES:
+   - Respuestas breves, cercanas y profesionales. Diseñado para lectura rápida en celulares.
+   - Si el usuario te hace preguntas no relacionadas con la tienda o MAXINEGO, responde cordialmente: "Soy el asistente de ${nombre_tienda} y estoy aquí para ayudarte con información sobre nuestros servicios profesionales y reservas."`;
+    } else {
+      systemInstruction = `Eres el "Agente Max", el asistente comercial inteligente oficial de la tienda "${nombre_tienda}" en MAXINEGO.
+Tu único objetivo es atender a los clientes, resolver dudas sobre los productos disponibles y guiarlos paso a paso para cerrar su pedido.
+
+DATOS DEL COMERCIO:
+- WhatsApp oficial: ${hasWhatsapp ? `${whatsapp_tienda} (wa.me/${cleanWhatsapp})` : 'No registrado (ESTRICTAMENTE PROHIBIDO generar enlaces a https://wa.me/)'}
+- QR de pago disponible: ${hasQr ? qr_url_tienda : 'No registrado (ESTRICTAMENTE PROHIBIDO mostrar etiquetas de imagen de QR)'}
+
+LISTA DE PRODUCTOS DISPONIBLES:
+${lista_productos}
+
+=== REGLAS ESTRICTAS DE SEGURIDAD Y CATÁLOGO ===
+1. CATÁLOGO CERRADO (PROHIBIDO INVENTAR):
+   - Solo puedes ofrecer y hablar de los productos que están explícitamente en la lista de productos suministrada.
+   - Si el cliente pide un producto que NO está en la lista (gaseosas, salsas, combos o marcas no registradas), responde amablemente: "Actualmente no disponemos de [producto] en nuestro menú. Te sugiero probar [producto similar disponible] o revisar nuestras opciones en pantalla."
+   - Nunca inventes ingredientes, sabores, tamaños ni precios que no figuren en los datos.
+
+2. PRECIOS Y MONEDA:
+   - Todos los precios son estrictamente en Bolivianos (Bs.). Muestra siempre el monto con el prefijo "Bs." (ejemplo: Bs. 18).
+   - Realiza los cálculos matemáticos de forma exacta y sin errores al multiplicar cantidades por precios unitarios.
+
+3. FLUJO DE VENTAS PASO A PASO:
+   - Cuando el cliente muestre interés en pedir, solicita los datos de manera ordenada y sin abrumar:
+     a) Confirmar productos y cantidades exactas.
+     b) Modalidad de entrega: ¿Retiro en tienda o Delivery?
+     c) Si es Delivery: solicitar zona o dirección de entrega.
+     d) Método de pago preferido: Pago por QR o Efectivo.
+
+${qrInstruction}
+
+${cierreInstruction}
+
+6. TONO Y LÍMITES:
+   - Respuestas breves, cercanas y al grano. Diseñado para lectura rápida en celulares.
+   - Si el usuario te hace preguntas no relacionadas con la tienda o MAXINEGO, responde cordialmente: "Soy el asistente de ${nombre_tienda} y estoy aquí para ayudarte con tus pedidos y dudas sobre nuestro menú."`;
+    }
+
+    const isQrQuery = isQrPaymentQuery(userMessage);
+
+    // 8. Verificar clave de API de Gemini
+    const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+    if (!apiKey) {
+      if (isQrQuery) {
+        const reply = hasQr
+          ? `¡Claro! 💜 Este es el código QR de **${nombre_tienda}** para que puedas realizar tu pago:\n\n![Código QR de Pago - ${nombre_tienda}](${qr_url_tienda})\n\nPuedes escanear este QR desde tu aplicación bancaria para realizar el pago.\n\nUna vez realizado el pago, recuerda enviar tu comprobante por WhatsApp junto con el pedido que tienes en tu carrito. Así el comercio podrá revisar la información de tu pago. 📲`
+          : `Por el momento, este comercio no tiene un código QR de pago disponible.\n\nPuedes revisar los otros métodos de pago disponibles en el carrito o coordinar directamente con **${nombre_tienda}** por WhatsApp.`;
+
+        return res.status(200).json({
+          success: true,
+          reply,
+          store: {
+            id: store.id,
+            name: store.name,
+            slug: store.slug,
+            storeType: store.store_type,
+          },
+        });
+      }
+
+      console.warn('[Chat API] GEMINI_API_KEY no encontrada en process.env.');
+      return res.status(500).json({
+        success: false,
+        error: 'La clave de API de Gemini (GEMINI_API_KEY) no está configurada en el servidor. Por favor agrégala al archivo de variables de entorno (.env).',
+      });
+    }
+
+    // 9. Ejecutar llamada al SDK @google/genai
+    const ai = new GoogleGenAI({ apiKey });
+
+    // Preparar historial de conversación
+    const contents: any[] = [];
+    if (Array.isArray(history) && history.length > 0) {
+      for (const item of history.slice(-8)) { // Mantener últimos 8 mensajes para contexto óptimo
+        const role = item.role === 'assistant' || item.role === 'model' ? 'model' : 'user';
+        const text = item.content || item.text || '';
+        if (text) {
+          contents.push({
+            role,
+            parts: [{ text }],
+          });
+        }
+      }
+    }
+
+    // Agregar el mensaje actual del usuario
+    contents.push({
+      role: 'user',
+      parts: [{ text: userMessage.trim() }],
+    });
+
+    const modelCandidate = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+    let replyText = '';
+
+    try {
+      const aiResponse = await ai.models.generateContent({
+        model: modelCandidate,
+        contents,
+        config: {
+          systemInstruction,
+          temperature: 0.7,
+        },
+      });
+
+      replyText = aiResponse.text || 'Disculpa, no pude procesar tu consulta en este momento.';
+    } catch (modelErr: any) {
+      console.warn(`[Chat API] Error con modelo ${modelCandidate}:`, modelErr?.message);
+      // Intento de respaldo transparente si el modelo configurado no responde (e.g. depreciado o sobrecarga)
+      const fallbackCandidates = ['gemini-3.5-flash-lite', 'gemini-3.8-flash'];
+      let succeeded = false;
+
+      for (const fallbackModel of fallbackCandidates) {
+        if (fallbackModel === modelCandidate) continue;
+        try {
+          const fallbackResponse = await ai.models.generateContent({
+            model: fallbackModel,
+            contents,
+            config: {
+              systemInstruction,
+              temperature: 0.7,
+            },
+          });
+          replyText = fallbackResponse.text || 'Disculpa, no pude procesar tu consulta en este momento.';
+          succeeded = true;
+          break;
+        } catch (fallbackErr: any) {
+          console.warn(`[Chat API] Fallback ${fallbackModel} falló:`, fallbackErr?.message);
+        }
+      }
+
+      if (!succeeded) {
+        if (isQrQuery) {
+          replyText = hasQr
+            ? `¡Claro! 💜 Este es el código QR de **${nombre_tienda}** para que puedas realizar tu pago:\n\n![Código QR de Pago - ${nombre_tienda}](${qr_url_tienda})\n\nPuedes escanear este QR desde tu aplicación bancaria para realizar el pago.\n\nUna vez realizado el pago, recuerda enviar tu comprobante por WhatsApp junto con el pedido que tienes en tu carrito. Así el comercio podrá revisar la información de tu pago. 📲`
+            : `Por el momento, este comercio no tiene un código QR de pago disponible.\n\nPuedes revisar los otros métodos de pago disponibles en el carrito o coordinar directamente con **${nombre_tienda}** por WhatsApp.`;
+        } else {
+          throw modelErr;
+        }
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      reply: replyText,
+      store: {
+        id: store.id,
+        name: store.name,
+        slug: store.slug,
+        storeType: store.store_type,
+      },
+    });
+  } catch (error: any) {
+    console.error('[Chat API] Error procesando solicitud de chat:', error);
+    return res.status(500).json({
+      success: false,
+      error: error?.message || 'Error interno del servidor al procesar el mensaje.',
+    });
+  }
+}

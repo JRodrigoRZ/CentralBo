@@ -1,0 +1,244 @@
+{
+  "metrics": {
+    "crear_mi_tienda_total": 7,
+    "crear_mi_tienda_por_origen": {
+      "header_desktop": 4,
+      "hero_cta": 1,
+      "test_runner": 1,
+      "test_runner_1792768951925": 1
+    },
+    "explorar_tiendas_total": 4,
+    "explorar_tiendas_por_origen": {
+      "header_mobile": 1,
+      "hero_secundario": 1,
+      "vitrina_empty_state": 1,
+      "asi_se_ve_tu_tienda": 1
+    },
+    "ver_tienda_catalogo_total": 1,
+    "ver_tienda_por_comercio": {
+      "tienda-gloria": 1
+    },
+    "solicitar_info_clics_total": 4,
+    "solicitar_info_por_origen": {
+      "planes_basic": 2,
+      "planes_pro": 2
+    },
+    "formulario_intentos_total": 1,
+    "formulario_validaciones_fallidas_total": 1,
+    "solicitudes_comerciales_validas_total": 1,
+    "aperturas_whatsapp_comercial_total": 1,
+    "distribucion_por_origen": {
+      "header_desktop": 4,
+      "header_mobile": 1,
+      "formulario_contacto": 4,
+      "hero_cta": 1,
+      "hero_secundario": 1,
+      "planes_basic": 2,
+      "vitrina_card": 1,
+      "planes_pro": 2,
+      "vitrina_empty_state": 1,
+      "test_runner": 1,
+      "test_runner_1792768951925": 1,
+      "asi_se_ve_tu_tienda": 1
+    },
+    "total_eventos_registrados": 20,
+    "ultimo_evento": {
+      "id": "1792769011931-u9jg3z",
+      "type": "click_explorar_tiendas",
+      "origin": "asi_se_ve_tu_tienda",
+      "timestamp": "2026-10-23T15:23:31.931Z",
+      "metadata": {
+        "origin": "asi_se_ve_tu_tienda"
+      }
+    },
+    "actualizado_en": "2026-10-23T15:23:31.931Z"
+  },
+  "events": [
+    {
+      "id": "1792769011931-u9jg3z",
+      "type": "click_explorar_tiendas",
+      "origin": "asi_se_ve_tu_tienda",
+      "timestamp": "2026-10-23T15:23:31.931Z",
+      "metadata": {
+        "origin": "asi_se_ve_tu_tienda"
+      }
+    },
+    {
+      "id": "1792769011299-5ecf4x",
+      "type": "click_solicitar_informacion",
+      "origin": "planes_pro",
+      "timestamp": "2026-10-23T15:23:31.299Z",
+      "metadata": {
+        "origin": "planes_pro",
+        "planId": "pro"
+      }
+    },
+    {
+      "id": "1792768951926-1yolou",
+      "type": "click_crear_mi_tienda",
+      "origin": "test_runner_1792768951925",
+      "timestamp": "2026-10-23T15:22:31.926Z",
+      "metadata": {
+        "origin": "test_runner_1792768951925"
+      }
+    },
+    {
+      "id": "1792768915082-fab4cj",
+      "type": "click_crear_mi_tienda",
+      "origin": "test_runner",
+      "timestamp": "2026-10-23T15:21:55.082Z",
+      "metadata": {
+        "origin": "test_runner"
+      }
+    },
+    {
+      "id": "1792768895633-unrvyn",
+      "type": "click_solicitar_informacion",
+      "origin": "planes_basic",
+      "timestamp": "2026-10-23T15:21:35.633Z",
+      "metadata": {
+        "origin": "planes_basic",
+        "planId": "basic"
+      }
+    },
+    {
+      "id": "1792768769866-q2fzxv",
+      "type": "click_explorar_tiendas",
+      "origin": "vitrina_empty_state",
+      "timestamp": "2026-10-23T15:19:29.866Z",
+      "metadata": {
+        "origin": "vitrina_empty_state"
+      }
+    },
+    {
+      "id": "1792768769504-geuqsd",
+      "type": "click_crear_mi_tienda",
+      "origin": "header_desktop",
+      "timestamp": "2026-10-23T15:19:29.504Z",
+      "metadata": {
+        "origin": "header_desktop"
+      }
+    },
+    {
+      "id": "1792768570210-ombhor",
+      "type": "click_solicitar_informacion",
+      "origin": "planes_pro",
+      "timestamp": "2026-10-23T15:16:10.210Z",
+      "metadata": {
+        "origin": "planes_pro",
+        "planId": "pro"
+      }
+    },
+    {
+      "id": "1792768422167-uyzqxi",
+      "type": "click_ver_tienda_catalogo",
+      "origin": "vitrina_card",
+      "timestamp": "2026-10-23T15:13:42.167Z",
+      "metadata": {
+        "origin": "vitrina_card",
+        "storeSlug": "tienda-gloria"
+      }
+    },
+    {
+      "id": "1792768422140-qi27aq",
+      "type": "click_solicitar_informacion",
+      "origin": "planes_basic",
+      "timestamp": "2026-10-23T15:13:42.140Z",
+      "metadata": {
+        "origin": "planes_basic",
+        "planId": "basic"
+      }
+    },
+    {
+      "id": "1792768246974-zmkbgu",
+      "type": "click_explorar_tiendas",
+      "origin": "hero_secundario",
+      "timestamp": "2026-10-23T15:10:46.974Z",
+      "metadata": {
+        "origin": "hero_secundario"
+      }
+    },
+    {
+      "id": "1792768246952-0mzerv",
+      "type": "click_crear_mi_tienda",
+      "origin": "hero_cta",
+      "timestamp": "2026-10-23T15:10:46.952Z",
+      "metadata": {
+        "origin": "hero_cta"
+      }
+    },
+    {
+      "id": "1792763371038-givyzw",
+      "type": "apertura_whatsapp_comercial",
+      "origin": "formulario_contacto",
+      "timestamp": "2026-10-23T13:49:31.038Z",
+      "metadata": {
+        "origin": "formulario_contacto"
+      }
+    },
+    {
+      "id": "1792763371012-gq8zl9",
+      "type": "solicitud_comercial_valida",
+      "origin": "formulario_contacto",
+      "timestamp": "2026-10-23T13:49:31.012Z",
+      "metadata": {
+        "origin": "formulario_contacto"
+      }
+    },
+    {
+      "id": "1792763364248-5yftds",
+      "type": "validacion_formulario_fallida",
+      "origin": "formulario_contacto",
+      "timestamp": "2026-10-23T13:49:24.248Z",
+      "metadata": {
+        "origin": "formulario_contacto",
+        "reason": "campos_incompletos"
+      }
+    },
+    {
+      "id": "1792763364224-26jyta",
+      "type": "intento_formulario_comercial",
+      "origin": "formulario_contacto",
+      "timestamp": "2026-10-23T13:49:24.224Z",
+      "metadata": {
+        "origin": "formulario_contacto"
+      }
+    },
+    {
+      "id": "1792763358345-icjd3w",
+      "type": "click_explorar_tiendas",
+      "origin": "header_mobile",
+      "timestamp": "2026-10-23T13:49:18.345Z",
+      "metadata": {
+        "origin": "header_mobile"
+      }
+    },
+    {
+      "id": "1792763354150-hmu458",
+      "type": "click_crear_mi_tienda",
+      "origin": "header_desktop",
+      "timestamp": "2026-10-23T13:49:14.150Z",
+      "metadata": {
+        "origin": "header_desktop"
+      }
+    },
+    {
+      "id": "1792763349933-39g9f6",
+      "type": "click_crear_mi_tienda",
+      "origin": "header_desktop",
+      "timestamp": "2026-10-23T13:49:09.933Z",
+      "metadata": {
+        "origin": "header_desktop"
+      }
+    },
+    {
+      "id": "1792763343184-inadtt",
+      "type": "click_crear_mi_tienda",
+      "origin": "header_desktop",
+      "timestamp": "2026-10-23T13:49:03.184Z",
+      "metadata": {
+        "origin": "header_desktop"
+      }
+    }
+  ]
+}
