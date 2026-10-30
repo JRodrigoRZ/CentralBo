@@ -107,9 +107,15 @@ Soporta las particularidades de diferentes verticales mediante JSONB:
 
 ## 6. Instrucciones de Despliegue y Pruebas
 
-### Paso 1: Ejecutar la Migración
-1. Abre tu proyecto en Supabase Dashboard (`https://wuerdwkcpurbtcwyqjep.supabase.co`).
-2. Ve a **SQL Editor**.
+> **Estado SEC-02 en Production:** la corrección fue aplicada manualmente y
+> validada primero con 11/11 comprobaciones y después con 15/15 comprobaciones
+> de solo lectura. Los scripts de este directorio son una baseline alineada para
+> reconstrucciones nuevas; no constituyen una migración y no deben volver a
+> ejecutarse automáticamente sobre la instancia Production existente.
+
+### Paso 1: Ejecutar la baseline (solo instalaciones nuevas)
+1. No ejecutes este procedimiento sobre la instancia Production existente.
+2. En un proyecto Supabase nuevo, abre **SQL Editor**.
 3. Copia y pega el contenido de `complete_phase1_database.sql`.
 4. Haz clic en **Run**.
 

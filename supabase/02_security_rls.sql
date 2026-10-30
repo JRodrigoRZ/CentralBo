@@ -2,6 +2,11 @@
 -- FASE 1: BASE DE DATOS Y SEGURIDAD — SAAS MARKETPLACE VERTICALIZADO
 -- 02_security_rls.sql: Row Level Security (RLS) y Políticas Multi-Tenant
 -- ============================================================================
+-- BASELINE DE RECONSTRUCCIÓN, NO MIGRACIÓN DE PRODUCTION.
+-- SEC-02 ya fue aplicada manualmente en Production y validada primero con
+-- 11/11 comprobaciones y después con 15/15 comprobaciones de solo lectura.
+-- Este archivo representa esa configuración aprobada para instalaciones nuevas;
+-- no debe reaplicarse automáticamente sobre la base de datos Production existente.
 
 -- ----------------------------------------------------------------------------
 -- 1. FUNCIONES HELPER DE SEGURIDAD (SECURITY DEFINER)
@@ -25,26 +30,24 @@ BEGIN
 END;
 $$;
 
--- Verifica si el usuario actual es SuperAdmin de la plataforma
-CREATE OR REPLACE FUNCTION is_superadmin()
+-- Verifica si el usuario actual es SuperAdmin de la plataforma.
+-- La asociación activa en store_users es la única fuente de autorización.
+CREATE OR REPLACE FUNCTION public.is_superadmin()
 RETURNS BOOLEAN
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = pg_catalog
 STABLE
 AS $$
 BEGIN
     RETURN (
-        -- Verificación por registro explícito en store_users
         EXISTS (
             SELECT 1
-            FROM store_users su
+            FROM public.store_users su
             WHERE su.user_id = auth.uid()
               AND su.role = 'superadmin'
               AND su.is_active = TRUE
         )
-        -- O mediante claim/role en el JWT de Supabase
-        OR (coalesce(auth.jwt()->>'role', '') = 'superadmin')
     );
 END;
 $$;
@@ -66,28 +69,6 @@ BEGIN
             WHERE su.tenant_id = check_tenant_id
               AND su.user_id = auth.uid()
               AND su.role IN ('admin', 'superadmin')
-              AND su.is_active = TRUE
-        )
-    );
-END;
-$$;
-
--- Verifica si el usuario actual pertenece a un comercio específico (cualquier rol activo)
-CREATE OR REPLACE FUNCTION is_tenant_member(check_tenant_id UUID)
-RETURNS BOOLEAN
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-STABLE
-AS $$
-BEGIN
-    RETURN (
-        is_superadmin()
-        OR EXISTS (
-            SELECT 1
-            FROM store_users su
-            WHERE su.tenant_id = check_tenant_id
-              AND su.user_id = auth.uid()
               AND su.is_active = TRUE
         )
     );
@@ -131,7 +112,7 @@ CREATE POLICY "stores_tenant_update"
 CREATE POLICY "stores_superadmin_insert"
     ON stores FOR INSERT
     TO authenticated
-    WITH CHECK (is_superadmin() OR auth.uid() IS NOT NULL);
+    WITH CHECK (public.is_superadmin());
 
 CREATE POLICY "stores_superadmin_delete"
     ON stores FOR DELETE
@@ -149,24 +130,15 @@ CREATE POLICY "store_users_tenant_select"
     TO authenticated
     USING (tenant_id IN (SELECT get_user_tenant_ids()) OR is_superadmin());
 
--- Administrador del comercio: Puede registrar usuarios en su propio comercio
-CREATE POLICY "store_users_tenant_insert"
-    ON store_users FOR INSERT
-    TO authenticated
-    WITH CHECK (is_tenant_admin(tenant_id) OR is_superadmin());
-
--- Administrador del comercio: Puede modificar usuarios de su propio comercio
-CREATE POLICY "store_users_tenant_update"
-    ON store_users FOR UPDATE
-    TO authenticated
-    USING (is_tenant_admin(tenant_id) OR is_superadmin())
-    WITH CHECK (is_tenant_admin(tenant_id) OR is_superadmin());
-
--- Administrador del comercio: Puede eliminar la vinculación de usuarios de su comercio
-CREATE POLICY "store_users_tenant_delete"
-    ON store_users FOR DELETE
-    TO authenticated
-    USING (is_tenant_admin(tenant_id) OR is_superadmin());
+-- SEC-02: store_users no expone políticas de escritura a sesiones cliente.
+-- Las asociaciones administrativas se gestionan exclusivamente mediante el
+-- backend autorizado con service_role (por ejemplo, SEC-01).
+REVOKE INSERT, UPDATE, DELETE ON TABLE public.store_users FROM PUBLIC, anon, authenticated;
+REVOKE INSERT (id, tenant_id, user_id, role, full_name, email, is_active, created_at, updated_at),
+       UPDATE (id, tenant_id, user_id, role, full_name, email, is_active, created_at, updated_at)
+    ON TABLE public.store_users FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON TABLE public.store_users TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.store_users TO service_role;
 
 -- ----------------------------------------------------------------------------
 -- 5. POLÍTICAS: CATEGORÍAS (categories)
