@@ -3,6 +3,11 @@
 -- ARCHIVO COMPLETO CONSOLIDADO PARA SUPABASE / POSTGRESQL
 -- Incluye: Esquema, Índices, Funciones de Seguridad, RLS y Storage Buckets
 -- ============================================================================
+-- BASELINE DE RECONSTRUCCIÓN, NO MIGRACIÓN DE PRODUCTION.
+-- SEC-02 ya fue aplicada manualmente en Production y validada primero con
+-- 11/11 comprobaciones y después con 15/15 comprobaciones de solo lectura.
+-- Este archivo representa esa configuración aprobada para instalaciones nuevas;
+-- no debe reaplicarse automáticamente sobre la base de datos Production existente.
 
 -- 1. EXTENSIONES
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -182,23 +187,22 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION is_superadmin()
+CREATE OR REPLACE FUNCTION public.is_superadmin()
 RETURNS BOOLEAN
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = pg_catalog
 STABLE
 AS $$
 BEGIN
     RETURN (
         EXISTS (
             SELECT 1
-            FROM store_users su
+            FROM public.store_users su
             WHERE su.user_id = auth.uid()
               AND su.role = 'superadmin'
               AND su.is_active = TRUE
         )
-        OR (coalesce(auth.jwt()->>'role', '') = 'superadmin')
     );
 END;
 $$;
@@ -245,7 +249,7 @@ CREATE POLICY "stores_tenant_update" ON stores FOR UPDATE TO authenticated
     WITH CHECK (id IN (SELECT get_user_tenant_ids()) OR is_superadmin());
 
 CREATE POLICY "stores_superadmin_insert" ON stores FOR INSERT TO authenticated
-    WITH CHECK (is_superadmin() OR auth.uid() IS NOT NULL);
+    WITH CHECK (public.is_superadmin());
 
 CREATE POLICY "stores_superadmin_delete" ON stores FOR DELETE TO authenticated
     USING (is_superadmin());
@@ -254,15 +258,15 @@ CREATE POLICY "stores_superadmin_delete" ON stores FOR DELETE TO authenticated
 CREATE POLICY "store_users_tenant_select" ON store_users FOR SELECT TO authenticated
     USING (tenant_id IN (SELECT get_user_tenant_ids()) OR is_superadmin());
 
-CREATE POLICY "store_users_tenant_insert" ON store_users FOR INSERT TO authenticated
-    WITH CHECK (is_tenant_admin(tenant_id) OR is_superadmin());
-
-CREATE POLICY "store_users_tenant_update" ON store_users FOR UPDATE TO authenticated
-    USING (is_tenant_admin(tenant_id) OR is_superadmin())
-    WITH CHECK (is_tenant_admin(tenant_id) OR is_superadmin());
-
-CREATE POLICY "store_users_tenant_delete" ON store_users FOR DELETE TO authenticated
-    USING (is_tenant_admin(tenant_id) OR is_superadmin());
+-- SEC-02: store_users no expone políticas de escritura a sesiones cliente.
+-- Las asociaciones administrativas se gestionan exclusivamente mediante el
+-- backend autorizado con service_role (por ejemplo, SEC-01).
+REVOKE INSERT, UPDATE, DELETE ON TABLE public.store_users FROM PUBLIC, anon, authenticated;
+REVOKE INSERT (id, tenant_id, user_id, role, full_name, email, is_active, created_at, updated_at),
+       UPDATE (id, tenant_id, user_id, role, full_name, email, is_active, created_at, updated_at)
+    ON TABLE public.store_users FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON TABLE public.store_users TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.store_users TO service_role;
 
 -- 6.3 Políticas: Categorías
 CREATE POLICY "categories_public_read" ON categories FOR SELECT TO anon, authenticated

@@ -2,9 +2,25 @@ import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://wuerdwkcpurbtcwyqjep.supabase.co';
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
+const configuredSuperadminUserId = process.env.SUPERADMIN_AUTH_USER_ID?.trim();
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const ALLOWED_STATUSES = ['activo', 'prueba', 'inactivo', 'suspendido'] as const;
 type StoreStatus = (typeof ALLOWED_STATUSES)[number];
+
+function extractBearerToken(authorizationHeader: unknown): string | null {
+  if (typeof authorizationHeader !== 'string') return null;
+  const match = authorizationHeader.match(/^Bearer\s+([^\s]+)$/i);
+  return match?.[1] || null;
+}
+
+function getSafeErrorDetails(error: any): Record<string, string | number> {
+  const details: Record<string, string | number> = {};
+  if (typeof error?.name === 'string') details.name = error.name;
+  if (typeof error?.code === 'string' || typeof error?.code === 'number') details.code = error.code;
+  if (typeof error?.status === 'string' || typeof error?.status === 'number') details.status = error.status;
+  return Object.keys(details).length > 0 ? details : { name: 'unknown_error' };
+}
 
 export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -23,28 +39,24 @@ export default async function handler(req: any, res: any) {
     return res.status(405).json({ success: false, error: 'Método no permitido. Se requiere POST.' });
   }
 
-  // Verificación estricta de credencial de servicio administrativo
-  if (!supabaseServiceRoleKey) {
-    return res.status(500).json({
+  // Fallar de forma cerrada si falta cualquier configuración privada necesaria.
+  if (
+    !supabaseServiceRoleKey ||
+    !configuredSuperadminUserId ||
+    !UUID_PATTERN.test(configuredSuperadminUserId)
+  ) {
+    return res.status(503).json({
       success: false,
-      error: 'Error de configuración del servidor: SUPABASE_SERVICE_ROLE_KEY no está configurada en las variables de entorno.'
+      error: 'La operación administrativa no está disponible por una configuración incompleta del servidor.'
     });
   }
 
   // 1. Extraer y verificar el token Bearer
-  const authHeader = req.headers.authorization || req.headers.Authorization;
-  if (!authHeader || typeof authHeader !== 'string') {
-    return res.status(401).json({
-      success: false,
-      error: 'Cabecera de autorización ausente o inválida'
-    });
-  }
-
-  const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+  const token = extractBearerToken(req.headers?.authorization || req.headers?.Authorization);
   if (!token) {
     return res.status(401).json({
       success: false,
-      error: 'Token de autorización ausente'
+      error: 'Se requiere una sesión administrativa válida.'
     });
   }
 
@@ -62,24 +74,12 @@ export default async function handler(req: any, res: any) {
       });
     }
 
-    const userId = authData.user.id;
-
-    // 3. Validar que el usuario tenga rol SuperAdmin
-    const { data: storeUserData, error: roleError } = await supabase
-      .from('store_users')
-      .select('role, is_active')
-      .eq('user_id', userId)
-      .eq('is_active', true)
-      .maybeSingle();
-
-    const isSuperAdmin =
-      storeUserData?.role === 'superadmin' ||
-      authData.user.user_metadata?.role === 'superadmin';
-
-    if (!isSuperAdmin) {
+    // 3. Autorizar exclusivamente el UUID privado configurado por el propietario.
+    // No se confía en user_metadata, store_users ni roles enviados por el cliente.
+    if (authData.user.id.toLowerCase() !== configuredSuperadminUserId.toLowerCase()) {
       return res.status(403).json({
         success: false,
-        error: 'Acceso denegado: Solo usuarios con rol SuperAdmin tienen permiso para cambiar el estado de un comercio.'
+        error: 'El usuario autenticado no está autorizado para cambiar el estado de comercios.'
       });
     }
 
@@ -122,9 +122,13 @@ export default async function handler(req: any, res: any) {
       .maybeSingle();
 
     if (findError) {
+      console.error('[CentralBo API] Error al consultar comercio para cambio de estado', {
+        operation: 'find_store',
+        ...getSafeErrorDetails(findError)
+      });
       return res.status(500).json({
         success: false,
-        error: `Error al consultar el comercio: ${findError.message}`
+        error: 'No se pudo consultar el comercio solicitado.'
       });
     }
 
@@ -148,9 +152,13 @@ export default async function handler(req: any, res: any) {
       .single();
 
     if (updateError || !updatedStore) {
+      console.error('[CentralBo API] Error al actualizar estado de comercio', {
+        operation: 'update_store_status',
+        ...getSafeErrorDetails(updateError)
+      });
       return res.status(500).json({
         success: false,
-        error: `Error al persistir el nuevo estado en Supabase: ${updateError?.message || 'Fallo desconocido'}`
+        error: 'No se pudo actualizar el estado del comercio.'
       });
     }
 
@@ -162,10 +170,13 @@ export default async function handler(req: any, res: any) {
       newStatus: updatedStore.status
     });
   } catch (err: any) {
-    console.error('[CentralBo API] Error en update-store-status:', err);
+    console.error('[CentralBo API] Error en update-store-status', {
+      operation: 'update_store_status',
+      ...getSafeErrorDetails(err)
+    });
     return res.status(500).json({
       success: false,
-      error: `Error interno del servidor: ${err.message || 'Error desconocido'}`
+      error: 'Ocurrió un error interno al actualizar el estado del comercio.'
     });
   }
 }
